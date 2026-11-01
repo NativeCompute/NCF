@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en" class="no-js">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>NCF gallery</title>
+  <link rel="icon" href="../brand/app-icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="ncf.css">
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="site-header" data-header>
+    <div class="header-inner">
+      <a class="brand" href="#"><img class="on-dark" src="../brand/logo-dark.svg" alt="NativeCompute" width="153" height="20"><img class="on-light" src="../brand/logo.svg" alt="NativeCompute" width="153" height="20"></a>
+      <nav class="nav" aria-label="Primary">
+        <a href="#type">Type</a>
+        <a href="#buttons" aria-current="page">Buttons</a>
+        <a href="#forms">Forms</a>
+      </nav>
+      <div class="header-actions">
+        <button class="btn btn--ghost btn--sm" type="button" data-theme-toggle>Dark / light</button>
+        <a class="btn btn--primary btn--sm header-start" href="#">Start a project</a>
+      </div>
+    </div>
+  </header>
+
+  <main id="main" class="layer-top">
+    <section class="page-hero">
+      <p class="hud">NCF / The NativeCompute Framework / <time data-clock>00:00:00</time></p>
+      <h1 class="giant"><span class="fit" data-fit>Gallery</span></h1>
+      <p class="lead">Every web component NCF ships, on one page. Use the same class names in any NativeCompute site.</p>
+    </section>
+
+    <section class="section" id="type">
+      <div class="section-head">
+        <p class="hud">01 / Type roles</p>
+        <h2 class="giant">Type</h2>
+        <p class="lead">Anybody for display and UI, JetBrains Mono for HUD readouts.</p>
+      </div>
+      <div class="stack-4">
+        <p class="h2">Heading two, Anybody 600 at width 125</p>
+        <p class="h3">Heading three, Anybody 600 at width 112</p>
+        <p class="lead">Lead paragraph in the secondary text colour.</p>
+        <p class="sec">Secondary text for supporting detail.</p>
+        <p class="hud">HUD readout / 05 pages / 11 scenes</p>
+        <p><span class="num">€150</span> · <a class="link" href="#">A text link</a> · <kbd>Ctrl</kbd>+<kbd>K</kbd> · <span class="live">Live status</span> · <span class="marker"></span> marker</p>
+      </div>
+    </section>
+
+    <section class="section" id="buttons">
+      <div class="section-head"><p class="hud">02 / Buttons</p><h2 class="giant">Buttons</h2></div>
+      <div class="actions">
+        <button class="btn btn--primary" type="button">Primary</button>
+        <button class="btn btn--ghost" type="button">Ghost</button>
+        <button class="btn btn--quiet" type="button">Quiet</button>
+        <button class="btn btn--danger" type="button" id="ask">Danger: confirm</button>
+        <button class="btn btn--ghost btn--sm" type="button" id="say">Show a toast</button>
+        <button class="btn btn--ghost btn--sm" type="button" data-tray-open="tray">Open the tray</button>
+        <span class="icon-wrap">
+          <button class="icon-btn" type="button" aria-label="Notes" aria-describedby="tip-notes">
+            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M5 3h10v14H5zM8 7h4M8 10h4M8 13h2"/></svg>
+            <span class="count">3</span>
+          </button>
+          <span class="tip" id="tip-notes" role="tooltip">Notes <kbd>N</kbd></span>
+        </span>
+      </div>
+    </section>
+
+    <section class="section" id="tabs">
+      <div class="section-head"><p class="hud">03 / Tabs and cards</p><h2 class="giant">Tabs</h2></div>
+      <div class="tabs" role="tablist" aria-label="Plans" data-hash="off">
+        <button class="tab" role="tab" aria-selected="true" aria-controls="p-one" data-key="one" id="t-one">Write</button>
+        <button class="tab" role="tab" aria-selected="false" aria-controls="p-two" data-key="two" id="t-two" tabindex="-1">Cards</button>
+        <button class="tab" role="tab" aria-selected="false" aria-controls="p-three" data-key="three" id="t-three" tabindex="-1">Read</button>
+      </div>
+      <div id="p-one" role="tabpanel" aria-labelledby="t-one">
+        <div class="cards" style="margin-top: var(--s-8)">
+          <article class="card"><div class="card-head"><h3>Simple</h3></div><p class="price"><span class="num">€20</span></p><ul><li>One feature</li><li>Fixed quote</li></ul><a class="btn btn--ghost" href="#">Choose</a></article>
+          <article class="card card--chosen"><div class="card-head"><h3>Advanced</h3><span class="card-flag">Most chosen</span></div><p class="price"><span class="num">€150</span></p><ul><li>Several features</li><li>Fixed quote</li></ul><a class="btn btn--primary" href="#">Choose</a></article>
+          <article class="card"><div class="card-head"><h3>Network</h3></div><p class="price"><span class="hud">From</span><span class="num">€300</span></p><ul><li>Everything</li><li>Fixed quote</li></ul><a class="btn btn--ghost" href="#">Choose</a></article>
+        </div>
+      </div>
+      <div id="p-two" role="tabpanel" aria-labelledby="t-two" hidden><p class="lead" style="margin-top: var(--s-8)">The second panel.</p></div>
+      <div id="p-three" role="tabpanel" aria-labelledby="t-three" hidden><p class="lead" style="margin-top: var(--s-8)">The third panel.</p></div>
+    </section>
+
+    <section class="section" id="panels">
+      <div class="section-head"><p class="hud">04 / Panels</p><h2 class="giant">Panels</h2></div>
+      <div class="stack-6">
+        <div class="panel panel-pad bracket stack-2"><p class="h3">A panel with brackets</p><p class="sec">The deep fill, a hairline and the inset top edge.</p></div>
+        <dl class="spec"><div><dt>Spec row</dt><dd>A definition, set in the secondary colour.</dd></div><div><dt>Another</dt><dd>Rows are divided by hairlines.</dd></div></dl>
+        <dl class="facts"><div><dt>Fact</dt><dd>Mono label, plain value.</dd></div><div><dt>Delivery</dt><dd>Two weeks.</dd></div></dl>
+        <div class="faq"><details><summary>A question <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M10 4v12M4 10h12"/></svg></summary><div class="answer">The answer opens under it.</div></details></div>
+      </div>
+    </section>
+
+    <section class="section" id="forms">
+      <div class="section-head"><p class="hud">05 / Forms</p><h2 class="giant">Forms</h2></div>
+      <form class="form" onsubmit="event.preventDefault(); NCF.toast('Sent.')">
+        <div class="field"><label for="f-name">Name <span class="opt">Optional</span></label><input class="input" id="f-name" placeholder="Your name"><p class="hint">How we greet you.</p></div>
+        <div class="field" data-invalid="true"><label for="f-mail">Email</label><input class="input" id="f-mail" value="not an address"><p class="error">That doesn't look like an email address.</p></div>
+        <div class="field"><label for="f-kind">Kind</label><select class="select" id="f-kind"><option>Website</option><option>Desktop app</option></select></div>
+        <div class="field"><label for="f-note">Notes</label><textarea class="textarea" id="f-note" placeholder="Anything else"></textarea></div>
+        <div class="field"><label for="f-range">Budget</label><input type="range" id="f-range" min="0" max="100" value="40"></div>
+        <label class="check"><input type="checkbox" checked><span class="t"><span>A choice</span><span>With a line of detail.</span></span></label>
+        <label class="actions"><span class="switch"><input type="checkbox" checked><span></span></span> A switch</label>
+        <div class="banner"><span>A banner says one thing.</span><button class="btn btn--quiet" type="button">Dismiss</button></div>
+        <div class="actions"><button class="btn btn--primary" type="submit">Send</button></div>
+      </form>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="footer-inner">
+      <div class="footer-brand"><img class="on-dark" src="../brand/logo-dark.svg" alt="NativeCompute" width="153" height="20"><img class="on-light" src="../brand/logo.svg" alt="" width="153" height="20"></div>
+      <div><h2>Framework</h2><a href="#type">Type</a></div>
+      <div><h2>Elsewhere</h2><a href="https://nativecompute.net">nativecompute.net</a></div>
+      <div class="footer-giant" aria-hidden="true"><span class="fit" data-fit>NativeCompute</span></div>
+      <div class="footer-legal"><a class="maker" href="https://nativecompute.net">Built with NCF by NativeCompute</a><span class="hud">MIT</span></div>
+    </div>
+  </footer>
+
+  <div class="tray-root" id="tray" data-tray aria-hidden="true">
+    <div class="tray-scrim"></div>
+    <aside class="tray" role="dialog" aria-modal="true" aria-labelledby="tray-title" tabindex="-1">
+      <div class="tray-head"><h2 id="tray-title">Tray</h2><button class="icon-btn" type="button" data-tray-close aria-label="Close"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="m5 5 10 10M15 5 5 15"/></svg></button></div>
+      <div class="tray-body"><p class="sec">A slide-over panel from the right.</p></div>
+      <div class="tray-foot"><button class="btn btn--primary btn--block" type="button" data-tray-close>Done</button></div>
+    </aside>
+  </div>
+
+  <script src="ncf.js"></script>
+  <script>
+    document.getElementById("say").addEventListener("click", () => NCF.toast("Saved.", { label: "Undo", run: () => NCF.toast("Undone.") }));
+    document.getElementById("ask").addEventListener("click", async () => {
+      const yes = await NCF.confirm({ title: "Delete this?", body: "It can't be brought back.", yes: "Delete", danger: true });
+      NCF.toast(yes ? "Deleted." : "Kept.");
+    });
+  </script>
+</body>
+</html>

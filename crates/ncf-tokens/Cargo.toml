@@ -1,0 +1,18 @@
+[package]
+name = "ncf-tokens"
+description = "Turns tokens/ncf.toml into the Rust and CSS token files."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+homepage.workspace = true
+repository.workspace = true
+
+[dependencies]
+eframe = { workspace = true }
+toml = "0.8"
+
+[[bin]]
+name = "ncf-tokens"
+path = "src/main.rs"

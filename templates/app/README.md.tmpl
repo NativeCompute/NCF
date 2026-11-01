@@ -1,0 +1,30 @@
+# __NAME__
+
+**__TAGLINE__** By [NativeCompute](https://nativecompute.net).
+
+Built on [NCF](https://github.com/NativeCompute/ncf), the NativeCompute Framework.
+
+## Installing
+
+Download the latest build from [Releases](https://github.com/__REPO__/releases):
+
+- **Linux** — unpack `__SLUG__-<version>-linux-x86_64.tar.gz` and run `./install.sh`.
+- **Windows** — unpack `__SLUG__-<version>-windows-x86_64.zip` and run `__SLUG__.exe`.
+
+From source on Linux: `./install.sh` builds and installs it for your user.
+
+## Development
+
+```bash
+cargo run
+cargo test
+cargo clippy --all-targets -- -D warnings
+cargo run -- --emit-icon packaging/__SLUG__.svg
+cargo run -- --emit-ico packaging/__SLUG__.ico
+```
+
+Releases: publish a release named `vX.Y.Z` on GitHub (or push the tag) and the release workflow attaches the Linux and Windows builds.
+
+## Licence
+
+MIT. See [LICENSE](LICENSE).

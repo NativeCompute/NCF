@@ -1,0 +1,274 @@
+use ncf::keys::{self, Command, Keymap, Modifiers};
+use ncf::platform;
+use ncf::prelude::*;
+
+use egui::{Align, Key, KeyboardShortcut, Layout, Pos2, Rect, Sense, Vec2};
+
+// commands here---
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Cmd {
+    NewItem,
+    Search,
+}
+
+impl Command for Cmd {
+    fn all() -> Vec<Self> {
+        vec![Cmd::NewItem, Cmd::Search]
+    }
+    fn slug(self) -> String {
+        match self {
+            Cmd::NewItem => "new_item".into(),
+            Cmd::Search => "search".into(),
+        }
+    }
+    fn label(self) -> String {
+        match self {
+            Cmd::NewItem => "New item".into(),
+            Cmd::Search => "Search".into(),
+        }
+    }
+    fn group(self) -> &'static str {
+        "General"
+    }
+    fn defaults(self, _web: bool) -> Vec<KeyboardShortcut> {
+        match self {
+            Cmd::NewItem => vec![keys::shortcut(Modifiers::COMMAND, Key::N)],
+            Cmd::Search => vec![keys::shortcut(Modifiers::COMMAND, Key::F)],
+        }
+    }
+}
+
+// app here---
+
+pub struct App {
+    pub items: Vec<String>,
+    pub search: String,
+    pub adding: bool,
+    pub draft: String,
+    pub compact: bool,
+    pub keymap: Keymap<Cmd>,
+    capture: keys::Capture<Cmd>,
+    focus_search: bool,
+}
+
+const CARD_W: f32 = 268.0;
+
+impl App {
+    pub fn load(shell: &mut Shell) -> App {
+        let text = std::fs::read_to_string(shell.folder().join("items.txt")).unwrap_or_default();
+        App {
+            items: text.lines().map(str::trim).filter(|l| !l.is_empty()).map(str::to_string).collect(),
+            search: String::new(),
+            adding: false,
+            draft: String::new(),
+            compact: false,
+            keymap: Keymap::default(),
+            capture: keys::Capture::default(),
+            focus_search: false,
+        }
+    }
+
+    fn save(&self, shell: &mut Shell) {
+        let text = self.items.join("\n") + "\n";
+        if let Err(e) = platform::write_atomic(&shell.folder().join("items.txt"), text.as_bytes()) {
+            shell.warn("Could not save", &e.to_string());
+        }
+    }
+
+    fn add(&mut self, shell: &mut Shell) {
+        let title = self.draft.trim().to_string();
+        if !title.is_empty() {
+            self.items.insert(0, title);
+            self.save(shell);
+        }
+        self.draft.clear();
+        self.adding = false;
+    }
+}
+
+impl NcfApp for App {
+    fn ui(&mut self, ui: &mut egui::Ui, shell: &mut Shell) {
+        let p = pal();
+        if shell.settings_open() {
+            if self.capture.poll(ui.ctx(), &mut self.keymap, &Cmd::all(), false) {
+                shell.save_settings();
+            }
+        } else if !shell.deck.asking() {
+            for cmd in keys::fired(ui.ctx(), &self.keymap, &Cmd::all(), false) {
+                match cmd {
+                    Cmd::NewItem => self.adding = true,
+                    Cmd::Search => self.focus_search = true,
+                }
+            }
+        }
+
+        egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
+            let w = ui.available_width().min(1100.0);
+            ui.add_space(14.0);
+            ui.horizontal(|ui| {
+                ui.set_width(w);
+                ui.vertical(|ui| {
+                    ui.spacing_mut().item_spacing.y = 2.0;
+                    ui::eyebrow(ui, &format!("{} / {} items", shell.info.name, self.items.len()));
+                    ui.add_space(6.0);
+                    ui::giant_fit(ui, "Your items", 34.0, 22.0, (w - 200.0).max(120.0));
+                });
+                ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                    if ui::button_response(ui, "New item", Some(Icon::Plus), true, Some(140.0)).on_hover_text("New item · Ctrl+N").clicked() {
+                        self.adding = true;
+                    }
+                });
+            });
+            ui.add_space(14.0);
+            let search = ui::field(ui, &mut self.search, "Search  ·  Ctrl+F", w.min(380.0));
+            if self.focus_search {
+                search.request_focus();
+                self.focus_search = false;
+            }
+            ui.add_space(16.0);
+
+            if self.adding {
+                theme::panel_frame().inner_margin(egui::Margin::same(18.0)).show(ui, |ui| {
+                    ui.set_width(w - 38.0);
+                    ui::section(ui, "New item");
+                    let r = ui::field(ui, &mut self.draft, "What is it called?", w - 38.0);
+                    r.request_focus();
+                    let enter = r.lost_focus() && ui.input(|i| i.key_pressed(Key::Enter));
+                    ui.add_space(8.0);
+                    ui.horizontal(|ui| {
+                        if ui::button(ui, "Add", None, true) || enter {
+                            self.add(shell);
+                        }
+                        if ui::button(ui, "Cancel", None, false) || ui.input(|i| i.key_pressed(Key::Escape)) {
+                            self.adding = false;
+                            self.draft.clear();
+                        }
+                    });
+                });
+                ui.add_space(16.0);
+            }
+
+            let needle = self.search.trim().to_lowercase();
+            let shown: Vec<(usize, String)> = self
+                .items
+                .iter()
+                .enumerate()
+                .filter(|(_, t)| needle.is_empty() || t.to_lowercase().contains(&needle))
+                .map(|(i, t)| (i, t.clone()))
+                .collect();
+
+            if self.items.is_empty() {
+                theme::panel_frame().inner_margin(egui::Margin::symmetric(28.0, 26.0)).show(ui, |ui| {
+                    ui.set_width(w - 58.0);
+                    ui::giant(ui, "Nothing yet", 26.0);
+                    ui.add_space(4.0);
+                    ui::body(ui, "Make your first item and it shows up here.");
+                    ui.add_space(12.0);
+                    if ui::button(ui, "New item", Some(Icon::Plus), true) {
+                        self.adding = true;
+                    }
+                });
+            } else if shown.is_empty() {
+                ui::caption(ui, "Nothing matches.");
+            } else {
+                ui::hud(ui, &format!("Items / {:02}", shown.len()), Some(p.text_2));
+                ui.add_space(8.0);
+                let gap = 14.0;
+                let cols = (((w + gap) / (CARD_W + gap)).floor() as usize).max(1);
+                let card_w = (w - gap * (cols - 1) as f32) / cols as f32;
+                let card_h = if self.compact { 64.0 } else { 104.0 };
+                for row in shown.chunks(cols) {
+                    ui.horizontal(|ui| {
+                        ui.spacing_mut().item_spacing.x = gap;
+                        for (i, title) in row {
+                            let (rect, resp) = ui.allocate_exact_size(Vec2::new(card_w, card_h), Sense::click());
+                            let hot = anim::ease(ui.ctx(), resp.id, resp.hovered(), anim::HOVER);
+                            ui.painter().rect_filled(rect, egui::Rounding::same(theme::RADIUS), theme::mix(p.deep, p.panel, hot));
+                            ui.painter().rect_stroke(rect.shrink(0.5), egui::Rounding::same(theme::RADIUS), egui::Stroke::new(1.0_f32, theme::mix(p.line, p.text_3, hot)));
+                            theme::top_edge(ui.painter(), rect);
+                            let clip = ui.painter().with_clip_rect(rect.shrink(1.0));
+                            let font = theme::font_bold(theme::T_BODY);
+                            clip.text(
+                                Pos2::new(rect.left() + 16.0, rect.top() + 24.0),
+                                egui::Align2::LEFT_CENTER,
+                                ui::elide_to_width(ui.ctx(), title, font.clone(), 0.0, card_w - 60.0),
+                                font,
+                                p.text,
+                            );
+                            if !self.compact {
+                                theme::tracked_text(&clip, Pos2::new(rect.left() + 16.0, rect.bottom() - 22.0), &format!("ITEM {:02}", i + 1), theme::font_hud(theme::T_MICRO + 0.5), p.text_3, theme::HUD_TRACKING);
+                            }
+                            let bin = Rect::from_center_size(Pos2::new(rect.right() - 22.0, rect.top() + 24.0), Vec2::splat(24.0));
+                            let mut child = ui.new_child(egui::UiBuilder::new().max_rect(bin));
+                            if hot > 0.02 && ui::icon_button(&mut child, Icon::Trash, "Delete", 24.0) {
+                                shell.ask(&format!("Delete “{}”?", ui::elide(title, 40)), "It can't be brought back.", "Delete", true, &format!("delete:{i}"));
+                            }
+                        }
+                    });
+                    ui.add_space(gap);
+                }
+            }
+
+            ui.add_space(24.0);
+            let (r, _) = ui.allocate_exact_size(Vec2::new(w, 16.0), Sense::hover());
+            if ui::maker_line(ui, r, true, shell.info.name) {
+                shell.open_url(ncf::NATIVECOMPUTE_URL);
+            }
+            ui.add_space(12.0);
+        });
+    }
+
+    fn settings_tabs(&self) -> Vec<(&'static str, Icon)> {
+        vec![("General", Icon::Settings), ("Keyboard", Icon::Keyboard)]
+    }
+
+    fn settings_ui(&mut self, tab: &str, ui: &mut egui::Ui, shell: &mut Shell) {
+        match tab {
+            "General" => {
+                ui::section(ui, "Cards");
+                let mut v = self.compact;
+                if ui::toggle_row(ui, "Compact cards", "One line per item.", &mut v) {
+                    self.compact = v;
+                    shell.save_settings();
+                }
+                ui::separator(ui);
+                ui::section(ui, "Where things live");
+                ui::caption(ui, &shell.folder().display().to_string());
+                ui.add_space(6.0);
+                if ui::button(ui, "Open the folder", Some(Icon::Folder), false) {
+                    platform::open(shell.folder());
+                }
+            }
+            "Keyboard" => {
+                let changed = keys::settings_ui(ui, &mut self.keymap, &mut self.capture, &Cmd::all(), false);
+                if changed {
+                    shell.save_settings();
+                }
+            }
+            _ => {}
+        }
+    }
+
+    fn read_setting(&mut self, key: &str, value: &str) {
+        if key == "compact" {
+            self.compact = ncf::settings::yes(value);
+        } else {
+            self.keymap.parse_line(key, value);
+        }
+    }
+
+    fn write_settings(&self) -> String {
+        format!("compact = {}\n{}", ncf::settings::b(self.compact), self.keymap.serialize())
+    }
+
+    fn answer(&mut self, action: &str, _text: Option<String>, shell: &mut Shell) {
+        if let Some(i) = action.strip_prefix("delete:").and_then(|n| n.parse::<usize>().ok()) {
+            if i < self.items.len() {
+                let gone = self.items.remove(i);
+                self.save(shell);
+                shell.ok("Deleted", &gone);
+            }
+        }
+    }
+}

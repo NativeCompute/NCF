@@ -1,0 +1,19 @@
+[package]
+name = "ncf-cli"
+description = "The NativeCompute Framework command line: new apps, icons and tokens."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+homepage.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "ncf"
+path = "src/main.rs"
+
+[dependencies]
+eframe = { workspace = true }
+ncf = { path = "../ncf" }
+ncf-tokens = { path = "../ncf-tokens" }

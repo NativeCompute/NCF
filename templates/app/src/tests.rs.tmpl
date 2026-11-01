@@ -1,0 +1,45 @@
+use ncf::app::{frame, start, NcfApp, Shell};
+use ncf::testing::Harness;
+
+use crate::app::App;
+use crate::INFO;
+
+static LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+fn sandbox() -> (std::sync::MutexGuard<'static, ()>, std::path::PathBuf) {
+    let g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let dir = std::env::temp_dir().join(format!("__SLUG__-test-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    std::env::set_var("XDG_DATA_HOME", &dir);
+    (g, dir)
+}
+
+#[test]
+fn the_app_draws_in_both_casts_and_keeps_its_items() {
+    let (_g, _dir) = sandbox();
+    let mut h = Harness::new(1320.0, 900.0);
+    let mut shell = Shell::new(INFO);
+    shell.look.check_updates = false;
+    let mut app: App = start(&h.ctx, &mut shell, |_, s| App::load(s));
+    h.frames(3, |ctx| frame(ctx, &mut app, &mut shell));
+    app.draft = "First".into();
+    app.adding = true;
+    h.frames(2, |ctx| frame(ctx, &mut app, &mut shell));
+    app.items.insert(0, "Second".into());
+    for light in [true, false] {
+        shell.set_light(light);
+        h.frames(3, |ctx| frame(ctx, &mut app, &mut shell));
+    }
+    shell.open_settings("Keyboard");
+    h.frames(3, |ctx| frame(ctx, &mut app, &mut shell));
+    assert!(shell.settings_open());
+    app.answer("delete:0", None, &mut shell);
+    assert_eq!(app.items.len(), 0);
+}
+
+#[test]
+fn the_mark_exports_an_icon() {
+    assert!(crate::MARK.svg().contains("<polygon"));
+    assert_eq!(&crate::MARK.ico()[..4], &[0, 0, 1, 0]);
+}

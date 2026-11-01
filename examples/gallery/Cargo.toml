@@ -1,0 +1,15 @@
+[package]
+name = "ncf-gallery"
+description = "Every NCF desktop component on one screen, in both casts."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+publish = false
+
+[dependencies]
+ncf = { path = "../../crates/ncf" }
+
+[dev-dependencies]
+ncf = { path = "../../crates/ncf", features = ["testing"] }

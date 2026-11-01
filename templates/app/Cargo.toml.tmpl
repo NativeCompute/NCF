@@ -1,0 +1,25 @@
+[package]
+name = "__SLUG__"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.76"
+description = "__TAGLINE__"
+license = "MIT"
+authors = ["NativeCompute"]
+homepage = "https://nativecompute.net"
+repository = "https://github.com/__REPO__"
+
+[dependencies]
+__NCF__
+
+[dev-dependencies]
+__NCF_TESTING__
+
+[build-dependencies]
+__NCF_BUILD__
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+strip = true

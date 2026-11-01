@@ -1,0 +1,16 @@
+pub const FILES: &[(&str, &str)] = &[
+    (".github/workflows/ci.yml", include_str!("../../../templates/app/.github/workflows/ci.yml.tmpl")),
+    (".github/workflows/release.yml", include_str!("../../../templates/app/.github/workflows/release.yml.tmpl")),
+    ("CONTRIBUTING.md", include_str!("../../../templates/app/CONTRIBUTING.md.tmpl")),
+    ("Cargo.toml", include_str!("../../../templates/app/Cargo.toml.tmpl")),
+    ("LICENSE", include_str!("../../../templates/app/LICENSE.tmpl")),
+    ("README.md", include_str!("../../../templates/app/README.md.tmpl")),
+    ("SECURITY.md", include_str!("../../../templates/app/SECURITY.md.tmpl")),
+    ("build.rs", include_str!("../../../templates/app/build.rs.tmpl")),
+    (".gitignore", include_str!("../../../templates/app/gitignore.tmpl")),
+    ("install.sh", include_str!("../../../templates/app/install.sh.tmpl")),
+    ("packaging/__SLUG__.desktop", include_str!("../../../templates/app/packaging/app.desktop.tmpl")),
+    ("src/app.rs", include_str!("../../../templates/app/src/app.rs.tmpl")),
+    ("src/main.rs", include_str!("../../../templates/app/src/main.rs.tmpl")),
+    ("src/tests.rs", include_str!("../../../templates/app/src/tests.rs.tmpl")),
+];

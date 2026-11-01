@@ -1,0 +1,143 @@
+[meta]
+name = "NativeCompute"
+url = "https://nativecompute.net"
+
+[color.dark]
+void = "#000000"
+deep = "#07080d"
+panel = "#0c0e16"
+panel_2 = "#131624"
+sunken = "#000000"
+line = "#ffffff1f"
+line_strong = "#ffffff42"
+text = "#f2f3f7"
+text_2 = "#a6abc2"
+text_3 = "#8a8fa8"
+ink = "#ffffff"
+signal = "#3b4cff"
+signal_hi = "#6e7bff"
+signal_deep = "#2a36c8"
+signal_soft = "#3b4cff24"
+signal_soft_hi = "#3b4cff38"
+chrome = "#c9cddb"
+chrome_hi = "#f2f3f7"
+chrome_lo = "#8a8fa8"
+danger = "#ff6b7a"
+danger_hi = "#ff9aa5"
+warn = "#f5c451"
+ok = "#5ee0a0"
+edge = "#ffffff0f"
+guide = "#ffffff09"
+groups = ["#6e7bff", "#5cc8ff", "#a78bfa", "#5ee0a0", "#f5c451", "#ff6b7a"]
+
+[color.light]
+void = "#f4f5f8"
+deep = "#ffffff"
+panel = "#f6f7fa"
+panel_2 = "#e6e9f1"
+sunken = "#eceef4"
+line = "#0000001f"
+line_strong = "#00000042"
+text = "#0b0c12"
+text_2 = "#454a5e"
+text_3 = "#5f647a"
+ink = "#ffffff"
+signal = "#3b4cff"
+signal_hi = "#2b3ae0"
+signal_deep = "#1f2ab0"
+signal_soft = "#3b4cff1a"
+signal_soft_hi = "#3b4cff2c"
+chrome = "#2a2d3a"
+chrome_hi = "#0b0c12"
+chrome_lo = "#5f647a"
+danger = "#d1243b"
+danger_hi = "#e54b5e"
+warn = "#b77b00"
+ok = "#148a4f"
+edge = "#00000000"
+guide = "#0000000c"
+groups = ["#3b4cff", "#0086c2", "#7c4de8", "#148a4f", "#b77b00", "#d1243b"]
+
+[font.display]
+family = "Anybody"
+weight = 800
+stretch = 150
+tracking = -0.02
+case = "upper"
+
+[font.heading]
+family = "Anybody"
+weight = 700
+stretch = 130
+tracking = 0.0
+case = "none"
+
+[font.ui]
+family = "Anybody"
+weight = 600
+stretch = 112
+tracking = 0.0
+case = "none"
+
+[font.body]
+family = "Anybody"
+weight = 400
+stretch = 100
+tracking = 0.0
+case = "none"
+
+[font.hud]
+family = "JetBrains Mono"
+weight = 500
+stretch = 100
+tracking = 0.08
+case = "upper"
+
+[size.app]
+title = 26.0
+heading = 17.0
+body = 14.5
+small = 13.0
+label = 12.0
+caption = 11.0
+micro = 10.0
+
+[size.web]
+meta = "0.75rem"
+sec = "0.875rem"
+body = "1rem"
+t1 = "1.2rem"
+t2 = "1.44rem"
+t3 = "1.728rem"
+t4 = "2.074rem"
+t5 = "2.488rem"
+
+[space]
+s1 = 4
+s2 = 8
+s3 = 12
+s4 = 16
+s6 = 24
+s8 = 32
+s12 = 48
+s16 = 64
+s24 = 96
+s32 = 128
+
+[shape]
+radius = 2.0
+line = 1.0
+focus_ring = 2.0
+focus_offset = 2.0
+gutter_narrow = 20.0
+gutter_wide = 40.0
+columns = 6
+
+[motion]
+fast = 100
+quick = 150
+base = 200
+slow = 300
+hover = 240
+ease_out = [0.16, 1.0, 0.3, 1.0]
+ease_in = [0.7, 0.0, 0.84, 0.0]

@@ -1,0 +1,413 @@
+use std::path::PathBuf;
+use std::sync::mpsc::Receiver;
+
+use eframe::egui::{self, Align, Layout, Pos2, Rect, Sense, Stroke, Vec2};
+
+use crate::alerts::{Deck, Tone};
+use crate::icons::Icon;
+use crate::settings::{self, Look};
+use crate::splash::{self, Splash};
+use crate::theme::{self, pal};
+use crate::update::{self, Status};
+use crate::{anim, chrome, platform, ui, AppInfo};
+
+pub const SIZE: Vec2 = Vec2::new(1320.0, 900.0);
+pub const MIN_SIZE: Vec2 = Vec2::new(880.0, 580.0);
+
+// app side here---
+
+pub trait NcfApp {
+    fn ui(&mut self, ui: &mut egui::Ui, shell: &mut Shell);
+    fn title_extras(&mut self, _ui: &mut egui::Ui, _shell: &mut Shell) {}
+    fn settings_tabs(&self) -> Vec<(&'static str, Icon)> {
+        Vec::new()
+    }
+    fn settings_ui(&mut self, _tab: &str, _ui: &mut egui::Ui, _shell: &mut Shell) {}
+    fn read_setting(&mut self, _key: &str, _value: &str) {}
+    fn write_settings(&self) -> String {
+        String::new()
+    }
+    fn answer(&mut self, _action: &str, _text: Option<String>, _shell: &mut Shell) {}
+    fn about(&mut self, _ui: &mut egui::Ui, _shell: &mut Shell) {}
+}
+
+// shell here---
+
+pub struct Shell {
+    pub info: AppInfo,
+    pub look: Look,
+    pub deck: Deck<String>,
+    pub update: Status,
+    pub frame_no: u64,
+    settings_open: bool,
+    settings_tab: String,
+    look_dirty: bool,
+    save_due: bool,
+    update_rx: Option<Receiver<Status>>,
+    extra_settings: Vec<(String, String)>,
+}
+
+impl Shell {
+    pub fn new(info: AppInfo) -> Shell {
+        let text = std::fs::read_to_string(settings_path(&info)).unwrap_or_default();
+        let look = Look::parse(&text);
+        let extra_settings = settings::pairs(&text).into_iter().filter(|(k, _)| !Look::default().clone().read(k, "")).collect();
+        Shell {
+            info,
+            look,
+            deck: Deck::default(),
+            update: Status::Off,
+            frame_no: 0,
+            settings_open: false,
+            settings_tab: "Appearance".into(),
+            look_dirty: true,
+            save_due: false,
+            update_rx: None,
+            extra_settings,
+        }
+    }
+
+    pub fn folder(&self) -> PathBuf {
+        platform::app_folder(self.info.name)
+    }
+
+    pub fn say(&mut self, title: &str, body: &str) {
+        self.deck.say(title, body, Tone::Info);
+    }
+
+    pub fn ok(&mut self, title: &str, body: &str) {
+        self.deck.ok(title, body);
+    }
+
+    pub fn warn(&mut self, title: &str, body: &str) {
+        self.deck.warn(title, body);
+    }
+
+    pub fn ask(&mut self, title: &str, body: &str, yes: &str, danger: bool, action: &str) {
+        let tone = if danger { Tone::Danger } else { Tone::Info };
+        self.deck.ask(title, body, yes, tone, action.to_string());
+    }
+
+    pub fn open_url(&self, url: &str) {
+        platform::open(url);
+    }
+
+    pub fn open_settings(&mut self, tab: &str) {
+        self.settings_open = true;
+        self.settings_tab = tab.to_string();
+    }
+
+    pub fn settings_open(&self) -> bool {
+        self.settings_open
+    }
+
+    pub fn set_light(&mut self, light: bool) {
+        self.look.light_mode = light;
+        self.look_dirty = true;
+        self.save_due = true;
+    }
+
+    pub fn save_settings(&mut self) {
+        self.save_due = true;
+    }
+
+    pub fn check_for_updates(&mut self) {
+        if !self.info.repo.is_empty() {
+            self.update_rx = Some(update::spawn(self.info.repo, self.info.version));
+            self.update = Status::Checking;
+        }
+    }
+}
+
+pub fn settings_path(info: &AppInfo) -> PathBuf {
+    platform::app_folder(info.name).join("settings.conf")
+}
+
+// runner here---
+
+struct Runner<A: NcfApp> {
+    app: A,
+    shell: Shell,
+    splash: Option<Splash>,
+}
+
+pub fn run<A: NcfApp + 'static>(info: AppInfo, make: impl FnOnce(&egui::Context, &mut Shell) -> A + 'static) -> eframe::Result<()> {
+    run_with(Shell::new(info), make)
+}
+
+pub fn run_with<A: NcfApp + 'static>(shell: Shell, make: impl FnOnce(&egui::Context, &mut Shell) -> A + 'static) -> eframe::Result<()> {
+    let info = shell.info;
+    let small = shell.look.splash && shell.look.animations;
+    let size = if small { splash::CARD } else { SIZE };
+    let options = eframe::NativeOptions {
+        viewport: egui::ViewportBuilder::default()
+            .with_title(info.name)
+            .with_icon(std::sync::Arc::new(info.mark.icon_data(128)))
+            .with_app_id(info.id)
+            .with_transparent(true)
+            .with_decorations(false)
+            .with_drag_and_drop(true)
+            .with_inner_size(size)
+            .with_min_inner_size(if small { size } else { MIN_SIZE }),
+        ..Default::default()
+    };
+    eframe::run_native(
+        info.name,
+        options,
+        Box::new(move |cc| {
+            let mut shell = shell;
+            let app = start(&cc.egui_ctx, &mut shell, make);
+            let splash = if small { Some(Splash::new(info)) } else { None };
+            Ok(Box::new(Runner { app, shell, splash }))
+        }),
+    )
+}
+
+pub fn start<A: NcfApp>(ctx: &egui::Context, shell: &mut Shell, make: impl FnOnce(&egui::Context, &mut Shell) -> A) -> A {
+    theme::install_fonts(ctx);
+    theme::set_palette(!shell.look.light_mode);
+    theme::apply(ctx);
+    anim::set_enabled(shell.look.animations);
+    ctx.set_zoom_factor(shell.look.font_scale);
+    let mut app = make(ctx, shell);
+    for (k, v) in std::mem::take(&mut shell.extra_settings) {
+        app.read_setting(&k, &v);
+    }
+    if shell.look.check_updates {
+        shell.check_for_updates();
+    }
+    app
+}
+
+impl<A: NcfApp> eframe::App for Runner<A> {
+    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        frame(ctx, &mut self.app, &mut self.shell);
+        if let Some(s) = self.splash.as_mut() {
+            if s.show(ctx) {
+                if self.shell.frame_no < 3 {
+                    splash::centre(ctx, splash::CARD);
+                }
+            } else {
+                self.splash = None;
+                ctx.send_viewport_cmd(egui::ViewportCommand::MinInnerSize(MIN_SIZE));
+                ctx.send_viewport_cmd(egui::ViewportCommand::InnerSize(SIZE));
+                splash::centre(ctx, SIZE);
+            }
+        }
+    }
+
+    fn clear_color(&self, _visuals: &egui::Visuals) -> [f32; 4] {
+        [0.0, 0.0, 0.0, 0.0]
+    }
+}
+
+pub fn frame<A: NcfApp>(ctx: &egui::Context, app: &mut A, shell: &mut Shell) {
+    shell.frame_no = shell.frame_no.wrapping_add(1);
+    if shell.look_dirty {
+        theme::set_palette(!shell.look.light_mode);
+        theme::apply(ctx);
+        anim::set_enabled(shell.look.animations);
+        ctx.set_zoom_factor(shell.look.font_scale);
+        shell.look_dirty = false;
+    }
+    if let Some(rx) = &shell.update_rx {
+        if let Ok(status) = rx.try_recv() {
+            shell.update_rx = None;
+            if let Status::Newer(r) = &status {
+                let (title, body) = (format!("{} {} is out", shell.info.name, r.version), "Download it from Settings → About.".to_string());
+                shell.say(&title, &body);
+            }
+            shell.update = status;
+        }
+    }
+
+    chrome::backdrop(ctx, pal().void);
+    chrome::resize_handles(ctx);
+
+    egui::CentralPanel::default().frame(egui::Frame::none()).show(ctx, |ui| {
+        let info = shell.info;
+        let mut open_settings = false;
+        chrome::title_bar(ui, ctx, &info, |ui| {
+            if ui::icon_button(ui, Icon::Settings, "Settings · Ctrl+,", 28.0) {
+                open_settings = true;
+            }
+            app.title_extras(ui, shell);
+        });
+        if open_settings {
+            shell.settings_open = !shell.settings_open;
+        }
+        let rect = ui.available_rect_before_wrap().shrink2(Vec2::new(14.0, 0.0));
+        let mut content = ui.new_child(egui::UiBuilder::new().max_rect(Rect::from_min_max(rect.min, rect.max - Vec2::new(0.0, 14.0))));
+        app.ui(&mut content, shell);
+    });
+
+    if ctx.input_mut(|i| i.consume_key(egui::Modifiers::COMMAND, egui::Key::Comma)) {
+        shell.settings_open = !shell.settings_open;
+    }
+    if shell.settings_open {
+        settings_window(ctx, app, shell);
+    }
+    if let Some(answer) = shell.deck.show(ctx) {
+        app.answer(&answer.action, answer.text, shell);
+    }
+
+    if shell.save_due {
+        shell.save_due = false;
+        let text = format!("{}{}", shell.look.write(), app.write_settings());
+        if let Err(e) = platform::write_atomic(&settings_path(&shell.info), text.as_bytes()) {
+            shell.warn("Could not save settings", &e.to_string());
+        }
+    }
+}
+
+// settings window here---
+
+fn settings_window<A: NcfApp>(ctx: &egui::Context, app: &mut A, shell: &mut Shell) {
+    let p = pal();
+    let t = anim::ease(ctx, "ncf-settings-rise", true, crate::tokens::MOTION_SLOW);
+    if ui::scrim(ctx, "ncf-settings-scrim", t) || ctx.input(|i| i.key_pressed(egui::Key::Escape)) && !shell.deck.asking() {
+        shell.settings_open = false;
+        return;
+    }
+    let screen = ctx.screen_rect();
+    let size = Vec2::new((screen.width() - 80.0).clamp(560.0, 780.0), (screen.height() - 80.0).clamp(420.0, 620.0));
+    let rect = Rect::from_center_size(screen.center(), size * (0.97 + 0.03 * t));
+
+    let mut tabs: Vec<(&str, Icon)> = vec![("Appearance", Icon::Palette)];
+    let extra = app.settings_tabs();
+    tabs.extend(extra.iter().copied());
+    tabs.push(("About", Icon::Info));
+    let current = tabs.iter().position(|(n, _)| *n == shell.settings_tab).unwrap_or(0);
+
+    egui::Area::new(egui::Id::new("ncf-settings"))
+        .order(egui::Order::Foreground)
+        .fixed_pos(rect.min)
+        .show(ctx, |ui| {
+            ui.set_opacity(0.2 + 0.8 * t);
+            let (win, _) = ui.allocate_exact_size(rect.size(), Sense::click());
+            ui.painter().rect_filled(win, egui::Rounding::same(theme::RADIUS), p.deep);
+            ui.painter().rect_stroke(win.shrink(0.5), egui::Rounding::same(theme::RADIUS), Stroke::new(1.0_f32, p.line_strong));
+
+            let head = Rect::from_min_size(win.min, Vec2::new(win.width(), 56.0));
+            let mut h = ui.new_child(egui::UiBuilder::new().max_rect(head.shrink2(Vec2::new(20.0, 0.0))).layout(Layout::left_to_right(Align::Center)));
+            h.spacing_mut().item_spacing.x = 10.0;
+            h.label(egui::RichText::new("Settings").font(theme::font_bold(theme::T_H + 1.0)).color(p.text));
+            ui::hud(&mut h, &format!("{} / {}", shell.info.name, if p.dark { "dark" } else { "light" }), None);
+            h.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                if ui::icon_button(ui, Icon::Close, "Close · Esc", 28.0) {
+                    shell.settings_open = false;
+                }
+            });
+
+            let nav = Rect::from_min_max(Pos2::new(win.left() + 14.0, head.bottom()), Pos2::new(win.left() + 198.0, win.bottom() - 14.0));
+            let mut n = ui.new_child(egui::UiBuilder::new().max_rect(nav).layout(Layout::top_down(Align::Min)));
+            if let Some(k) = ui::vertical_tabs(&mut n, &tabs, current) {
+                shell.settings_tab = tabs[k].0.to_string();
+            }
+            theme::tracked_text(
+                ui.painter(),
+                Pos2::new(nav.left() + 10.0, nav.bottom() - 16.0),
+                &format!("{} V{}", shell.info.name.to_uppercase(), shell.info.version),
+                theme::font_hud(theme::T_MICRO),
+                p.text_3,
+                0.8,
+            );
+
+            let pane = Rect::from_min_max(Pos2::new(nav.right() + 14.0, head.bottom()), Pos2::new(win.right() - 10.0, win.bottom() - 10.0));
+            ui.painter().rect_filled(pane, egui::Rounding::same(theme::RADIUS), p.panel);
+            ui.painter().rect_stroke(pane.shrink(0.5), egui::Rounding::same(theme::RADIUS), Stroke::new(1.0_f32, p.line));
+            let mut pane_ui = ui.new_child(egui::UiBuilder::new().max_rect(pane.shrink2(Vec2::new(18.0, 14.0))).layout(Layout::top_down(Align::Min)));
+            let name = tabs[current].0;
+            pane_ui.label(egui::RichText::new(name.to_uppercase()).font(theme::font_display(theme::T_H + 1.0)).color(p.text));
+            pane_ui.add_space(4.0);
+            egui::ScrollArea::vertical().id_salt(("ncf-settings-pane", current)).auto_shrink([false, false]).show(&mut pane_ui, |ui| {
+                ui.set_max_width(ui.available_width() - 14.0);
+                match name {
+                    "Appearance" => appearance(ui, shell),
+                    "About" => about(ui, app, shell),
+                    other => app.settings_ui(other, ui, shell),
+                }
+                ui.add_space(8.0);
+            });
+        });
+}
+
+fn appearance(ui: &mut egui::Ui, shell: &mut Shell) {
+    let before = shell.look.clone();
+    ui::section(ui, "Mode");
+    let dark = !shell.look.light_mode;
+    if let Some(k) = ui::tabs(ui, &["Dark", "Light"], if dark { 0 } else { 1 }) {
+        shell.look.light_mode = k == 1;
+    }
+    ui.add_space(4.0);
+    ui::caption(ui, "Dark is NativeCompute's own: void black and one signal blue. Light is the same language on paper white.");
+    ui::separator(ui);
+    ui::section(ui, "Motion");
+    let mut v = shell.look.animations;
+    if ui::toggle_row(ui, "Animations", "Every transition in the app, at once.", &mut v) {
+        shell.look.animations = v;
+    }
+    let mut s = shell.look.splash;
+    if ui::toggle_row(ui, "Splash screen", "The card the app opens on.", &mut s) {
+        shell.look.splash = s;
+    }
+    ui.add_space(6.0);
+    ui.label(egui::RichText::new(format!("Interface size · {:.0}%", shell.look.font_scale * 100.0)).font(theme::font_med(theme::T_SM)).color(pal().text));
+    let mut fs = shell.look.font_scale;
+    if ui::slider(ui, &mut fs, 0.8..=1.4) {
+        shell.look.font_scale = (fs * 20.0).round() / 20.0;
+    }
+    if shell.look != before {
+        shell.look_dirty = true;
+        shell.save_due = true;
+    }
+}
+
+fn about<A: NcfApp>(ui: &mut egui::Ui, app: &mut A, shell: &mut Shell) {
+    let p = pal();
+    ui::section(ui, shell.info.name);
+    ui.label(egui::RichText::new(format!("Version {}", shell.info.version)).font(theme::font(theme::T_CAP)).color(p.text_3));
+    if !shell.info.tagline.is_empty() {
+        ui::body(ui, shell.info.tagline);
+    }
+    app.about(ui, shell);
+    if !shell.info.repo.is_empty() {
+        ui::separator(ui);
+        ui::section(ui, "Updates");
+        let mut v = shell.look.check_updates;
+        if ui::toggle_row(
+            ui,
+            "Check for updates on launch",
+            "Asks GitHub once whether a newer version is out. Nothing is downloaded or installed by itself.",
+            &mut v,
+        ) {
+            shell.look.check_updates = v;
+            shell.save_due = true;
+        }
+        let line = match &shell.update {
+            Status::Off | Status::Newer(_) => None,
+            Status::Checking => Some("Checking…".to_string()),
+            Status::Latest => Some(format!("{} {} is the latest version.", shell.info.name, shell.info.version)),
+            Status::Failed => Some("Could not reach GitHub to check.".to_string()),
+        };
+        if let Some(line) = line {
+            ui::caption(ui, &line);
+        }
+        if let Status::Newer(r) = shell.update.clone() {
+            if ui::link(ui, &format!("{} {} is out — download it", shell.info.name, r.version)) {
+                shell.open_url(&r.url);
+            }
+        }
+        if ui::link(ui, "All releases") {
+            shell.open_url(&update::releases_page(shell.info.repo));
+        }
+    }
+    ui::separator(ui);
+    ui::section(ui, "Made by");
+    ui.label(egui::RichText::new("NativeCompute").font(theme::font_bold(theme::T_H)).color(p.text));
+    ui::body(ui, &format!("{} is made by NativeCompute.", shell.info.name));
+    ui.add_space(4.0);
+    if ui::link(ui, "nativecompute.net") {
+        shell.open_url(crate::tokens::BRAND_URL);
+    }
+}

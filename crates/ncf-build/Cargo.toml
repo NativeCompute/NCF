@@ -1,0 +1,13 @@
+[package]
+name = "ncf-build"
+description = "build.rs helpers for NativeCompute apps: the Windows icon and version details."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+homepage.workspace = true
+repository.workspace = true
+
+[dependencies]
+winresource = "0.1"

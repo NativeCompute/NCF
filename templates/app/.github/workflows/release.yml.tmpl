@@ -1,0 +1,77 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref_name }}
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  linux:
+    name: Linux build
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Test
+        run: cargo test --release
+      - name: Build
+        run: cargo build --release
+      - name: Package
+        run: |
+          name="__SLUG__-${GITHUB_REF_NAME}-linux-x86_64"
+          mkdir -p "$name/packaging"
+          cp target/release/__SLUG__ install.sh README.md LICENSE "$name/"
+          cp packaging/__SLUG__.desktop packaging/__SLUG__.svg "$name/packaging/"
+          tar -czf "$name.tar.gz" "$name"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux
+          path: __SLUG__-*.tar.gz
+
+  windows:
+    name: Windows build
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Build
+        run: cargo build --release
+      - name: Package
+        shell: pwsh
+        run: |
+          $name = "__SLUG__-$env:GITHUB_REF_NAME-windows-x86_64"
+          New-Item -ItemType Directory -Path $name | Out-Null
+          Copy-Item target/release/__SLUG__.exe, README.md, LICENSE -Destination $name
+          Compress-Archive -Path $name -DestinationPath "$name.zip"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: __SLUG__-*.zip
+
+  publish:
+    name: GitHub Release
+    needs: [linux, windows]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          files: |
+            __SLUG__-*.tar.gz
+            __SLUG__-*.zip
