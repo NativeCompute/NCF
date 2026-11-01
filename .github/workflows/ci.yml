@@ -82,7 +82,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - name: Install a virtual display
-        run: sudo apt-get update && sudo apt-get install -y xvfb xdotool imagemagick x11-utils libgl1-mesa-dri
+        run: sudo apt-get update && sudo apt-get install -y xvfb xdotool imagemagick x11-utils libgl1-mesa-dri libxkbcommon-x11-0
       - name: Take the screenshots
         run: tools/shots.sh "$RUNNER_TEMP/shots"
       - uses: actions/upload-artifact@v4
