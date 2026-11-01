@@ -23,6 +23,7 @@ pub struct Colors {
     pub chrome: Color32,
     pub chrome_hi: Color32,
     pub chrome_lo: Color32,
+    pub chrome_shade: Color32,
     pub danger: Color32,
     pub danger_hi: Color32,
     pub warn: Color32,
@@ -33,7 +34,7 @@ pub struct Colors {
 }
 
 impl Colors {
-    pub fn named(&self) -> [(&'static str, Color32); 25] {
+    pub fn named(&self) -> [(&'static str, Color32); 26] {
         [
             ("void", self.void),
             ("deep", self.deep),
@@ -54,6 +55,7 @@ impl Colors {
             ("chrome", self.chrome),
             ("chrome-hi", self.chrome_hi),
             ("chrome-lo", self.chrome_lo),
+            ("chrome-shade", self.chrome_shade),
             ("danger", self.danger),
             ("danger-hi", self.danger_hi),
             ("warn", self.warn),
@@ -84,6 +86,7 @@ pub const DARK: Colors = Colors {
     chrome: Color32::from_rgb(201, 205, 219),
     chrome_hi: Color32::from_rgb(242, 243, 247),
     chrome_lo: Color32::from_rgb(138, 143, 168),
+    chrome_shade: Color32::from_rgb(138, 143, 168),
     danger: Color32::from_rgb(255, 107, 122),
     danger_hi: Color32::from_rgb(255, 154, 165),
     warn: Color32::from_rgb(245, 196, 81),
@@ -120,6 +123,7 @@ pub const LIGHT: Colors = Colors {
     chrome: Color32::from_rgb(42, 45, 58),
     chrome_hi: Color32::from_rgb(11, 12, 18),
     chrome_lo: Color32::from_rgb(95, 100, 122),
+    chrome_shade: Color32::from_rgb(5, 6, 10),
     danger: Color32::from_rgb(209, 36, 59),
     danger_hi: Color32::from_rgb(229, 75, 94),
     warn: Color32::from_rgb(183, 123, 0),

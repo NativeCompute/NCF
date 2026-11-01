@@ -134,7 +134,7 @@ if self.open {
 
 ## Notices and confirmation
 
-Notices stack at the bottom centre and leave on their own. Confirmations sit in the centre over a scrim and wait for an answer.
+Notices stack at the bottom centre, with fully rounded ends and a faint wash of their tone colour that fades from the top, and leave on their own. Confirmations sit in the centre over a scrim, with the same wash, and wait for an answer.
 
 | Component | Rust | Web | Use when |
 |---|---|---|---|
@@ -200,7 +200,7 @@ for cmd in keys::fired(ctx, &keymap, &Cmd::all(), ncf::WEB) { … }
 ```
 
 - `keys::settings_ui(ui, &mut keymap, &mut capture, &Cmd::all(), ncf::WEB)` is the whole Settings → Keyboard page: every command, its keys, rebinding and reset.
-- `keys::keycap(ui, label, listening, custom)` draws one key.
+- `keys::keycap(ui, label, listening, custom)` draws one key: a 6 px rounded cap in mono type, tinted signal while it listens and when the binding is custom.
 - Write bindings with `keymap.serialize()` from `NcfApp::write_settings` and read them back with `keymap.parse_line(key, value)` in `read_setting`.
 - Shortcut text in tooltips and hints comes from `keymap.label(cmd, ncf::WEB)` or `keys::text(&shortcut)`, after a middle dot: `Search · Ctrl+F`.
 

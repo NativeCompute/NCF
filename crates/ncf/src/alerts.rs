@@ -274,7 +274,7 @@ impl<A> Deck<A> {
                 )
             };
 
-            match self.card(ctx, idx, rect, eased) {
+            match self.card(ctx, idx, rect) {
                 CardOut::None => {}
                 CardOut::Dismiss => dismiss = Some(id),
                 CardOut::Confirm => confirm = Some(id),
@@ -347,7 +347,7 @@ impl<A> Deck<A> {
         Vec2::new(CARD_W, h)
     }
 
-    fn card(&mut self, ctx: &egui::Context, idx: usize, rect: Rect, eased: f32) -> CardOut {
+    fn card(&mut self, ctx: &egui::Context, idx: usize, rect: Rect) -> CardOut {
         let p = pal();
         let mut out = CardOut::None;
         let tone = self.items[idx].tone;
@@ -367,12 +367,13 @@ impl<A> Deck<A> {
                 ui.set_width(rect.width());
                 let painter = ui.painter();
 
-                let _ = (radius, eased);
-                theme::panel(painter, rect);
-                painter.rect_filled(
-                    Rect::from_min_size(rect.min + Vec2::new(1.0, 1.0), Vec2::new(2.0, rect.height() - 2.0)),
-                    egui::Rounding::ZERO,
-                    accent,
+                theme::panel_rounded(painter, rect, radius);
+                theme::fill_grad_poly(
+                    painter,
+                    &theme::rounded_poly(rect, radius),
+                    theme::wash(accent, if p.dark { 40 } else { 30 }),
+                    theme::wash(accent, 0),
+                    Vec2::new(0.35, 1.0),
                 );
 
                 let icon_c = Pos2::new(
@@ -519,19 +520,39 @@ enum CardOut {
 
 fn pill_button(ui: &mut egui::Ui, label: &str, tint: Color32, filled: bool) -> bool {
     let p = pal();
-    if !filled {
-        return crate::ui::button(ui, label, None, false);
+    let galley = ui.painter().layout_no_wrap(
+        label.to_string(),
+        theme::font_semi(theme::T_SM),
+        if filled { theme::on(tint) } else { tint },
+    );
+    let size = Vec2::new(galley.rect.width() + 28.0, 28.0);
+    let (rect, resp) = ui.allocate_exact_size(size, Sense::click());
+    let hot = anim::ease(ui.ctx(), resp.id, resp.hovered(), anim::HOVER) > 0.45;
+    if filled {
+        theme::grad_rect(
+            ui.painter(),
+            rect,
+            theme::RADIUS,
+            if hot { theme::lighten(tint, 0.16) } else { tint },
+            theme::darken(tint, 0.18),
+            Vec2::new(0.0, 1.0),
+        );
+    } else {
+        ui.painter().rect_filled(
+            rect,
+            egui::Rounding::same(theme::RADIUS),
+            if hot { p.panel } else { Color32::TRANSPARENT },
+        );
+        ui.painter().rect_filled(
+            rect,
+            egui::Rounding::same(theme::RADIUS),
+            theme::wash(p.text, if hot { 30 } else { 14 }),
+        );
     }
-    let font = theme::font_semi(theme::T_SM);
-    let galley = ui.painter().layout_no_wrap(label.to_string(), font.clone(), Color32::WHITE);
-    let (rect, resp) = ui.allocate_exact_size(Vec2::new(galley.rect.width() + 28.0, 30.0), Sense::click());
-    let hot = anim::ease(ui.ctx(), resp.id, resp.hovered(), crate::tokens::MOTION_SLOW);
-    let danger = tint == p.danger;
-    let fill = if danger { p.danger } else { p.signal };
-    let rest = if danger { theme::on(fill) } else { Color32::WHITE };
-    ui.painter().rect_filled(rect, egui::Rounding::same(theme::RADIUS), fill);
-    crate::ui::wipe(ui.painter(), rect, hot, Color32::WHITE);
-    let ink = theme::mix(rest, Color32::BLACK, anim::ease_out_expo(hot));
-    ui.painter().text(rect.center(), egui::Align2::CENTER_CENTER, label, font, ink);
+    ui.painter().galley(
+        rect.center() - galley.rect.size() * 0.5,
+        galley,
+        if filled { theme::on(tint) } else { tint },
+    );
     resp.clicked()
 }

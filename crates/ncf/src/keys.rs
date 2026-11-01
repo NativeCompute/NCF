@@ -347,23 +347,46 @@ pub fn settings_ui<C: Command>(ui: &mut egui::Ui, keymap: &mut Keymap<C>, captur
     changed
 }
 
-pub fn keycap(ui: &mut egui::Ui, label: &str, listening: bool, custom: bool) -> bool {
+pub fn keycap(ui: &mut egui::Ui, text: &str, listening: bool, custom: bool) -> bool {
     let p = pal();
-    let font = theme::font_hud(theme::T_CAP);
-    let g = ui.painter().layout_no_wrap(label.to_string(), font, p.text);
-    let (rect, resp) = ui.allocate_exact_size(Vec2::new(g.rect.width() + 20.0, 24.0), Sense::click());
+    let font = theme::font_mono(theme::T_CAP);
+    let g = ui.painter().layout_no_wrap(text.to_string(), font, p.text);
+    let size = Vec2::new(g.rect.width() + 20.0, 24.0);
+    let (rect, resp) = ui.allocate_exact_size(size, Sense::click());
     let hot = anim::ease(ui.ctx(), resp.id, resp.hovered(), anim::HOVER);
-    let lit = anim::ease(ui.ctx(), resp.id.with("lit"), listening, crate::tokens::MOTION_BASE);
-    ui.painter().rect_filled(rect, egui::Rounding::same(theme::RADIUS), theme::mix(p.sunken, p.signal_soft_hi, lit.max(0.5 * hot)));
-    let edge = if listening || custom { p.signal_hi } else { theme::mix(p.line_strong, p.text_3, hot) };
-    ui.painter().rect_stroke(rect.shrink(0.5), egui::Rounding::same(theme::RADIUS), Stroke::new(1.0_f32, edge));
-    let ink = if listening { p.signal_hi } else { theme::mix(p.text_2, p.text, hot) };
-    ui.painter().galley(Rect::from_center_size(rect.center(), g.rect.size()).min, g, ink);
+    let lit = anim::ease(ui.ctx(), resp.id.with("lit"), listening, anim::HOVER);
+    let fill = theme::mix(p.sunken, theme::mix(p.sunken, p.signal, 0.25), lit.max(0.4 * hot));
+    ui.painter().rect_filled(rect, egui::Rounding::same(6.0), fill);
+    ui.painter().line_segment(
+        [
+            rect.left_bottom() + Vec2::new(5.0, -0.5),
+            rect.right_bottom() + Vec2::new(-5.0, -0.5),
+        ],
+        Stroke::new(1.0_f32, theme::wash(p.line_strong, 160)),
+    );
+    let edge = if listening {
+        theme::wash(p.signal_hi, 200)
+    } else if custom {
+        theme::wash(p.signal_hi, 110)
+    } else {
+        theme::wash(p.line_strong, 140)
+    };
+    ui.painter().rect_stroke(rect, egui::Rounding::same(6.0), Stroke::new(1.0_f32, edge));
+    let ink = if listening {
+        p.signal_hi
+    } else if custom {
+        theme::mix(p.text, p.signal_hi, 0.35)
+    } else {
+        theme::mix(p.text_2, p.text, hot)
+    };
+    let at = Rect::from_center_size(rect.center(), g.rect.size()).min;
+    ui.painter().galley(at, g, ink);
     if listening {
         anim::keep_going(ui.ctx());
     }
     if resp.hovered() {
         ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
     }
-    resp.on_hover_text(if listening { "Press the keys · Esc cancels" } else { "Click, then press the keys you want" }).clicked()
+    resp.on_hover_text(if listening { "Press the keys · Esc cancels" } else { "Click, then press the keys you want" })
+        .clicked()
 }

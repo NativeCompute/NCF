@@ -29,7 +29,7 @@ New app? Follow [`.claude/skills/ncf-app/SKILL.md`](.claude/skills/ncf-app/SKILL
 
 ### Do
 - One accent: signal blue (`signal`, `signal-hi`). Everything else is neutral.
-- Corners at 2 px (`RADIUS`). Hairline borders (`line`, `line-strong`), 1 px.
+- Corners at 2 px (`RADIUS`). Hairline borders (`line`, `line-strong`), 1 px. The two built-in exceptions are notices, which have fully rounded ends, and keycaps, at 6 px; both are drawn by NCF, so never copy them onto other things.
 - Solid fills: `void` behind everything, then `deep`, `panel`, `panel-2`.
 - Display type is Anybody 800 at width 150, upper case, for giant words and page titles only.
 - HUD readouts are JetBrains Mono 500, upper case, tracked 0.08em, in `text-2` or `text-3`.
@@ -44,9 +44,9 @@ New app? Follow [`.claude/skills/ncf-app/SKILL.md`](.claude/skills/ncf-app/SKILL
 
 ### Never
 - Glass, blur, glows or drop shadows.
-- Gradients on buttons or surfaces, or more than one accent hue.
+- Multi-hue gradients, new gradients on buttons or surfaces, or more than one accent hue. The single-hue shading on confirmation buttons and the faint accent wash on notices are built in; do not add more.
 - Pills or badges on static text. A chip is for a tag a person can act on.
-- Rounded corners above 2 px.
+- Rounded corners above 2 px, other than the notices and keycaps NCF already draws.
 - Emoji in the interface.
 - Motion longer than 300 ms, except what NCF already does: the splash, notices arriving (420 ms) and a web page-load reveal (600 ms).
 - Bouncy or elastic motion on anything a person waits on. The overshoot on notices and confirmations is built in; do not add more.

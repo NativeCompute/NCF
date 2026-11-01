@@ -1,9 +1,9 @@
 use eframe::egui::Color32;
 use std::fmt::Write;
 
-pub const COLOR_NAMES: [&str; 25] = [
+pub const COLOR_NAMES: [&str; 26] = [
     "void", "deep", "panel", "panel_2", "sunken", "line", "line_strong", "text", "text_2", "text_3", "ink",
-    "signal", "signal_hi", "signal_deep", "signal_soft", "signal_soft_hi", "chrome", "chrome_hi", "chrome_lo",
+    "signal", "signal_hi", "signal_deep", "signal_soft", "signal_soft_hi", "chrome", "chrome_hi", "chrome_lo", "chrome_shade",
     "danger", "danger_hi", "warn", "ok", "edge", "guide",
 ];
 

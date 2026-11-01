@@ -96,9 +96,9 @@ pub fn darken(col: Color32, t: f32) -> Color32 {
 pub fn on(bg: Color32) -> Color32 {
     let l = 0.299 * bg.r() as f32 + 0.587 * bg.g() as f32 + 0.114 * bg.b() as f32;
     if l > 150.0 {
-        Color32::from_rgb(0x0B, 0x0C, 0x12)
+        Color32::from_rgb(0x10, 0x12, 0x11)
     } else {
-        Color32::from_rgb(0xF2, 0xF3, 0xF7)
+        Color32::from_rgb(0xF4, 0xF7, 0xF5)
     }
 }
 
@@ -210,6 +210,17 @@ pub fn hover_surface(painter: &egui::Painter, rect: Rect, radius: f32, accent: C
         Rounding::same(radius),
         Stroke::new(1.0_f32, wash(edge, ((if on { 255.0 } else { 140.0 }) * lit) as u8)),
     );
+}
+
+pub fn grad_rect(painter: &egui::Painter, rect: Rect, radius: f32, a: Color32, b: Color32, dir: Vec2) {
+    fill_grad_poly(painter, &rounded_poly(rect, radius), a, b, dir);
+}
+
+pub fn panel_rounded(painter: &egui::Painter, rect: Rect, radius: f32) {
+    let p = pal();
+    painter.rect_filled(rect, Rounding::same(radius), p.panel);
+    painter.rect_stroke(rect.shrink(0.5), Rounding::same(radius), Stroke::new(1.0_f32, p.line_strong));
+    top_edge(painter, rect);
 }
 
 pub fn panel(painter: &egui::Painter, rect: Rect) {

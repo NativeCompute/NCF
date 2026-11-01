@@ -21,6 +21,7 @@
   --chrome: #c9cddb;
   --chrome-hi: #f2f3f7;
   --chrome-lo: #8a8fa8;
+  --chrome-shade: #8a8fa8;
   --danger: #ff6b7a;
   --danger-hi: #ff9aa5;
   --warn: #f5c451;
@@ -107,6 +108,7 @@
   --chrome: #2a2d3a;
   --chrome-hi: #0b0c12;
   --chrome-lo: #5f647a;
+  --chrome-shade: #05060a;
   --danger: #d1243b;
   --danger-hi: #e54b5e;
   --warn: #b77b00;

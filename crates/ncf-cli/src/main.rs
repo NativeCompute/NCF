@@ -63,7 +63,7 @@ pub struct Plan {
 pub fn dep_lines(plan: &Plan) -> (String, String, String) {
     match &plan.ncf_path {
         Some(p) => {
-            let p = p.display().to_string().replace('\\', "/");
+            let p = toml_path(p);
             (
                 format!("ncf = {{ path = \"{p}/crates/ncf\" }}"),
                 format!("ncf = {{ path = \"{p}/crates/ncf\", features = [\"testing\"] }}"),
@@ -79,6 +79,11 @@ pub fn dep_lines(plan: &Plan) -> (String, String, String) {
             )
         }
     }
+}
+
+pub fn toml_path(p: &std::path::Path) -> String {
+    let s = p.display().to_string();
+    s.strip_prefix(r"\\?\").unwrap_or(&s).replace('\\', "/")
 }
 
 pub fn fill(text: &str, plan: &Plan) -> String {
@@ -176,6 +181,12 @@ fn mark(args: &[String]) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn windows_paths_become_toml_paths() {
+        assert_eq!(toml_path(std::path::Path::new(r"\\?\D:\a\ncf\ncf")), "D:/a/ncf/ncf");
+        assert_eq!(toml_path(std::path::Path::new("/home/me/ncf")), "/home/me/ncf");
+    }
 
     #[test]
     fn names_become_slugs() {

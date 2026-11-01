@@ -88,7 +88,7 @@ impl AppMark {
         for (k, (pts, ink, convex)) in self.outlines(rect).into_iter().enumerate() {
             match ink {
                 Ink::Chrome => {
-                    let (lit, deep) = if p.dark { (p.chrome_hi, p.chrome_lo) } else { (p.chrome, p.chrome_hi) };
+                    let (lit, deep) = if p.dark { (p.chrome_hi, p.chrome_shade) } else { (p.chrome, p.chrome_shade) };
                     if convex {
                         theme::fill_grad_poly(painter, &pts, lit, deep, Vec2::new(0.35, 1.0));
                     } else {

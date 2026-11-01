@@ -58,7 +58,7 @@ Rules:
 ## Space and shape
 
 - Spacing steps of 4 and 8: `SPACE_1` 4, `SPACE_2` 8, `SPACE_3` 12, `SPACE_4` 16, `SPACE_6` 24, `SPACE_8` 32, then 48, 64, 96, 128.
-- Corner radius is 2 px everywhere (`RADIUS`, `--r-sm`).
+- Corner radius is 2 px (`RADIUS`, `--r-sm`). Two things NCF draws are deliberately softer: notices have fully rounded ends so they read as passing messages, and keycaps are rounded at 6 px so they read as keys.
 - Lines are 1 px. Focus rings are 2 px `signal-hi` with a 2 px offset.
 - Six columns with a 40 px gutter (20 px on narrow screens). The guides are drawn by `chrome::column_guides` and by `body::before` on the web.
 
@@ -79,7 +79,7 @@ Rules:
 - **Primary:** signal fill, white text. One per screen, for the action the screen exists for. `ui::button(ui, label, icon, true)`; `.btn--primary`.
 - **Ghost:** clear with a `line-strong` hairline. Every other action. `ui::button(ui, label, icon, false)`; `.btn--ghost`.
 - **Quiet:** text only, for skip, cancel-like and tertiary actions. `ui::quiet_button`; `.btn--quiet`.
-- **Danger:** only inside a confirmation, for the destructive answer. `shell.ask(.., danger: true, ..)`; `.btn--danger`.
+- **Confirmation answers:** the answer buttons in a confirmation are their own small family. The main answer is filled with the tone colour (signal, or danger for a destructive answer) and shaded slightly darker toward the bottom; it brightens on hover. Cancel is a faint text wash. `shell.ask(..)`; `.btn--danger` on the web.
 - On hover a text-coloured fill wipes in from the left over `MOTION_SLOW` (300 ms) and the label inverts as the edge passes. It does not glow or lift.
 
 ## Icons
