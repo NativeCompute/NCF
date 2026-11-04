@@ -231,7 +231,7 @@ mod tests {
             assert!(!text.contains("__"), "{path} still has a placeholder");
         }
         assert!(dir.join("packaging/ledger.ico").exists());
-        assert!(std::fs::read_to_string(dir.join("Cargo.toml")).unwrap().contains("tag = \"v0.1.0\""));
+        assert!(std::fs::read_to_string(dir.join("Cargo.toml")).unwrap().contains(&format!("tag = \"v{}\"", ncf::VERSION)));
         assert!(write_app(&dir, &plan).is_err(), "never writes over an existing folder");
         let _ = std::fs::remove_dir_all(&dir);
     }

@@ -247,3 +247,16 @@ fn the_update_check_compares_versions_and_reads_github() {
     let r = update::parse(r#"{"tag_name":"v2.1.0"}"#, "NativeCompute/x").unwrap();
     assert_eq!(r.url, "https://github.com/NativeCompute/x/releases");
 }
+
+#[test]
+fn the_splash_says_how_the_update_check_went() {
+    use crate::splash::status_line;
+    use update::{Release, Status};
+    assert_eq!(status_line(&Status::Off), None);
+    assert_eq!(status_line(&Status::Checking), Some(("CHECKING FOR UPDATES…".to_string(), false)));
+    assert_eq!(status_line(&Status::Latest), Some(("UP TO DATE".to_string(), false)));
+    let r = Release { version: "2.2.0".into(), url: String::new() };
+    assert_eq!(status_line(&Status::Newer(r)), Some(("V2.2.0 IS OUT".to_string(), true)));
+    assert!(status_line(&Status::Failed).is_some());
+    assert_eq!(update::releases_latest("NativeCompute/x"), "https://github.com/NativeCompute/x/releases/latest");
+}

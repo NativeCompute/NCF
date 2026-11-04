@@ -4,6 +4,13 @@ NCF follows [semantic versioning](https://semver.org). Apps pin a tag, so nothin
 
 ## Unreleased
 
+## 0.2.0
+
+### Desktop (`ncf`)
+- The splash card shows how the update check is going, right-aligned above the progress bar: "Checking for updates…", "Up to date", "V2.2.0 is out" or "Could not check for updates". Nothing shows when checks are off. It never holds the splash open.
+- `Splash::set_status` and `splash::status_line` for apps that run their own splash. `ncf::app` passes the shell's update status in by itself.
+- `update::releases_latest(repo)` gives the link to the newest release page, for a "Download" button.
+
 ## 0.1.0
 
 The first release: the NativeCompute look and app plumbing, lifted out of Blackline and nativecompute.net into one framework.

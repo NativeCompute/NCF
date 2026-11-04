@@ -12,7 +12,7 @@ cargo run
 
 Or install the CLI once with `cargo install --git https://github.com/NativeCompute/ncf ncf-cli` and run `ncf new Ledger`.
 
-`ncf new` refuses a folder that already has files in it. `--dir` picks the folder; `--ncf-path` points the new app at a local NCF checkout instead of the `v0.1.0` tag.
+`ncf new` refuses a folder that already has files in it. `--dir` picks the folder; `--ncf-path` points the new app at a local NCF checkout instead of the `v0.2.0` tag.
 
 ## What you get
 

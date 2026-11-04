@@ -21,6 +21,10 @@ pub fn releases_page(repo: &str) -> String {
     format!("https://github.com/{repo}/releases")
 }
 
+pub fn releases_latest(repo: &str) -> String {
+    format!("https://github.com/{repo}/releases/latest")
+}
+
 fn parts(v: &str) -> Vec<u64> {
     v.trim()
         .trim_start_matches(['v', 'V'])

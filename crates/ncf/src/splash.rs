@@ -4,6 +4,7 @@ use eframe::egui::{self, Pos2, Rect, Sense, Vec2};
 
 use crate::anim;
 use crate::theme::{self, pal};
+use crate::update::Status;
 
 pub const CARD: Vec2 = Vec2::new(540.0, 296.0);
 
@@ -14,11 +15,26 @@ pub struct Splash {
     app: crate::AppInfo,
     born: Instant,
     skip_at: Option<f32>,
+    status: Status,
+}
+
+pub fn status_line(status: &Status) -> Option<(String, bool)> {
+    match status {
+        Status::Off => None,
+        Status::Checking => Some(("CHECKING FOR UPDATES…".to_string(), false)),
+        Status::Latest => Some(("UP TO DATE".to_string(), false)),
+        Status::Newer(r) => Some((format!("V{} IS OUT", r.version), true)),
+        Status::Failed => Some(("COULD NOT CHECK FOR UPDATES".to_string(), false)),
+    }
 }
 
 impl Splash {
     pub fn new(app: crate::AppInfo) -> Splash {
-        Splash { app, born: Instant::now(), skip_at: None }
+        Splash { app, born: Instant::now(), skip_at: None, status: Status::Off }
+    }
+
+    pub fn set_status(&mut self, status: Status) {
+        self.status = status;
     }
 
     pub fn show(&mut self, ctx: &egui::Context) -> bool {
@@ -96,6 +112,12 @@ impl Splash {
                     ink(p.text_3, 1.0),
                     0.8,
                 );
+                if let Some((line, news)) = status_line(&self.status) {
+                    let font = theme::font_hud(theme::T_MICRO + 0.5);
+                    let w = theme::tracked_width(ui.ctx(), &line, font.clone(), 0.8);
+                    let colour = if news { p.signal_hi } else { p.text_3 };
+                    theme::tracked_text(painter, Pos2::new(left + width - w, foot_y - 13.0), &line, font, ink(colour, 1.0), 0.8);
+                }
                 let track = Rect::from_min_size(Pos2::new(left + width - 140.0, foot_y - 1.0), Vec2::new(140.0, 2.0));
                 painter.rect_filled(track, egui::Rounding::ZERO, ink(p.line_strong, 1.0));
                 let done = anim::ease_out_expo((t / HOLD).clamp(0.0, 1.0));

@@ -183,6 +183,7 @@ impl<A: NcfApp> eframe::App for Runner<A> {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         frame(ctx, &mut self.app, &mut self.shell);
         if let Some(s) = self.splash.as_mut() {
+            s.set_status(self.shell.update.clone());
             if s.show(ctx) {
                 if self.shell.frame_no < 3 {
                     splash::centre(ctx, splash::CARD);

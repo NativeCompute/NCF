@@ -13,7 +13,7 @@
 ## A desktop app
 
 ```sh
-cargo install --git https://github.com/NativeCompute/ncf --tag v0.1.0 ncf-cli
+cargo install --git https://github.com/NativeCompute/ncf --tag v0.2.0 ncf-cli
 ncf new Ledger --tagline "Money, plainly." --repo NativeCompute/ledger
 cd ledger && cargo run
 ```
@@ -22,7 +22,7 @@ Or add NCF to an existing app:
 
 ```toml
 [dependencies]
-ncf = { git = "https://github.com/NativeCompute/ncf", tag = "v0.1.0" }
+ncf = { git = "https://github.com/NativeCompute/ncf", tag = "v0.2.0" }
 ```
 
 ```rust
@@ -64,8 +64,8 @@ fn main() -> ncf::eframe::Result<()> {
 ## A website
 
 ```html
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/NativeCompute/ncf@v0.1.0/web/ncf.css">
-<script src="https://cdn.jsdelivr.net/gh/NativeCompute/ncf@v0.1.0/web/ncf.js" defer></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/NativeCompute/ncf@v0.2.0/web/ncf.css">
+<script src="https://cdn.jsdelivr.net/gh/NativeCompute/ncf@v0.2.0/web/ncf.js" defer></script>
 ```
 
 Or copy `web/` (with `web/fonts`) into the site. Open [`web/gallery.html`](web/gallery.html) to see every component.
