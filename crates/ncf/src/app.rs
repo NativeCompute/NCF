@@ -28,6 +28,7 @@ pub trait NcfApp {
         String::new()
     }
     fn answer(&mut self, _action: &str, _text: Option<String>, _shell: &mut Shell) {}
+    fn on_exit(&mut self, _shell: &mut Shell) {}
     fn about(&mut self, _ui: &mut egui::Ui, _shell: &mut Shell) {}
 }
 
@@ -129,6 +130,26 @@ struct Runner<A: NcfApp> {
     app: A,
     shell: Shell,
     splash: Option<Splash>,
+    settled: bool,
+}
+
+pub fn viewport(info: &AppInfo, size: Vec2, min: Vec2) -> egui::ViewportBuilder {
+    let builder = egui::ViewportBuilder::default()
+        .with_title(info.name)
+        .with_icon(std::sync::Arc::new(info.mark.icon_data(128)))
+        .with_app_id(info.id)
+        .with_drag_and_drop(true)
+        .with_inner_size(size)
+        .with_min_inner_size(min);
+    chrome::viewport(builder, crate::OS)
+}
+
+pub fn first_size(splash: bool, os: crate::Os) -> (Vec2, Vec2) {
+    if splash && splash::own_window(os) {
+        (splash::CARD, splash::CARD)
+    } else {
+        (SIZE, MIN_SIZE)
+    }
 }
 
 pub fn run<A: NcfApp + 'static>(info: AppInfo, make: impl FnOnce(&egui::Context, &mut Shell) -> A + 'static) -> eframe::Result<()> {
@@ -137,18 +158,11 @@ pub fn run<A: NcfApp + 'static>(info: AppInfo, make: impl FnOnce(&egui::Context,
 
 pub fn run_with<A: NcfApp + 'static>(shell: Shell, make: impl FnOnce(&egui::Context, &mut Shell) -> A + 'static) -> eframe::Result<()> {
     let info = shell.info;
-    let small = shell.look.splash && shell.look.animations;
-    let size = if small { splash::CARD } else { SIZE };
+    let wants_splash = shell.look.splash && shell.look.animations;
+    let (size, min) = first_size(wants_splash, crate::OS);
     let options = eframe::NativeOptions {
-        viewport: egui::ViewportBuilder::default()
-            .with_title(info.name)
-            .with_icon(std::sync::Arc::new(info.mark.icon_data(128)))
-            .with_app_id(info.id)
-            .with_transparent(true)
-            .with_decorations(false)
-            .with_drag_and_drop(true)
-            .with_inner_size(size)
-            .with_min_inner_size(if small { size } else { MIN_SIZE }),
+        viewport: viewport(&info, size, min),
+        centered: chrome::native_frame(crate::OS),
         ..Default::default()
     };
     eframe::run_native(
@@ -157,8 +171,8 @@ pub fn run_with<A: NcfApp + 'static>(shell: Shell, make: impl FnOnce(&egui::Cont
         Box::new(move |cc| {
             let mut shell = shell;
             let app = start(&cc.egui_ctx, &mut shell, make);
-            let splash = if small { Some(Splash::new(info)) } else { None };
-            Ok(Box::new(Runner { app, shell, splash }))
+            let splash = if wants_splash { Some(Splash::for_os(info, crate::OS)) } else { None };
+            Ok(Box::new(Runner { app, shell, splash, settled: false }))
         }),
     )
 }
@@ -182,23 +196,36 @@ pub fn start<A: NcfApp>(ctx: &egui::Context, shell: &mut Shell, make: impl FnOnc
 impl<A: NcfApp> eframe::App for Runner<A> {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         frame(ctx, &mut self.app, &mut self.shell);
+        let own_window = self.splash.as_ref().map(|s| !s.is_inline()).unwrap_or(false);
+        if !own_window && !self.settled {
+            self.settled = splash::settle(ctx, SIZE);
+        }
         if let Some(s) = self.splash.as_mut() {
             s.set_status(self.shell.update.clone());
             if s.show(ctx) {
-                if self.shell.frame_no < 3 {
+                if own_window && self.shell.frame_no < 3 {
                     splash::centre(ctx, splash::CARD);
                 }
             } else {
                 self.splash = None;
-                ctx.send_viewport_cmd(egui::ViewportCommand::MinInnerSize(MIN_SIZE));
-                ctx.send_viewport_cmd(egui::ViewportCommand::InnerSize(SIZE));
-                splash::centre(ctx, SIZE);
+                if own_window {
+                    let size = chrome::fit(SIZE, ctx.input(|i| i.viewport().monitor_size), crate::OS);
+                    ctx.send_viewport_cmd(egui::ViewportCommand::MinInnerSize(MIN_SIZE));
+                    ctx.send_viewport_cmd(egui::ViewportCommand::InnerSize(size));
+                    splash::centre(ctx, size);
+                }
             }
         }
     }
 
     fn clear_color(&self, _visuals: &egui::Visuals) -> [f32; 4] {
-        [0.0, 0.0, 0.0, 0.0]
+        chrome::clear_color(crate::OS, pal().void)
+    }
+
+    fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
+        self.app.on_exit(&mut self.shell);
+        let text = format!("{}{}", self.shell.look.write(), self.app.write_settings());
+        let _ = platform::write_atomic(&settings_path(&self.shell.info), text.as_bytes());
     }
 }
 
@@ -229,7 +256,7 @@ pub fn frame<A: NcfApp>(ctx: &egui::Context, app: &mut A, shell: &mut Shell) {
         let info = shell.info;
         let mut open_settings = false;
         chrome::title_bar(ui, ctx, &info, |ui| {
-            if ui::icon_button(ui, Icon::Settings, "Settings · Ctrl+,", 28.0) {
+            if ui::icon_button(ui, Icon::Settings, &format!("Settings · {}+,", crate::OS.command_key()), 28.0) {
                 open_settings = true;
             }
             app.title_extras(ui, shell);

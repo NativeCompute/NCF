@@ -4,6 +4,24 @@ NCF follows [semantic versioning](https://semver.org). Apps pin a tag, so nothin
 
 ## Unreleased
 
+## 0.3.0
+
+macOS. Every check runs on GitHub's Macs, Apple Silicon and Intel, as well as on Linux and Windows.
+
+### Desktop (`ncf`)
+- `ncf::Os` names the platform, so code that differs by platform can be tested for every one of them on any machine.
+- The window keeps the native macOS frame: traffic lights, edge resizing, full screen and tiling. The title bar leaves them room and draws no window buttons of its own there, and the custom resize grips are off. `chrome::viewport`, `chrome::fit` (caps the window to the screen, leaving the menu bar and Dock clear) and `chrome::window_radius` hold the rules.
+- On a Mac the splash card shows inside the main window, and the window opens centred.
+- `keys::label` shows shortcuts the way each platform names its keys: "Cmd+Shift+F" and "Option" on a Mac. `keys::text`, which writes settings files, is unchanged, so a settings file reads the same everywhere.
+- `keys::refused` keeps the shortcuts macOS holds for itself, and Option with a letter or number, out of the keymap. A saved shortcut that's refused falls back to its default.
+- `NcfApp::on_exit` runs on quit, including Cmd+Q, and the settings are written then.
+- `platform`: the data folder is `~/Library/Application Support/<Name>` on a Mac; `reveal` selects the file in Finder; `pick_file` uses the system open panel; `alert` shows a real dialog on every platform.
+- `AppMark::png` and `AppMark::icns` (the Mac icon file, 16 to 1024 px), and `bundle::info_plist` for the app bundle.
+- The mark draws much faster, with the same pixels.
+
+### Tools
+- `ncf mark --icns`, and `--emit-icns` / `--emit-info-plist` in new apps.
+
 ## 0.2.0
 
 ### Desktop (`ncf`)

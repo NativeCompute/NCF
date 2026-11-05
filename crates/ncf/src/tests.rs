@@ -211,7 +211,7 @@ impl Command for Cmd {
 fn a_keymap_works_for_any_apps_commands() {
     let mut k: Keymap<Cmd> = Keymap::default();
     assert!(k.is_default());
-    assert_eq!(k.label(Cmd::Save, false), "Ctrl+S");
+    assert_eq!(k.label(Cmd::Save, false), format!("{}+S", crate::OS.command_key()));
     let chord = keys::parse("Ctrl+Shift+S").unwrap();
     k.set(Cmd::Save, chord, false);
     assert!(k.is_custom(Cmd::Save));
@@ -259,4 +259,129 @@ fn the_splash_says_how_the_update_check_went() {
     assert_eq!(status_line(&Status::Newer(r)), Some(("V2.2.0 IS OUT".to_string(), true)));
     assert!(status_line(&Status::Failed).is_some());
     assert_eq!(update::releases_latest("NativeCompute/x"), "https://github.com/NativeCompute/x/releases/latest");
+}
+
+#[test]
+fn shortcut_labels_name_the_keys_each_platform_has() {
+    use crate::Os;
+    let c = keys::parse("Ctrl+Alt+Shift+F").unwrap();
+    assert_eq!(keys::label_for(&c, Os::Linux), "Ctrl+Alt+Shift+F");
+    assert_eq!(keys::label_for(&c, Os::Windows), "Ctrl+Alt+Shift+F");
+    assert_eq!(keys::label_for(&c, Os::Mac), "Cmd+Option+Shift+F");
+    assert_eq!(keys::text(&c), "Ctrl+Alt+Shift+F", "the settings file spells it the same on every platform");
+    assert_eq!(keys::parse("Cmd+Option+F"), keys::parse("Ctrl+Alt+F"));
+    let fonts = [include_bytes!("../fonts/Anybody-Regular.ttf").as_slice(), include_bytes!("../fonts/JetBrainsMono-Regular.ttf").as_slice()];
+    let label = keys::label_for(&c, Os::Mac);
+    assert!(label.is_ascii(), "plain letters only: the bundled fonts have no Mac key symbols");
+    assert!(fonts.iter().all(|f| f.len() > 1000));
+}
+
+#[test]
+fn the_mac_keeps_its_own_shortcuts_and_option_types() {
+    use crate::Os;
+    let p = |s: &str| keys::parse(s).unwrap();
+    for taken in ["Cmd+Q", "Cmd+H", "Cmd+Tab", "Cmd+Space", "Cmd+`", "Cmd+Shift+4"] {
+        assert_eq!(keys::refused_for(&p(taken), false, Os::Mac), Some("macOS keeps that one for itself."), "{taken}");
+        assert_eq!(keys::refused_for(&p(taken), false, Os::Linux).filter(|w| w.contains("macOS")), None, "{taken} is fine elsewhere");
+    }
+    assert!(keys::refused_for(&p("Option+1"), false, Os::Mac).unwrap().contains("types a character"));
+    assert!(keys::refused_for(&p("Option+N"), false, Os::Mac).is_some());
+    assert_eq!(keys::refused_for(&p("Alt+1"), false, Os::Linux), None);
+    assert_eq!(keys::refused_for(&p("Cmd+Option+F"), false, Os::Mac), None);
+    assert_eq!(keys::refused_for(&p("Cmd+Shift+H"), false, Os::Mac), None);
+    assert!(keys::refused_for(&p("Option+Up"), false, Os::Mac).unwrap().starts_with("Option+Up"));
+    assert!(keys::refused_for(&p("F"), false, Os::Mac).unwrap().contains("Cmd or Option"));
+}
+
+#[test]
+fn a_mac_window_uses_the_native_frame_and_fits_the_screen() {
+    use crate::{chrome, splash, Os};
+    use eframe::egui::Vec2;
+    assert!(chrome::native_frame(Os::Mac));
+    assert!(!chrome::native_frame(Os::Linux) && !chrome::native_frame(Os::Windows));
+    assert_eq!(chrome::title_inset(Os::Mac, false), chrome::TRAFFIC_LIGHTS);
+    assert_eq!(chrome::title_inset(Os::Mac, true), 2.0, "in full screen the traffic lights are hidden");
+    assert_eq!(chrome::title_inset(Os::Linux, false), 2.0);
+    let want = Vec2::new(1320.0, 900.0);
+    let air = chrome::fit(want, Some(Vec2::new(1440.0, 900.0)), Os::Mac);
+    assert!(air.y <= 760.0 && air.x == 1320.0, "{air:?}");
+    assert_eq!(chrome::fit(want, Some(Vec2::new(2560.0, 1440.0)), Os::Mac), want);
+    assert_eq!(chrome::fit(want, None, Os::Mac), want);
+    let at = splash::centred(Vec2::new(1440.0, 900.0), air, Os::Mac);
+    assert!(at.y >= 38.0, "below the menu bar: {at:?}");
+    assert!(!splash::own_window(Os::Mac) && splash::own_window(Os::Linux));
+    assert_eq!(crate::app::first_size(true, Os::Mac), (crate::app::SIZE, crate::app::MIN_SIZE));
+    assert_eq!(crate::app::first_size(true, Os::Linux), (splash::CARD, splash::CARD));
+    assert_eq!(chrome::clear_color(Os::Linux, eframe::egui::Color32::WHITE), [0.0; 4]);
+    assert_eq!(chrome::clear_color(Os::Mac, eframe::egui::Color32::WHITE)[3], 1.0);
+}
+
+#[test]
+fn app_folders_follow_each_platforms_custom() {
+    use crate::{platform, Os};
+    assert_eq!(platform::folder_name("Field Notes", Os::Linux), "field notes");
+    assert_eq!(platform::folder_name("Field Notes", Os::Windows), "Field Notes");
+    assert_eq!(platform::folder_name("Field Notes", Os::Mac), "Field Notes");
+}
+
+#[test]
+fn a_mac_alert_is_safe_applescript() {
+    use crate::platform::{alert_script, applescript_text};
+    assert_eq!(applescript_text("a \"b\"\\c"), "\"a \\\"b\\\"\\\\c\"");
+    assert_eq!(applescript_text("one\ntwo"), "\"one\" & return & \"two\"");
+    let script = alert_script("App", "Line one\nIt said \"no\"");
+    assert!(script.starts_with("display alert \"App\" message \"Line one\" & return & \"It said \\\"no\\\"\""), "{script}");
+    assert!(script.ends_with("as critical buttons {\"OK\"} default button \"OK\""));
+}
+
+#[test]
+fn the_mac_icon_file_holds_every_size_as_png() {
+    let icns = crate::mark::NATIVECOMPUTE.icns();
+    assert_eq!(&icns[0..4], b"icns");
+    assert_eq!(u32::from_be_bytes(icns[4..8].try_into().unwrap()) as usize, icns.len());
+    let mut at = 8;
+    let mut seen = Vec::new();
+    while at < icns.len() {
+        let kind = String::from_utf8(icns[at..at + 4].to_vec()).unwrap();
+        let len = u32::from_be_bytes(icns[at + 4..at + 8].try_into().unwrap()) as usize;
+        let png = &icns[at + 8..at + len];
+        assert_eq!(&png[0..8], b"\x89PNG\r\n\x1a\n", "{kind}");
+        let decoder = png::Decoder::new(std::io::Cursor::new(png));
+        let reader = decoder.read_info().unwrap();
+        let info = reader.info();
+        assert_eq!(info.width, info.height);
+        seen.push((kind, info.width));
+        at += len;
+    }
+    assert_eq!(at, icns.len());
+    let want = [("icp4", 16), ("icp5", 32), ("ic11", 32), ("ic12", 64), ("ic07", 128), ("ic13", 256), ("ic08", 256), ("ic14", 512), ("ic09", 512), ("ic10", 1024)];
+    assert_eq!(seen, want.iter().map(|(k, s)| (k.to_string(), *s)).collect::<Vec<_>>());
+}
+
+#[test]
+fn the_mac_info_plist_has_what_finder_and_retina_need() {
+    let info = crate::AppInfo {
+        name: "Field & Notes",
+        id: "field-notes",
+        version: "1.2.3",
+        tagline: "",
+        repo: "",
+        mark: crate::mark::NATIVECOMPUTE,
+    };
+    let plist = crate::bundle::info_plist(&info, "field-notes", "Field Notes");
+    for (k, v) in [
+        ("CFBundleExecutable", "<string>field-notes</string>"),
+        ("CFBundleIdentifier", "<string>net.nativecompute.field-notes</string>"),
+        ("CFBundleShortVersionString", "<string>1.2.3</string>"),
+        ("LSMinimumSystemVersion", "<string>11.0</string>"),
+        ("CFBundleName", "<string>Field &amp; Notes</string>"),
+        ("CFBundlePackageType", "<string>APPL</string>"),
+        ("NSHighResolutionCapable", "<true/>"),
+    ] {
+        let at = plist.find(&format!("<key>{k}</key>")).unwrap_or_else(|| panic!("{k} missing"));
+        assert!(plist[at..].lines().nth(1).unwrap().trim() == v, "{k}");
+    }
+    assert!(plist.starts_with("<?xml version=\"1.0\" encoding=\"UTF-8\"?>"));
+    assert_eq!(plist.matches("<key>").count(), plist.matches("</key>").count());
+    assert!(!plist.contains("CFBundleDocumentTypes"), "no file types claimed until opening from Finder works");
 }

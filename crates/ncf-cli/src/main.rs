@@ -10,7 +10,7 @@ const USAGE: &str = "ncf — the NativeCompute Framework
       Make a new NativeCompute desktop app.
   ncf tokens [--check]
       Write (or check) the Rust and CSS token files from tokens/ncf.toml.
-  ncf mark --svg <path> | --ico <path>
+  ncf mark --svg <path> | --ico <path> | --icns <path>
       Write the NativeCompute mark.
   ncf --version";
 
@@ -173,6 +173,10 @@ fn mark(args: &[String]) -> Result<(), String> {
     }
     if let Some(p) = flag(args, "--ico") {
         std::fs::write(&p, ncf::mark::NATIVECOMPUTE.ico()).map_err(|e| e.to_string())?;
+        println!("wrote {p}");
+    }
+    if let Some(p) = flag(args, "--icns") {
+        std::fs::write(&p, ncf::mark::NATIVECOMPUTE.icns()).map_err(|e| e.to_string())?;
         println!("wrote {p}");
     }
     Ok(())

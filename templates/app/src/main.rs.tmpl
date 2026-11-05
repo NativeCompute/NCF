@@ -29,6 +29,14 @@ fn main() -> ncf::eframe::Result<()> {
         std::fs::write(&path, MARK.ico()).map_err(|e| eprintln!("{path}: {e}")).ok();
         return Ok(());
     }
+    if let Some(path) = out("--emit-icns", "__SLUG__.icns") {
+        std::fs::write(&path, MARK.icns()).map_err(|e| eprintln!("{path}: {e}")).ok();
+        return Ok(());
+    }
+    if let Some(path) = out("--emit-info-plist", "Info.plist") {
+        std::fs::write(&path, ncf::bundle::info_plist(&INFO, "__SLUG__", "__NAME__")).map_err(|e| eprintln!("{path}: {e}")).ok();
+        return Ok(());
+    }
     if args.iter().any(|a| a == "--version" || a == "-V") {
         println!("__SLUG__ {}", INFO.version);
         return Ok(());

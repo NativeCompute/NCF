@@ -55,7 +55,8 @@ New app? Follow [`.claude/skills/ncf-app/SKILL.md`](.claude/skills/ncf-app/SKILL
 
 ### Code
 - No comments in source code. If a marker helps you find your place later, use a lazy one: `// thing part here` or `// function_name here---`. Explanations go in `docs/`.
-- Keep `cargo test` and `cargo clippy --all-targets -- -D warnings` clean on Linux and on `x86_64-pc-windows-gnu`.
+- Keep `cargo test` and `cargo clippy --all-targets -- -D warnings` clean on Linux and on `x86_64-pc-windows-gnu`. CI runs both on GitHub's Macs too (Apple Silicon and Intel), and nothing merges until they pass there.
+- Anything that differs by platform takes an `Os` (`ncf::Os`) instead of reading `cfg!` in place, so tests on Linux can run the macOS and Windows branches. On a Mac the window keeps the native frame (`chrome::viewport`), shortcuts are shown with `keys::label` ("Cmd", "Option"; never `keys::text`, which is for files), and Option with a letter or number is never a default shortcut because it types a character.
 - The template under `templates/app` must build, test and pass clippy straight from `ncf new`. CI checks it.
 - Generated files (`crates/ncf/src/tokens.rs`, `web/ncf-tokens.css`) are never edited by hand.
 

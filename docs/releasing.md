@@ -10,7 +10,7 @@ Apps made with `ncf new` ship the same way Blackline does.
    cargo test
    cargo clippy --all-targets -- -D warnings
    ```
-3. Commit and push to `main`. CI runs the same checks on Linux and Windows.
+3. Commit and push to `main`. CI runs the same checks on Linux, Windows and GitHub's Macs.
 4. Publish a release on GitHub with a tag such as `v1.2.0`, either by pushing the tag or from **Releases → Draft a new release** on GitHub (create the tag there, then **Publish release**).
 5. `.github/workflows/release.yml` builds:
    - `<app>-v1.2.0-linux-x86_64.tar.gz`: the binary, `install.sh`, the `.desktop` file, the icon, README and LICENSE;

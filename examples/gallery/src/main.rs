@@ -186,8 +186,8 @@ impl Gallery {
         });
         block(ui, "Ribbon", "ui::ribbon_button(ui, icon, label, tip, on)", |ui| {
             ui.horizontal(|ui| {
-                ui::ribbon_button(ui, Icon::Bold, "Bold", "Bold · Ctrl+B", true);
-                ui::ribbon_button(ui, Icon::Italic, "Italic", "Italic · Ctrl+I", false);
+                ui::ribbon_button(ui, Icon::Bold, "Bold", &format!("Bold · {}+B", ncf::OS.command_key()), true);
+                ui::ribbon_button(ui, Icon::Italic, "Italic", &format!("Italic · {}+I", ncf::OS.command_key()), false);
                 ui::ribbon_button(ui, Icon::List, "List", "List", false);
             });
         });
@@ -205,7 +205,7 @@ impl Gallery {
         block(ui, "Field", "ui::field(ui, &mut text, hint, width)", |ui| {
             ui.horizontal(|ui| {
                 ui::field(ui, &mut self.name, "Name", 240.0);
-                ui::field(ui, &mut self.note, "Search · Ctrl+F", 240.0);
+                ui::field(ui, &mut self.note, &format!("Search · {}+F", ncf::OS.command_key()), 240.0);
             });
         });
         block(ui, "Switches", "ui::toggle · ui::toggle_row", |ui| {

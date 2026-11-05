@@ -3,7 +3,7 @@ pub use eframe::egui::Modifiers;
 
 use crate::icons::Icon;
 use crate::theme::{self, pal};
-use crate::{anim, ui};
+use crate::{anim, ui, Os};
 
 pub const DIGITS: [Key; 9] = [Key::Num1, Key::Num2, Key::Num3, Key::Num4, Key::Num5, Key::Num6, Key::Num7, Key::Num8, Key::Num9];
 
@@ -25,12 +25,24 @@ pub fn chord(modifiers: Modifiers, key: Key) -> KeyboardShortcut {
 }
 
 pub fn text(c: &KeyboardShortcut) -> String {
+    spell(c, "Ctrl", "Alt")
+}
+
+pub fn label(c: &KeyboardShortcut) -> String {
+    label_for(c, crate::OS)
+}
+
+pub fn label_for(c: &KeyboardShortcut, os: Os) -> String {
+    spell(c, os.command_key(), os.alt_key())
+}
+
+fn spell(c: &KeyboardShortcut, command: &str, alt: &str) -> String {
     let mut parts: Vec<&str> = Vec::new();
     if c.modifiers.command || c.modifiers.ctrl {
-        parts.push("Ctrl");
+        parts.push(command);
     }
     if c.modifiers.alt {
-        parts.push("Alt");
+        parts.push(alt);
     }
     if c.modifiers.shift {
         parts.push("Shift");
@@ -97,20 +109,57 @@ pub fn parse(s: &str) -> Option<KeyboardShortcut> {
 }
 
 pub fn refused(c: &KeyboardShortcut, web: bool) -> Option<&'static str> {
+    refused_for(c, web, crate::OS)
+}
+
+pub fn typing_key(k: Key) -> bool {
+    let name = k.name();
+    name.chars().count() == 1
+        || matches!(
+            k,
+            Key::Comma
+                | Key::Period
+                | Key::Plus
+                | Key::Equals
+                | Key::Minus
+                | Key::Slash
+                | Key::Backslash
+                | Key::Semicolon
+                | Key::OpenBracket
+                | Key::CloseBracket
+                | Key::Backtick
+                | Key::Quote
+                | Key::Space
+        )
+}
+
+pub fn refused_for(c: &KeyboardShortcut, web: bool, os: Os) -> Option<&'static str> {
     let m = c.modifiers;
     let k = c.logical_key;
+    let mac = os.is_mac();
     let function = matches!(
         k,
         Key::F1 | Key::F2 | Key::F3 | Key::F4 | Key::F5 | Key::F6 | Key::F7 | Key::F8 | Key::F9 | Key::F10 | Key::F11 | Key::F12
     );
     if !(m.command || m.ctrl || m.alt || function) {
-        return Some("Add Ctrl or Alt: a plain key is for typing.");
+        return Some(if mac { "Add Cmd or Option: a plain key is for typing." } else { "Add Ctrl or Alt: a plain key is for typing." });
     }
-    if matches!(k, Key::Escape | Key::Tab | Key::Backspace | Key::Delete) {
+    if matches!(k, Key::Escape | Key::Tab | Key::Backspace | Key::Delete) && !(mac && (m.command || m.ctrl) && k == Key::Tab) {
         return Some("That key belongs to the page.");
     }
     if m.alt && !(m.command || m.ctrl) && matches!(k, Key::ArrowUp | Key::ArrowDown) {
-        return Some("Alt+Up and Down move a block in the script.");
+        return Some(if mac { "Option+Up and Down move a block in the script." } else { "Alt+Up and Down move a block in the script." });
+    }
+    if mac && m.alt && !(m.command || m.ctrl) && typing_key(k) {
+        return Some("On a Mac, Option with a letter or number types a character. Add Cmd.");
+    }
+    if mac && (m.command || m.ctrl) {
+        let system = matches!(k, Key::Q | Key::Tab | Key::Space | Key::Backtick)
+            || (k == Key::H && !m.shift)
+            || (m.shift && matches!(k, Key::Num3 | Key::Num4 | Key::Num5));
+        if system {
+            return Some("macOS keeps that one for itself.");
+        }
     }
     if (m.command || m.ctrl) && !m.alt && !m.shift && matches!(k, Key::C | Key::V | Key::X | Key::A) {
         return Some("That is copy, cut, paste or select all.");
@@ -160,7 +209,7 @@ impl<C: Command> Keymap<C> {
     }
 
     pub fn label(&self, cmd: C, web: bool) -> String {
-        self.chords(cmd, web).first().map(text).unwrap_or_default()
+        self.chords(cmd, web).first().map(label).unwrap_or_default()
     }
 
     pub fn is_custom(&self, cmd: C) -> bool {
@@ -217,7 +266,9 @@ impl<C: Command> Keymap<C> {
         };
         if let (Some(cmd), Some(chord)) = (C::from_slug(slug.trim()), parse(value)) {
             self.custom.retain(|(c, _)| *c != cmd);
-            self.custom.push((cmd, chord));
+            if refused_for(&chord, false, crate::OS).is_none() {
+                self.custom.push((cmd, chord));
+            }
         }
         true
     }
@@ -266,11 +317,11 @@ impl<C: Command> Capture<C> {
         }
         let c = chord(mods, key);
         if let Some(why) = refused(&c, web) {
-            self.refusal = Some((cmd, format!("{}: {why}", text(&c))));
+            self.refusal = Some((cmd, format!("{}: {why}", label(&c))));
             return false;
         }
         if let Some(other) = keymap.taken_by(&c, cmd, commands, web) {
-            self.refusal = Some((cmd, format!("{} is already {}. Give that one another shortcut first.", text(&c), other.label())));
+            self.refusal = Some((cmd, format!("{} is already {}. Give that one another shortcut first.", label(&c), other.label())));
             return false;
         }
         keymap.set(cmd, c, web);
@@ -321,14 +372,14 @@ pub fn settings_ui<C: Command>(ui: &mut egui::Ui, keymap: &mut Keymap<C>, captur
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                     ui.spacing_mut().item_spacing.x = 6.0;
                     if custom {
-                        let back = cmd.defaults(web).first().map(text).unwrap_or_default();
+                        let back = cmd.defaults(web).first().map(label).unwrap_or_default();
                         if ui::icon_button(ui, Icon::Refresh, &format!("Back to {back}"), 24.0) {
                             keymap.reset(cmd);
                             capture.refusal = None;
                             changed = true;
                         }
                     }
-                    let chords: Vec<String> = keymap.chords(cmd, web).iter().map(text).collect();
+                    let chords: Vec<String> = keymap.chords(cmd, web).iter().map(label).collect();
                     let label = if listening { "Press keys…".to_string() } else { chords.join("  or  ") };
                     if keycap(ui, &label, listening, custom) {
                         capture.listening = if listening { None } else { Some(cmd) };

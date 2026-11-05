@@ -16,6 +16,11 @@ pub struct Splash {
     born: Instant,
     skip_at: Option<f32>,
     status: Status,
+    inline: bool,
+}
+
+pub fn own_window(os: crate::Os) -> bool {
+    !crate::chrome::native_frame(os)
 }
 
 pub fn status_line(status: &Status) -> Option<(String, bool)> {
@@ -30,7 +35,23 @@ pub fn status_line(status: &Status) -> Option<(String, bool)> {
 
 impl Splash {
     pub fn new(app: crate::AppInfo) -> Splash {
-        Splash { app, born: Instant::now(), skip_at: None, status: Status::Off }
+        Splash { app, born: Instant::now(), skip_at: None, status: Status::Off, inline: false }
+    }
+
+    pub fn inline(app: crate::AppInfo) -> Splash {
+        Splash { inline: true, ..Splash::new(app) }
+    }
+
+    pub fn for_os(app: crate::AppInfo, os: crate::Os) -> Splash {
+        if own_window(os) {
+            Splash::new(app)
+        } else {
+            Splash::inline(app)
+        }
+    }
+
+    pub fn is_inline(&self) -> bool {
+        self.inline
     }
 
     pub fn set_status(&mut self, status: Status) {
@@ -57,12 +78,19 @@ impl Splash {
             .fixed_pos(screen.min)
             .interactable(true)
             .show(ctx, |ui| {
-                let (rect, resp) = ui.allocate_exact_size(screen.size(), Sense::click());
+                let (whole, resp) = ui.allocate_exact_size(screen.size(), Sense::click());
                 let painter = ui.painter();
-                let round = egui::Rounding::same(theme::RADIUS);
+                let round = egui::Rounding::same(if self.inline { 0.0 } else { theme::RADIUS });
+                let rect = if self.inline { Rect::from_center_size(whole.center(), CARD.min(whole.size())) } else { whole };
 
+                if self.inline {
+                    painter.rect_filled(whole, egui::Rounding::ZERO, theme::wash(p.void, (255.0 * alpha) as u8));
+                    if alpha > 0.99 {
+                        crate::chrome::column_guides(painter, whole);
+                    }
+                }
                 painter.rect_filled(rect, round, theme::wash(p.void, (255.0 * alpha) as u8));
-                if alpha > 0.99 {
+                if alpha > 0.99 && !self.inline {
                     crate::chrome::column_guides(painter, rect);
                 }
                 painter.rect_stroke(
@@ -143,7 +171,25 @@ impl Splash {
 
 pub fn centre(ctx: &egui::Context, size: Vec2) {
     if let Some(monitor) = ctx.input(|i| i.viewport().monitor_size) {
-        let at = ((monitor - size) * 0.5).max(Vec2::ZERO);
-        ctx.send_viewport_cmd(egui::ViewportCommand::OuterPosition(at.to_pos2()));
+        ctx.send_viewport_cmd(egui::ViewportCommand::OuterPosition(centred(monitor, size, crate::OS)));
     }
+}
+
+pub fn centred(monitor: Vec2, size: Vec2, os: crate::Os) -> Pos2 {
+    let top = if os.is_mac() { 38.0 } else { 0.0 };
+    let at = ((monitor - size) * 0.5).max(Vec2::ZERO);
+    Pos2::new(at.x, at.y.max(top))
+}
+
+pub fn settle(ctx: &egui::Context, want: Vec2) -> bool {
+    let (monitor, inner) = ctx.input(|i| (i.viewport().monitor_size, i.viewport().inner_rect.map(|r| r.size())));
+    let (Some(monitor), Some(inner)) = (monitor, inner) else {
+        return false;
+    };
+    let fit = crate::chrome::fit(want, Some(monitor), crate::OS);
+    if inner.x > fit.x + 1.0 || inner.y > fit.y + 1.0 {
+        ctx.send_viewport_cmd(egui::ViewportCommand::InnerSize(fit));
+        ctx.send_viewport_cmd(egui::ViewportCommand::OuterPosition(centred(monitor, fit, crate::OS)));
+    }
+    true
 }

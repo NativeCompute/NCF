@@ -113,7 +113,7 @@ What the app can ask NCF for:
 
 | Call | Does |
 |---|---|
-| `shell.folder()` | The app's data folder: `$XDG_DATA_HOME/<name in lower case>` or `~/.local/share/<name in lower case>` on Linux, `%APPDATA%\<Name>` on Windows. |
+| `shell.folder()` | The app's data folder: `$XDG_DATA_HOME/<name in lower case>` or `~/.local/share/<name in lower case>` on Linux, `%APPDATA%\<Name>` on Windows, `~/Library/Application Support/<Name>` on macOS. |
 | `shell.say / ok / warn(title, body)` | A notice. |
 | `shell.ask(title, body, yes, danger, action)` | A confirmation. The answer arrives in `NcfApp::answer` with `action`. |
 | `shell.deck.prompt(title, body, hint, seed, yes, action)` | A confirmation with a text field. The text arrives in `answer` as `Some(text)`. |
@@ -138,7 +138,7 @@ What the app can ask NCF for:
 | `platform::write_atomic(path, bytes)` | Writes to a temporary file and renames it over the target. Use it for every save. |
 | `platform::open(target)` | Opens a file, folder or URL with the system handler. |
 | `platform::reveal(path)` | Shows a file in the file manager. |
-| `platform::pick_file(&FileFilter::new(title, label, &["md"]))` | A native open dialog: PowerShell on Windows, kdialog or zenity on Linux. |
+| `platform::pick_file(&FileFilter::new(title, label, &["md"]))` | A native open dialog: PowerShell on Windows, kdialog or zenity on Linux, the system open panel on macOS (call it from the UI thread there). |
 
 ### Update check (`ncf::update`)
 
@@ -166,3 +166,11 @@ Draw each screen in both casts in at least one test. Most layout bugs show up as
 ## Shipping
 
 See [releasing.md](releasing.md).
+
+## macOS
+
+- **The window.** `chrome::viewport` keeps the native frame on a Mac: the traffic lights, edge resizing, full screen and tiling all come from macOS, with the title bar hidden behind the app's own. `chrome::title_bar` leaves room on the left for the traffic lights and draws no window buttons of its own. `resize_handles` does nothing there. The window is opaque, and macOS rounds its corners.
+- **The splash.** On a Mac the splash card shows centred inside the main window, which opens at full size and is capped to the screen (`chrome::fit`), instead of in a small window that then grows.
+- **Shortcuts.** `Modifiers::COMMAND` is Cmd on a Mac. Show shortcuts with `keys::label` ("Cmd+Shift+F"). `keys::refused` turns away the shortcuts macOS keeps for itself (Cmd+Q, Cmd+H, Cmd+Tab, Cmd+Space, Cmd+\`, screenshots) and Option with a letter or number, which types a character.
+- **Saving on quit.** Cmd+Q ends the app through `NcfApp::on_exit`, not through the close button, so anything unsaved is written there.
+- **The app bundle.** `AppMark::icns()` writes the Mac icon file and `bundle::info_plist` the bundle's `Info.plist` (with `NSHighResolutionCapable`, so text is sharp on Retina screens, and macOS 11 as the minimum).

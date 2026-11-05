@@ -131,7 +131,7 @@ impl AppMark {
     pub fn rgba(&self, size: u32) -> Vec<u8> {
         let n = size as f32;
         let scale = n / 512.0;
-        let parts: Vec<(Vec<Pos2>, [u8; 3])> = self
+        let parts: Vec<(Vec<Pos2>, [u8; 3], Rect)> = self
             .outlines(Rect::from_min_size(Pos2::new(56.0 * scale, 56.0 * scale), Vec2::splat(400.0 * scale)))
             .into_iter()
             .map(|(pts, ink, _)| {
@@ -139,7 +139,8 @@ impl AppMark {
                     Ink::Signal => tokens::DARK.signal,
                     Ink::Chrome | Ink::Text => tokens::DARK.chrome_hi,
                 };
-                (pts, [c.r(), c.g(), c.b()])
+                let bounds = Rect::from_points(&pts);
+                (pts, [c.r(), c.g(), c.b()], bounds)
             })
             .collect();
         let radius = 116.0 * scale;
@@ -161,8 +162,8 @@ impl AppMark {
                             continue;
                         }
                         let mut c = [0u8, 0, 0];
-                        for (pts, col) in &parts {
-                            if inside(pts, x, y) {
+                        for (pts, col, bounds) in &parts {
+                            if x >= bounds.min.x && x <= bounds.max.x && y >= bounds.min.y && y <= bounds.max.y && inside(pts, x, y) {
                                 c = *col;
                             }
                         }
@@ -187,6 +188,51 @@ impl AppMark {
 
     pub fn icon_data(&self, size: u32) -> egui::IconData {
         egui::IconData { rgba: self.rgba(size), width: size, height: size }
+    }
+
+    pub fn png(&self, size: u32) -> Vec<u8> {
+        let mut out = Vec::new();
+        {
+            let mut encoder = png::Encoder::new(&mut out, size, size);
+            encoder.set_color(png::ColorType::Rgba);
+            encoder.set_depth(png::BitDepth::Eight);
+            encoder.set_compression(png::Compression::High);
+            if let Ok(mut writer) = encoder.write_header() {
+                let _ = writer.write_image_data(&self.rgba(size));
+            }
+        }
+        out
+    }
+
+    pub fn icns(&self) -> Vec<u8> {
+        const SLOTS: [(&[u8; 4], u32); 10] = [
+            (b"icp4", 16),
+            (b"icp5", 32),
+            (b"ic11", 32),
+            (b"ic12", 64),
+            (b"ic07", 128),
+            (b"ic13", 256),
+            (b"ic08", 256),
+            (b"ic14", 512),
+            (b"ic09", 512),
+            (b"ic10", 1024),
+        ];
+        let mut body = Vec::new();
+        let mut made: Vec<(u32, Vec<u8>)> = Vec::new();
+        for (kind, size) in SLOTS {
+            if !made.iter().any(|(s, _)| *s == size) {
+                made.push((size, self.png(size)));
+            }
+            let png = &made.iter().find(|(s, _)| *s == size).map(|(_, p)| p.clone()).unwrap_or_default();
+            body.extend_from_slice(kind);
+            body.extend_from_slice(&((png.len() as u32 + 8).to_be_bytes()));
+            body.extend_from_slice(png);
+        }
+        let mut out = Vec::with_capacity(body.len() + 8);
+        out.extend_from_slice(b"icns");
+        out.extend_from_slice(&((body.len() as u32 + 8).to_be_bytes()));
+        out.extend_from_slice(&body);
+        out
     }
 
     pub fn ico(&self) -> Vec<u8> {
