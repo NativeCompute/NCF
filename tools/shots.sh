@@ -22,17 +22,22 @@ for cast in dark light; do
     XDG_DATA_HOME="$home" HOME="$home" LIBGL_ALWAYS_SOFTWARE=1 "$bin" --"$cast" --no-splash --section "$section" >"$log" 2>&1 &
     pid=$!
     win=""
-    for _ in $(seq 1 100); do
+    for _ in $(seq 1 300); do
       win="$(xdotool search --onlyvisible --pid "$pid" 2>/dev/null | tail -1)"
       [ -n "$win" ] && break
       kill -0 "$pid" 2>/dev/null || break
       sleep 0.2
     done
     if [ -z "$win" ]; then
-      echo "no window for $section ($cast)"
+      if kill -0 "$pid" 2>/dev/null; then
+        echo "no window for $section ($cast) after 60 seconds; the gallery was still running"
+        kill "$pid" 2>/dev/null
+      else
+        wait "$pid"
+        echo "no window for $section ($cast); the gallery exited with code $?"
+      fi
       cat "$log"
       failed=1
-      kill "$pid" 2>/dev/null
       continue
     fi
     sleep 2
