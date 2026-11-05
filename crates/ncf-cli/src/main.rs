@@ -121,8 +121,9 @@ pub fn write_app(dir: &Path, plan: &Plan) -> Result<(), String> {
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
-        let script = dir.join("install.sh");
-        let _ = std::fs::set_permissions(&script, std::fs::Permissions::from_mode(0o755));
+        for script in ["install.sh", "install-macos.sh", "packaging/macos/bundle.sh"] {
+            let _ = std::fs::set_permissions(dir.join(script), std::fs::Permissions::from_mode(0o755));
+        }
     }
     Ok(())
 }

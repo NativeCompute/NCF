@@ -156,25 +156,45 @@ pub fn run<A: NcfApp + 'static>(info: AppInfo, make: impl FnOnce(&egui::Context,
     run_with(Shell::new(info), make)
 }
 
+pub fn renderers() -> Vec<eframe::Renderer> {
+    #[cfg(target_os = "macos")]
+    return vec![eframe::Renderer::Wgpu, eframe::Renderer::Glow];
+    #[cfg(not(target_os = "macos"))]
+    return vec![eframe::Renderer::Glow];
+}
+
 pub fn run_with<A: NcfApp + 'static>(shell: Shell, make: impl FnOnce(&egui::Context, &mut Shell) -> A + 'static) -> eframe::Result<()> {
     let info = shell.info;
     let wants_splash = shell.look.splash && shell.look.animations;
     let (size, min) = first_size(wants_splash, crate::OS);
-    let options = eframe::NativeOptions {
-        viewport: viewport(&info, size, min),
-        centered: chrome::native_frame(crate::OS),
-        ..Default::default()
-    };
-    eframe::run_native(
-        info.name,
-        options,
-        Box::new(move |cc| {
-            let mut shell = shell;
-            let app = start(&cc.egui_ctx, &mut shell, make);
-            let splash = if wants_splash { Some(Splash::for_os(info, crate::OS)) } else { None };
-            Ok(Box::new(Runner { app, shell, splash, settled: false }))
-        }),
-    )
+    let waiting = std::rc::Rc::new(std::cell::RefCell::new(Some((shell, make))));
+    let mut outcome = Ok(());
+    for renderer in renderers() {
+        let options = eframe::NativeOptions {
+            viewport: viewport(&info, size, min),
+            renderer,
+            centered: chrome::native_frame(crate::OS),
+            ..Default::default()
+        };
+        let parts = waiting.clone();
+        outcome = eframe::run_native(
+            info.name,
+            options,
+            Box::new(move |cc| {
+                let (mut shell, make) = parts.borrow_mut().take().ok_or("the app had already started")?;
+                let app = start(&cc.egui_ctx, &mut shell, make);
+                let splash = if wants_splash { Some(Splash::for_os(info, crate::OS)) } else { None };
+                Ok(Box::new(Runner { app, shell, splash, settled: false }))
+            }),
+        );
+        if outcome.is_ok() || waiting.borrow().is_none() {
+            break;
+        }
+        if let Err(e) = &outcome {
+            eprintln!("{}: the {renderer} renderer could not start ({e}); trying the next one", info.name);
+        }
+    }
+    outcome
 }
 
 pub fn start<A: NcfApp>(ctx: &egui::Context, shell: &mut Shell, make: impl FnOnce(&egui::Context, &mut Shell) -> A) -> A {

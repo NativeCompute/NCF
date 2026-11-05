@@ -294,6 +294,18 @@ fn the_mac_keeps_its_own_shortcuts_and_option_types() {
 }
 
 #[test]
+fn a_mac_draws_with_metal_first_and_opengl_after() {
+    let order = crate::app::renderers();
+    assert_eq!(order.last(), Some(&eframe::Renderer::Glow), "OpenGL is always there to fall back on");
+    if cfg!(target_os = "macos") {
+        assert_eq!(order.len(), 2);
+        assert_ne!(order[0], eframe::Renderer::Glow, "Metal comes first on a Mac");
+    } else {
+        assert_eq!(order, vec![eframe::Renderer::Glow]);
+    }
+}
+
+#[test]
 fn a_mac_window_uses_the_native_frame_and_fits_the_screen() {
     use crate::{chrome, splash, Os};
     use eframe::egui::Vec2;

@@ -61,9 +61,49 @@ jobs:
           name: windows
           path: __SLUG__-*.zip
 
+  macos:
+    name: macOS build (universal)
+    runs-on: macos-15
+    env:
+      MACOSX_DEPLOYMENT_TARGET: "11.0"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin, x86_64-apple-darwin
+      - uses: Swatinem/rust-cache@v2
+      - name: Test
+        run: cargo test --release
+      - name: Build, sign and zip the app
+        run: packaging/macos/bundle.sh --out dist
+      - name: Install it the way a user would
+        env:
+          NCF_INSTALL_SOURCE: file://${{ github.workspace }}/dist
+          NCF_INSTALL_APP_DIR: ${{ runner.temp }}/apps
+          NCF_INSTALL_NO_OPEN: "1"
+        run: |
+          /bin/bash install-macos.sh
+          codesign --verify --deep --strict "$NCF_INSTALL_APP_DIR/__NAME__.app"
+          "$NCF_INSTALL_APP_DIR/__NAME__.app/Contents/MacOS/__SLUG__" --version
+          /bin/bash install-macos.sh --uninstall
+      - name: Package
+        run: |
+          cd dist
+          name="__SLUG__-${GITHUB_REF_NAME}-macos-universal.zip"
+          cp __SLUG__-macos.zip "$name"
+          shasum -a 256 "$name" > "$name.sha256"
+          cp ../install-macos.sh .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos
+          path: |
+            dist/__SLUG__-*.zip
+            dist/__SLUG__-*.zip.sha256
+            dist/install-macos.sh
+
   publish:
     name: GitHub Release
-    needs: [linux, windows]
+    needs: [linux, windows, macos]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
@@ -75,3 +115,5 @@ jobs:
           files: |
             __SLUG__-*.tar.gz
             __SLUG__-*.zip
+            __SLUG__-*.zip.sha256
+            install-macos.sh

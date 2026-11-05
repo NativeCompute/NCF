@@ -17,10 +17,12 @@ macOS. Every check runs on GitHub's Macs, Apple Silicon and Intel, as well as on
 - `NcfApp::on_exit` runs on quit, including Cmd+Q, and the settings are written then.
 - `platform`: the data folder is `~/Library/Application Support/<Name>` on a Mac; `reveal` selects the file in Finder; `pick_file` uses the system open panel; `alert` shows a real dialog on every platform.
 - `AppMark::png` and `AppMark::icns` (the Mac icon file, 16 to 1024 px), and `bundle::info_plist` for the app bundle.
+- On a Mac, apps draw with Metal, and fall back to OpenGL if Metal can't start (`app::renderers`).
 - The mark draws much faster, with the same pixels.
 
 ### Tools
 - `ncf mark --icns`, and `--emit-icns` / `--emit-info-plist` in new apps.
+- New apps ship on the Mac: `packaging/macos/bundle.sh` builds one signed, universal app (Apple Silicon and Intel, macOS 11 and newer) and zips it; `install-macos.sh` is the one-line Terminal install, with updates, `--uninstall` and `--from-source`; `install.sh` hands over to it on a Mac; the release workflow attaches the Mac zip, its checksum and the installer.
 
 ## 0.2.0
 
