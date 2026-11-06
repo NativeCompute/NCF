@@ -9,6 +9,8 @@ pub const FILES: &[(&str, &str)] = &[
     ("build.rs", include_str!("../../../templates/app/build.rs.tmpl")),
     (".gitignore", include_str!("../../../templates/app/gitignore.tmpl")),
     ("install.sh", include_str!("../../../templates/app/install.sh.tmpl")),
+    ("install-macos.sh", include_str!("../../../templates/app/install-macos.sh.tmpl")),
+    ("packaging/macos/bundle.sh", include_str!("../../../templates/app/packaging/macos/bundle.sh.tmpl")),
     ("packaging/__SLUG__.desktop", include_str!("../../../templates/app/packaging/app.desktop.tmpl")),
     ("src/app.rs", include_str!("../../../templates/app/src/app.rs.tmpl")),
     ("src/main.rs", include_str!("../../../templates/app/src/main.rs.tmpl")),

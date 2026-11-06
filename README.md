@@ -4,7 +4,7 @@
 
 ![The desktop gallery](docs/shots/controls-dark.png)
 
-- **Desktop:** a Rust crate on [egui](https://github.com/emilk/egui) for Linux and Windows apps. It gives you the theme, every component, the window frame, the splash, notices, settings, keyboard shortcuts, app icons and an update check.
+- **Desktop:** a Rust crate on [egui](https://github.com/emilk/egui) for Linux, macOS and Windows apps. It gives you the theme, every component, the window frame, the splash, notices, settings, keyboard shortcuts, app icons and an update check.
 - **Web:** `ncf.css` and `ncf.js`, with no build step, using the same tokens and class names as nativecompute.net.
 - **One source of truth:** every colour, size and duration lives in [`tokens/ncf.toml`](tokens/ncf.toml) and is generated into Rust and CSS.
 - **A new app in one command:** `ncf new Ledger` writes an app that builds, tests and ships on day one.

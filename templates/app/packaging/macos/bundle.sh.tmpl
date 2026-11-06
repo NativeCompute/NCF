@@ -1,0 +1,76 @@
+#!/bin/bash
+set -euo pipefail
+
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+cd "$here"
+
+say() { printf '\033[1;34m::\033[0m %s\n' "$*"; }
+die() { printf '\033[1;31m::\033[0m %s\n' "$*" >&2; exit 1; }
+
+OUT="dist"
+ARCHES="arm64 x86_64"
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --out) OUT="$2"; shift 2 ;;
+    --native) ARCHES="$(uname -m)"; shift ;;
+    *) die "Unknown option: $1" ;;
+  esac
+done
+
+[ "$(uname -s)" = "Darwin" ] || die "Building the Mac app needs a Mac."
+command -v cargo >/dev/null 2>&1 || die "Rust is not installed. Get it from https://rustup.rs, then run this again."
+
+export MACOSX_DEPLOYMENT_TARGET=11.0
+TARGET_DIR="${CARGO_TARGET_DIR:-target}"
+mkdir -p "$OUT"
+OUT="$(cd "$OUT" && pwd)"
+
+binaries=()
+for arch in $ARCHES; do
+  case "$arch" in
+    arm64) triple="aarch64-apple-darwin" ;;
+    x86_64) triple="x86_64-apple-darwin" ;;
+    *) die "Unsupported architecture: $arch" ;;
+  esac
+  if command -v rustup >/dev/null 2>&1; then
+    rustup target add "$triple" >/dev/null 2>&1 || true
+  fi
+  say "Building for $arch"
+  cargo build --release --target "$triple"
+  binaries+=("$TARGET_DIR/$triple/release/__SLUG__")
+done
+
+APP="$OUT/__NAME__.app"
+rm -rf "$APP"
+mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
+
+if [ ${#binaries[@]} -gt 1 ]; then
+  lipo -create -output "$APP/Contents/MacOS/__SLUG__" "${binaries[@]}"
+else
+  cp "${binaries[0]}" "$APP/Contents/MacOS/__SLUG__"
+fi
+chmod 755 "$APP/Contents/MacOS/__SLUG__"
+
+for arch in $ARCHES; do
+  lipo "$APP/Contents/MacOS/__SLUG__" -verify_arch "$arch" || die "The app is missing its $arch build."
+  minos="$(otool -arch "$arch" -l "$APP/Contents/MacOS/__SLUG__" | awk '/LC_BUILD_VERSION/{found=1} found && /minos/{print $2; exit}')"
+  [ "$minos" = "11.0" ] || die "The $arch build needs macOS $minos, not 11.0."
+  say "$arch build runs on macOS $minos and newer"
+done
+
+"$APP/Contents/MacOS/__SLUG__" --emit-info-plist "$APP/Contents/Info.plist" >/dev/null
+"$APP/Contents/MacOS/__SLUG__" --emit-icns "$APP/Contents/Resources/__NAME__.icns" >/dev/null
+printf 'APPL????' > "$APP/Contents/PkgInfo"
+plutil -lint "$APP/Contents/Info.plist"
+[ "$(plutil -extract CFBundleExecutable raw "$APP/Contents/Info.plist")" = "__SLUG__" ] || die "Info.plist names the wrong program."
+sips -g pixelWidth "$APP/Contents/Resources/__NAME__.icns" >/dev/null || die "The icon file does not open."
+
+codesign --force --deep --sign - "$APP"
+codesign --verify --deep --strict --verbose=2 "$APP"
+say "Signed"
+
+ZIP="__SLUG__-macos.zip"
+rm -f "$OUT/$ZIP" "$OUT/$ZIP.sha256"
+(cd "$OUT" && ditto -c -k --sequesterRsrc --keepParent "__NAME__.app" "$ZIP")
+(cd "$OUT" && shasum -a 256 "$ZIP" > "$ZIP.sha256")
+say "Made $OUT/$ZIP ($(du -h "$OUT/$ZIP" | cut -f1))"

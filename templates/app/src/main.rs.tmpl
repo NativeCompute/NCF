@@ -20,6 +20,18 @@ pub const INFO: AppInfo = AppInfo {
 
 fn main() -> ncf::eframe::Result<()> {
     let args: Vec<String> = std::env::args().collect();
+    if let Some(demo) = ncf::updater::demo_from_args(&args) {
+        std::process::exit(ncf::updater::run_demo(INFO, demo));
+    }
+    if let Some(plan) = ncf::updater::from_args(&args, ncf::OS) {
+        match plan {
+            Ok(plan) => std::process::exit(ncf::updater::run(INFO, plan)),
+            Err(e) => {
+                eprintln!("{e}");
+                std::process::exit(2);
+            }
+        }
+    }
     let out = |flag: &str, default: &str| args.iter().position(|a| a == flag).map(|i| args.get(i + 1).cloned().unwrap_or_else(|| default.to_string()));
     if let Some(path) = out("--emit-icon", "__SLUG__.svg") {
         std::fs::write(&path, MARK.svg()).map_err(|e| eprintln!("{path}: {e}")).ok();
@@ -29,9 +41,18 @@ fn main() -> ncf::eframe::Result<()> {
         std::fs::write(&path, MARK.ico()).map_err(|e| eprintln!("{path}: {e}")).ok();
         return Ok(());
     }
+    if let Some(path) = out("--emit-icns", "__SLUG__.icns") {
+        std::fs::write(&path, MARK.icns()).map_err(|e| eprintln!("{path}: {e}")).ok();
+        return Ok(());
+    }
+    if let Some(path) = out("--emit-info-plist", "Info.plist") {
+        std::fs::write(&path, ncf::bundle::info_plist(&INFO, "__SLUG__", "__NAME__")).map_err(|e| eprintln!("{path}: {e}")).ok();
+        return Ok(());
+    }
     if args.iter().any(|a| a == "--version" || a == "-V") {
         println!("__SLUG__ {}", INFO.version);
         return Ok(());
     }
+    ncf::updater::tidy("__SLUG__");
     ncf::app::run(INFO, |_ctx, shell| app::App::load(shell))
 }

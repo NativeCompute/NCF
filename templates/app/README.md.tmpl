@@ -8,10 +8,22 @@ Built on [NCF](https://github.com/NativeCompute/ncf), the NativeCompute Framewor
 
 Download the latest build from [Releases](https://github.com/__REPO__/releases):
 
+- **macOS** 11 or newer, Apple Silicon or Intel — paste this into Terminal:
+
+  ```bash
+  curl -fsSL https://github.com/__REPO__/releases/latest/download/install-macos.sh | bash
+  ```
+
+  It installs `__NAME__.app` in Applications. Run it again to update; add
+  `-s -- --uninstall` after `bash` to remove it. The release also has
+  `__SLUG__-<version>-macos-universal.zip`; a copy downloaded with a browser
+  needs *Open Anyway* in System Settings → Privacy & Security the first time.
 - **Linux** — unpack `__SLUG__-<version>-linux-x86_64.tar.gz` and run `./install.sh`.
 - **Windows** — unpack `__SLUG__-<version>-windows-x86_64.zip` and run `__SLUG__.exe`.
 
-From source on Linux: `./install.sh` builds and installs it for your user.
+From source: `./install.sh` builds and installs it for your user. On a Mac it
+needs Apple's command line tools (`xcode-select --install`) and Rust, and
+builds `__NAME__.app`.
 
 ## Development
 
@@ -23,7 +35,7 @@ cargo run -- --emit-icon packaging/__SLUG__.svg
 cargo run -- --emit-ico packaging/__SLUG__.ico
 ```
 
-Releases: publish a release named `vX.Y.Z` on GitHub (or push the tag) and the release workflow attaches the Linux and Windows builds.
+Releases: publish a release named `vX.Y.Z` on GitHub (or push the tag) and the release workflow attaches the Linux, macOS and Windows builds. `packaging/macos/bundle.sh` builds the Mac app on a Mac.
 
 ## Licence
 

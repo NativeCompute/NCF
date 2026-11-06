@@ -28,7 +28,9 @@ pub trait NcfApp {
         String::new()
     }
     fn answer(&mut self, _action: &str, _text: Option<String>, _shell: &mut Shell) {}
+    fn on_exit(&mut self, _shell: &mut Shell) {}
     fn about(&mut self, _ui: &mut egui::Ui, _shell: &mut Shell) {}
+    fn debug_ui(&mut self, _ui: &mut egui::Ui, _shell: &mut Shell) {}
 }
 
 // shell here---
@@ -39,6 +41,8 @@ pub struct Shell {
     pub deck: Deck<String>,
     pub update: Status,
     pub frame_no: u64,
+    pub debug: crate::debug::Debug,
+    splash_replay: Option<Status>,
     settings_open: bool,
     settings_tab: String,
     look_dirty: bool,
@@ -54,6 +58,8 @@ impl Shell {
         let extra_settings = settings::pairs(&text).into_iter().filter(|(k, _)| !Look::default().clone().read(k, "")).collect();
         Shell {
             info,
+            debug: crate::debug::Debug::new(look.debug),
+            splash_replay: None,
             look,
             deck: Deck::default(),
             update: Status::Off,
@@ -111,6 +117,29 @@ impl Shell {
         self.save_due = true;
     }
 
+    pub fn update_plan(&self) -> Option<crate::updater::Plan> {
+        let Status::Newer(r) = &self.update else {
+            return None;
+        };
+        crate::updater::Plan::for_release(&self.info, &r.version, self.folder())
+    }
+
+    pub fn update_now(&mut self, ctx: &egui::Context) -> bool {
+        let Some(plan) = self.update_plan() else {
+            return false;
+        };
+        match crate::updater::start(&plan) {
+            Ok(()) => {
+                ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+                true
+            }
+            Err(e) => {
+                self.warn("Couldn't start the update", &e);
+                false
+            }
+        }
+    }
+
     pub fn check_for_updates(&mut self) {
         if !self.info.repo.is_empty() {
             self.update_rx = Some(update::spawn(self.info.repo, self.info.version));
@@ -129,38 +158,72 @@ struct Runner<A: NcfApp> {
     app: A,
     shell: Shell,
     splash: Option<Splash>,
+    settled: bool,
+    replaying: bool,
+}
+
+pub fn viewport(info: &AppInfo, size: Vec2, min: Vec2) -> egui::ViewportBuilder {
+    let builder = egui::ViewportBuilder::default()
+        .with_title(info.name)
+        .with_icon(std::sync::Arc::new(info.mark.icon_data(128)))
+        .with_app_id(info.id)
+        .with_drag_and_drop(true)
+        .with_inner_size(size)
+        .with_min_inner_size(min);
+    chrome::viewport(builder, crate::OS)
+}
+
+pub fn first_size(splash: bool, os: crate::Os) -> (Vec2, Vec2) {
+    if splash && splash::own_window(os) {
+        (splash::CARD, splash::CARD)
+    } else {
+        (SIZE, MIN_SIZE)
+    }
 }
 
 pub fn run<A: NcfApp + 'static>(info: AppInfo, make: impl FnOnce(&egui::Context, &mut Shell) -> A + 'static) -> eframe::Result<()> {
     run_with(Shell::new(info), make)
 }
 
+pub fn renderers() -> Vec<eframe::Renderer> {
+    #[cfg(target_os = "macos")]
+    return vec![eframe::Renderer::Wgpu, eframe::Renderer::Glow];
+    #[cfg(not(target_os = "macos"))]
+    return vec![eframe::Renderer::Glow];
+}
+
 pub fn run_with<A: NcfApp + 'static>(shell: Shell, make: impl FnOnce(&egui::Context, &mut Shell) -> A + 'static) -> eframe::Result<()> {
     let info = shell.info;
-    let small = shell.look.splash && shell.look.animations;
-    let size = if small { splash::CARD } else { SIZE };
-    let options = eframe::NativeOptions {
-        viewport: egui::ViewportBuilder::default()
-            .with_title(info.name)
-            .with_icon(std::sync::Arc::new(info.mark.icon_data(128)))
-            .with_app_id(info.id)
-            .with_transparent(true)
-            .with_decorations(false)
-            .with_drag_and_drop(true)
-            .with_inner_size(size)
-            .with_min_inner_size(if small { size } else { MIN_SIZE }),
-        ..Default::default()
-    };
-    eframe::run_native(
-        info.name,
-        options,
-        Box::new(move |cc| {
-            let mut shell = shell;
-            let app = start(&cc.egui_ctx, &mut shell, make);
-            let splash = if small { Some(Splash::new(info)) } else { None };
-            Ok(Box::new(Runner { app, shell, splash }))
-        }),
-    )
+    let wants_splash = shell.look.splash && shell.look.animations;
+    let (size, min) = first_size(wants_splash, crate::OS);
+    let waiting = std::rc::Rc::new(std::cell::RefCell::new(Some((shell, make))));
+    let mut outcome = Ok(());
+    for renderer in renderers() {
+        let options = eframe::NativeOptions {
+            viewport: viewport(&info, size, min),
+            renderer,
+            centered: chrome::native_frame(crate::OS),
+            ..Default::default()
+        };
+        let parts = waiting.clone();
+        outcome = eframe::run_native(
+            info.name,
+            options,
+            Box::new(move |cc| {
+                let (mut shell, make) = parts.borrow_mut().take().ok_or("the app had already started")?;
+                let app = start(&cc.egui_ctx, &mut shell, make);
+                let splash = if wants_splash { Some(Splash::for_os(info, crate::OS)) } else { None };
+                Ok(Box::new(Runner { app, shell, splash, settled: false, replaying: false }))
+            }),
+        );
+        if outcome.is_ok() || waiting.borrow().is_none() {
+            break;
+        }
+        if let Err(e) = &outcome {
+            eprintln!("{}: the {renderer} renderer could not start ({e}); trying the next one", info.name);
+        }
+    }
+    outcome
 }
 
 pub fn start<A: NcfApp>(ctx: &egui::Context, shell: &mut Shell, make: impl FnOnce(&egui::Context, &mut Shell) -> A) -> A {
@@ -182,23 +245,45 @@ pub fn start<A: NcfApp>(ctx: &egui::Context, shell: &mut Shell, make: impl FnOnc
 impl<A: NcfApp> eframe::App for Runner<A> {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         frame(ctx, &mut self.app, &mut self.shell);
+        if let Some(status) = self.shell.splash_replay.take() {
+            let mut s = Splash::inline(self.shell.info);
+            s.set_status(status);
+            self.splash = Some(s);
+            self.replaying = true;
+        }
+        let own_window = self.splash.as_ref().map(|s| !s.is_inline()).unwrap_or(false);
+        if !own_window && !self.settled {
+            self.settled = splash::settle(ctx, SIZE);
+        }
         if let Some(s) = self.splash.as_mut() {
-            s.set_status(self.shell.update.clone());
+            if !self.replaying {
+                s.set_status(self.shell.update.clone());
+            }
             if s.show(ctx) {
-                if self.shell.frame_no < 3 {
+                if own_window && self.shell.frame_no < 3 {
                     splash::centre(ctx, splash::CARD);
                 }
             } else {
                 self.splash = None;
-                ctx.send_viewport_cmd(egui::ViewportCommand::MinInnerSize(MIN_SIZE));
-                ctx.send_viewport_cmd(egui::ViewportCommand::InnerSize(SIZE));
-                splash::centre(ctx, SIZE);
+                self.replaying = false;
+                if own_window {
+                    let size = chrome::fit(SIZE, ctx.input(|i| i.viewport().monitor_size), crate::OS);
+                    ctx.send_viewport_cmd(egui::ViewportCommand::MinInnerSize(MIN_SIZE));
+                    ctx.send_viewport_cmd(egui::ViewportCommand::InnerSize(size));
+                    splash::centre(ctx, size);
+                }
             }
         }
     }
 
     fn clear_color(&self, _visuals: &egui::Visuals) -> [f32; 4] {
-        [0.0, 0.0, 0.0, 0.0]
+        chrome::clear_color(crate::OS, pal().void)
+    }
+
+    fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
+        self.app.on_exit(&mut self.shell);
+        let text = format!("{}{}", self.shell.look.write(), self.app.write_settings());
+        let _ = platform::write_atomic(&settings_path(&self.shell.info), text.as_bytes());
     }
 }
 
@@ -229,10 +314,11 @@ pub fn frame<A: NcfApp>(ctx: &egui::Context, app: &mut A, shell: &mut Shell) {
         let info = shell.info;
         let mut open_settings = false;
         chrome::title_bar(ui, ctx, &info, |ui| {
-            if ui::icon_button(ui, Icon::Settings, "Settings · Ctrl+,", 28.0) {
+            if ui::icon_button(ui, Icon::Settings, &format!("Settings · {}+,", crate::OS.command_key()), 28.0) {
                 open_settings = true;
             }
             app.title_extras(ui, shell);
+            shell.debug.tag(ui);
         });
         if open_settings {
             shell.settings_open = !shell.settings_open;
@@ -248,8 +334,18 @@ pub fn frame<A: NcfApp>(ctx: &egui::Context, app: &mut A, shell: &mut Shell) {
     if shell.settings_open {
         settings_window(ctx, app, shell);
     }
+    let mut debug = std::mem::take(&mut shell.debug);
+    let requests = debug.panel(ctx, SIZE, |ui, _| app.debug_ui(ui, shell));
+    shell.debug = debug;
+    for request in requests {
+        apply_debug(ctx, shell, &request);
+    }
     if let Some(answer) = shell.deck.show(ctx) {
-        app.answer(&answer.action, answer.text, shell);
+        if answer.action == "ncf-debug-update" {
+            shell.update_now(ctx);
+        } else {
+            app.answer(&answer.action, answer.text, shell);
+        }
     }
 
     if shell.save_due {
@@ -258,6 +354,58 @@ pub fn frame<A: NcfApp>(ctx: &egui::Context, app: &mut A, shell: &mut Shell) {
         if let Err(e) = platform::write_atomic(&settings_path(&shell.info), text.as_bytes()) {
             shell.warn("Could not save settings", &e.to_string());
         }
+    }
+}
+
+pub fn apply_debug(ctx: &egui::Context, shell: &mut Shell, request: &crate::debug::Request) {
+    use crate::debug::Request;
+    if crate::debug::apply(ctx, &mut shell.debug, request) {
+        if *request == Request::Off {
+            shell.look.debug = false;
+            shell.save_due = true;
+            shell.say("Debug mode off", "Turn it on again the same way.");
+        }
+        return;
+    }
+    match request {
+        Request::FakeUpdate => {
+            let version = crate::debug::next_version(shell.info.version);
+            shell.update = Status::Newer(update::Release { version: version.clone(), url: update::releases_page(shell.info.repo) });
+            shell.say(&format!("{} {} is out", shell.info.name, version), "A pretend release, from debug mode.");
+        }
+        Request::UpdaterDemo(demo) => match crate::updater::start_demo(*demo) {
+            Ok(()) => shell.say("Updater demo", "It opens in its own window. Nothing is installed."),
+            Err(e) => shell.warn("Couldn't open the updater demo", &e),
+        },
+        Request::UpdateFrom { dir, version } => {
+            std::env::set_var("NCF_UPDATE_SOURCE", format!("file://{}", dir.trim_end_matches(['/', '\\'])));
+            shell.update = Status::Newer(update::Release { version: version.clone(), url: String::new() });
+            let body = format!("{} closes and installs {version} from {dir}.", shell.info.name);
+            shell.ask(&format!("Update to {version} from this folder?"), &body, "Update now", false, "ncf-debug-update");
+        }
+        Request::Splash(status) => shell.splash_replay = Some(status.clone()),
+        Request::Notice(tone) => {
+            let (title, body) = crate::debug::notice(*tone);
+            shell.deck.say(title, body, *tone);
+        }
+        Request::Confirm => shell.ask("A confirm card", "This is how a question looks. Nothing happens either way.", "Fine", false, "ncf-debug-confirm"),
+        Request::Crash => {
+            let text = format!("{} hit a test error from debug mode. Nothing is wrong.", shell.info.name);
+            let log = crate::debug::crash_report(&shell.info, &text);
+            shell.say("Crash report", &format!("Written to {}", log.display()));
+        }
+        Request::TextScale(step) => {
+            shell.look.font_scale = (shell.look.font_scale + step).clamp(0.8, 1.4);
+            shell.look_dirty = true;
+            shell.save_due = true;
+        }
+        Request::Light(light) => shell.set_light(*light),
+        Request::Animations(on) => {
+            shell.look.animations = *on;
+            shell.look_dirty = true;
+            shell.save_due = true;
+        }
+        _ => {}
     }
 }
 
@@ -341,7 +489,7 @@ fn appearance(ui: &mut egui::Ui, shell: &mut Shell) {
         shell.look.light_mode = k == 1;
     }
     ui.add_space(4.0);
-    ui::caption(ui, "Dark is NativeCompute's own: void black and one signal blue. Light is the same language on paper white.");
+    ui::caption(ui, "Dark is the house look: void black and one signal blue. Light is the same language on paper white.");
     ui::separator(ui);
     ui::section(ui, "Motion");
     let mut v = shell.look.animations;
@@ -367,7 +515,16 @@ fn appearance(ui: &mut egui::Ui, shell: &mut Shell) {
 fn about<A: NcfApp>(ui: &mut egui::Ui, app: &mut A, shell: &mut Shell) {
     let p = pal();
     ui::section(ui, shell.info.name);
-    ui.label(egui::RichText::new(format!("Version {}", shell.info.version)).font(theme::font(theme::T_CAP)).color(p.text_3));
+    let version = ui.label(egui::RichText::new(format!("Version {}", shell.info.version)).font(theme::font(theme::T_CAP)).color(p.text_3));
+    if shell.debug.knock(ui, version.rect) {
+        shell.look.debug = shell.debug.on;
+        shell.save_due = true;
+        if shell.debug.on {
+            shell.say("Debug mode on", "The DEBUG tag in the title bar opens its panel.");
+        } else {
+            shell.say("Debug mode off", "Turn it on again the same way.");
+        }
+    }
     if !shell.info.tagline.is_empty() {
         ui::body(ui, shell.info.tagline);
     }
@@ -395,7 +552,11 @@ fn about<A: NcfApp>(ui: &mut egui::Ui, app: &mut A, shell: &mut Shell) {
             ui::caption(ui, &line);
         }
         if let Status::Newer(r) = shell.update.clone() {
-            if ui::link(ui, &format!("{} {} is out — download it", shell.info.name, r.version)) {
+            if shell.update_plan().is_some() {
+                if ui::link(ui, &format!("{} {} is out — update now", shell.info.name, r.version)) {
+                    shell.update_now(ui.ctx());
+                }
+            } else if ui::link(ui, &format!("{} {} is out — download it", shell.info.name, r.version)) {
                 shell.open_url(&r.url);
             }
         }
@@ -405,10 +566,8 @@ fn about<A: NcfApp>(ui: &mut egui::Ui, app: &mut A, shell: &mut Shell) {
     }
     ui::separator(ui);
     ui::section(ui, "Made by");
-    ui.label(egui::RichText::new("NativeCompute").font(theme::font_bold(theme::T_H)).color(p.text));
-    ui::body(ui, &format!("{} is made by NativeCompute.", shell.info.name));
-    ui.add_space(4.0);
-    if ui::link(ui, "nativecompute.net") {
+    ui.add_space(2.0);
+    if ui::logo_link(ui, (theme::T_H * 1.25).round(), p.text) {
         shell.open_url(crate::tokens::BRAND_URL);
     }
 }

@@ -16,6 +16,11 @@ pub struct Splash {
     born: Instant,
     skip_at: Option<f32>,
     status: Status,
+    inline: bool,
+}
+
+pub fn own_window(os: crate::Os) -> bool {
+    !crate::chrome::native_frame(os)
 }
 
 pub fn status_line(status: &Status) -> Option<(String, bool)> {
@@ -30,7 +35,23 @@ pub fn status_line(status: &Status) -> Option<(String, bool)> {
 
 impl Splash {
     pub fn new(app: crate::AppInfo) -> Splash {
-        Splash { app, born: Instant::now(), skip_at: None, status: Status::Off }
+        Splash { app, born: Instant::now(), skip_at: None, status: Status::Off, inline: false }
+    }
+
+    pub fn inline(app: crate::AppInfo) -> Splash {
+        Splash { inline: true, ..Splash::new(app) }
+    }
+
+    pub fn for_os(app: crate::AppInfo, os: crate::Os) -> Splash {
+        if own_window(os) {
+            Splash::new(app)
+        } else {
+            Splash::inline(app)
+        }
+    }
+
+    pub fn is_inline(&self) -> bool {
+        self.inline
     }
 
     pub fn set_status(&mut self, status: Status) {
@@ -57,12 +78,19 @@ impl Splash {
             .fixed_pos(screen.min)
             .interactable(true)
             .show(ctx, |ui| {
-                let (rect, resp) = ui.allocate_exact_size(screen.size(), Sense::click());
+                let (whole, resp) = ui.allocate_exact_size(screen.size(), Sense::click());
                 let painter = ui.painter();
-                let round = egui::Rounding::same(theme::RADIUS);
+                let round = egui::Rounding::same(if self.inline { 0.0 } else { theme::RADIUS });
+                let rect = if self.inline { Rect::from_center_size(whole.center(), CARD.min(whole.size())) } else { whole };
 
+                if self.inline {
+                    painter.rect_filled(whole, egui::Rounding::ZERO, theme::wash(p.void, (255.0 * alpha) as u8));
+                    if alpha > 0.99 {
+                        crate::chrome::column_guides(painter, whole);
+                    }
+                }
                 painter.rect_filled(rect, round, theme::wash(p.void, (255.0 * alpha) as u8));
-                if alpha > 0.99 {
+                if alpha > 0.99 && !self.inline {
                     crate::chrome::column_guides(painter, rect);
                 }
                 painter.rect_stroke(
@@ -97,28 +125,10 @@ impl Splash {
                 let probe = painter.layout_no_wrap(word.clone(), theme::font_display(100.0), p.text);
                 let size = (100.0 * width / probe.rect.width().max(1.0)).min(rect.height() * 0.42);
                 let name = painter.layout_no_wrap(word, theme::font_display(size), ink(p.text, 1.0));
+                let title_bottom = rect.top() + 84.0 + name.rect.height();
                 painter.galley(Pos2::new(left + drift, rect.top() + 84.0), name, ink(p.text, 1.0));
 
-                let foot_y = rect.bottom() - 40.0;
-                painter.line_segment(
-                    [Pos2::new(left, foot_y - 26.0), Pos2::new(left + width, foot_y - 26.0)],
-                    egui::Stroke::new(1.0_f32, ink(p.line, 1.0)),
-                );
-                theme::tracked_text(
-                    painter,
-                    Pos2::new(left, foot_y),
-                    "BY NATIVECOMPUTE / NATIVECOMPUTE.NET",
-                    theme::font_hud(theme::T_MICRO + 0.5),
-                    ink(p.text_3, 1.0),
-                    0.8,
-                );
-                if let Some((line, news)) = status_line(&self.status) {
-                    let font = theme::font_hud(theme::T_MICRO + 0.5);
-                    let w = theme::tracked_width(ui.ctx(), &line, font.clone(), 0.8);
-                    let colour = if news { p.signal_hi } else { p.text_3 };
-                    theme::tracked_text(painter, Pos2::new(left + width - w, foot_y - 13.0), &line, font, ink(colour, 1.0), 0.8);
-                }
-                let track = Rect::from_min_size(Pos2::new(left + width - 140.0, foot_y - 1.0), Vec2::new(140.0, 2.0));
+                let track = Rect::from_min_size(Pos2::new(left, title_bottom + 10.0), Vec2::new(width, 2.0));
                 painter.rect_filled(track, egui::Rounding::ZERO, ink(p.line_strong, 1.0));
                 let done = anim::ease_out_expo((t / HOLD).clamp(0.0, 1.0));
                 painter.rect_filled(
@@ -126,6 +136,30 @@ impl Splash {
                     egui::Rounding::ZERO,
                     ink(p.signal_hi, 1.0),
                 );
+
+                let foot_y = rect.bottom() - 40.0;
+                painter.line_segment(
+                    [Pos2::new(left, foot_y - 26.0), Pos2::new(left + width, foot_y - 26.0)],
+                    egui::Stroke::new(1.0_f32, ink(p.line, 1.0)),
+                );
+                let foot_font = theme::font_hud(theme::T_MICRO + 0.5);
+                let by = theme::tracked_text(painter, Pos2::new(left, foot_y), "BY", foot_font.clone(), ink(p.text_3, 1.0), 0.8);
+                let logo_h = ((theme::T_MICRO + 0.5) * 1.35).round();
+                let logo_at = Rect::from_min_size(Pos2::new(left + by + 8.0, foot_y - logo_h * 0.5), Vec2::new(crate::mark::logo_width(logo_h), logo_h));
+                let logo_hit = ui.interact(logo_at.expand(4.0), egui::Id::new("ncf-splash-logo"), Sense::click());
+                let logo_hot = anim::ease(ui.ctx(), logo_hit.id, logo_hit.hovered(), anim::HOVER);
+                crate::mark::logo(painter, logo_at.left_center(), logo_h, ink(theme::mix(p.text_2, p.text, logo_hot), 1.0));
+                if logo_hit.hovered() {
+                    ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+                }
+                if logo_hit.clicked() {
+                    crate::ui::open_site(ui.ctx());
+                }
+                if let Some((line, news)) = status_line(&self.status) {
+                    let w = theme::tracked_width(ui.ctx(), &line, foot_font.clone(), 0.8);
+                    let colour = if news { p.signal_hi } else { p.text_3 };
+                    theme::tracked_text(painter, Pos2::new(left + width - w, foot_y), &line, foot_font, ink(colour, 1.0), 0.8);
+                }
 
                 if resp.clicked() && self.skip_at.is_none() {
                     self.skip_at = Some(t);
@@ -143,7 +177,25 @@ impl Splash {
 
 pub fn centre(ctx: &egui::Context, size: Vec2) {
     if let Some(monitor) = ctx.input(|i| i.viewport().monitor_size) {
-        let at = ((monitor - size) * 0.5).max(Vec2::ZERO);
-        ctx.send_viewport_cmd(egui::ViewportCommand::OuterPosition(at.to_pos2()));
+        ctx.send_viewport_cmd(egui::ViewportCommand::OuterPosition(centred(monitor, size, crate::OS)));
     }
+}
+
+pub fn centred(monitor: Vec2, size: Vec2, os: crate::Os) -> Pos2 {
+    let top = if os.is_mac() { 38.0 } else { 0.0 };
+    let at = ((monitor - size) * 0.5).max(Vec2::ZERO);
+    Pos2::new(at.x, at.y.max(top))
+}
+
+pub fn settle(ctx: &egui::Context, want: Vec2) -> bool {
+    let (monitor, inner) = ctx.input(|i| (i.viewport().monitor_size, i.viewport().inner_rect.map(|r| r.size())));
+    let (Some(monitor), Some(inner)) = (monitor, inner) else {
+        return false;
+    };
+    let fit = crate::chrome::fit(want, Some(monitor), crate::OS);
+    if inner.x > fit.x + 1.0 || inner.y > fit.y + 1.0 {
+        ctx.send_viewport_cmd(egui::ViewportCommand::InnerSize(fit));
+        ctx.send_viewport_cmd(egui::ViewportCommand::OuterPosition(centred(monitor, fit, crate::OS)));
+    }
+    true
 }

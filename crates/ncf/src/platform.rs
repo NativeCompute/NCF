@@ -9,9 +9,15 @@ pub fn data_home() -> PathBuf {
     dirs::data_dir().unwrap_or_else(|| dirs::home_dir().unwrap_or_else(|| PathBuf::from(".")).join(".local/share"))
 }
 
+pub fn folder_name(name: &str, os: crate::Os) -> String {
+    match os {
+        crate::Os::Windows | crate::Os::Mac => name.to_string(),
+        _ => name.to_lowercase(),
+    }
+}
+
 pub fn app_folder(name: &str) -> PathBuf {
-    let folder = if cfg!(windows) { name.to_string() } else { name.to_lowercase() };
-    data_home().join(folder)
+    data_home().join(folder_name(name, crate::OS))
 }
 
 pub fn app_folder_or_legacy(name: &str, legacy: &[&str]) -> PathBuf {
@@ -66,7 +72,13 @@ pub fn reveal(path: &Path) {
         select.push(path.as_os_str());
         let _ = quiet("explorer").arg(select).spawn();
     }
-    #[cfg(not(windows))]
+    #[cfg(target_os = "macos")]
+    {
+        if quiet("open").arg("-R").arg(path).spawn().is_err() {
+            open(path.parent().unwrap_or(path));
+        }
+    }
+    #[cfg(not(any(windows, target_os = "macos")))]
     {
         let uri = format!("file://{}", path.display());
         let spoke = quiet("dbus-send")
@@ -123,7 +135,67 @@ pub fn pick_file(filter: &FileFilter) -> Result<Option<PathBuf>, String> {
     Ok(if out.status.success() && !picked.is_empty() { Some(PathBuf::from(picked)) } else { None })
 }
 
-#[cfg(not(windows))]
+#[cfg(target_os = "macos")]
+pub fn pick_file(filter: &FileFilter) -> Result<Option<PathBuf>, String> {
+    let exts: Vec<&str> = filter.extensions.iter().map(String::as_str).collect();
+    let mut dialog = rfd::FileDialog::new().set_title(filter.title.as_str());
+    if !exts.is_empty() {
+        dialog = dialog.add_filter(filter.label.as_str(), &exts);
+    }
+    if let Some(home) = dirs::home_dir() {
+        dialog = dialog.set_directory(home);
+    }
+    Ok(dialog.pick_file())
+}
+
+pub fn applescript_text(s: &str) -> String {
+    let parts: Vec<String> = s
+        .split('\n')
+        .map(|line| format!("\"{}\"", line.replace('\\', "\\\\").replace('"', "\\\"")))
+        .collect();
+    parts.join(" & return & ")
+}
+
+pub fn alert_script(title: &str, text: &str) -> String {
+    format!(
+        "display alert {} message {} as critical buttons {{\"OK\"}} default button \"OK\"",
+        applescript_text(title),
+        applescript_text(text)
+    )
+}
+
+pub fn alert(title: &str, text: &str) {
+    eprintln!("{title}\n{text}");
+    #[cfg(target_os = "macos")]
+    {
+        let _ = std::process::Command::new("osascript").arg("-e").arg(alert_script(title, text)).status();
+    }
+    #[cfg(windows)]
+    {
+        #[link(name = "user32")]
+        extern "system" {
+            fn MessageBoxW(window: *mut std::ffi::c_void, text: *const u16, caption: *const u16, kind: u32) -> i32;
+        }
+        let wide = |s: &str| s.encode_utf16().chain(Some(0)).collect::<Vec<u16>>();
+        let (body, caption) = (wide(text), wide(title));
+        unsafe {
+            MessageBoxW(std::ptr::null_mut(), body.as_ptr(), caption.as_ptr(), 0x10);
+        }
+    }
+    #[cfg(not(any(windows, target_os = "macos")))]
+    {
+        let shown = std::process::Command::new("zenity")
+            .args(["--error", "--no-wrap", &format!("--title={title}"), &format!("--text={text}")])
+            .status()
+            .map(|s| s.success())
+            .unwrap_or(false);
+        if !shown {
+            let _ = std::process::Command::new("kdialog").args(["--title", title, "--error", text]).status();
+        }
+    }
+}
+
+#[cfg(not(any(windows, target_os = "macos")))]
 pub fn pick_file(filter: &FileFilter) -> Result<Option<PathBuf>, String> {
     let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
     let globs = filter.extensions.iter().map(|e| format!("*.{e}")).collect::<Vec<_>>().join(" ");

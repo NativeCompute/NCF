@@ -43,3 +43,21 @@ jobs:
         run: cargo clippy --release --all-targets -- -D warnings
       - name: Build
         run: cargo build --release
+
+  macos:
+    name: macOS — tests, clippy and the app bundle
+    runs-on: macos-15
+    env:
+      MACOSX_DEPLOYMENT_TARGET: "11.0"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: Clippy
+        run: cargo clippy --release --all-targets -- -D warnings
+      - name: Tests
+        run: cargo test --release
+      - name: Build, sign and zip the app
+        run: packaging/macos/bundle.sh --native --out dist

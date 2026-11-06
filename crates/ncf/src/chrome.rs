@@ -2,21 +2,80 @@ use eframe::egui::{self, Pos2, Rect, Sense, Stroke, Vec2, ViewportCommand};
 
 use crate::anim;
 use crate::theme::{self, pal};
+use crate::Os;
 
 pub const TITLE_H: f32 = 32.0;
+pub const TRAFFIC_LIGHTS: f32 = 78.0;
+pub const MIN_SIZE: Vec2 = Vec2::new(880.0, 580.0);
+
+pub fn native_frame(os: Os) -> bool {
+    os.is_mac()
+}
+
+pub fn viewport(builder: egui::ViewportBuilder, os: Os) -> egui::ViewportBuilder {
+    if native_frame(os) {
+        builder
+            .with_decorations(true)
+            .with_transparent(false)
+            .with_resizable(true)
+            .with_fullsize_content_view(true)
+            .with_title_shown(false)
+            .with_titlebar_shown(false)
+            .with_titlebar_buttons_shown(true)
+    } else {
+        builder.with_transparent(true).with_decorations(false)
+    }
+}
+
+pub fn fit(want: Vec2, monitor: Option<Vec2>, os: Os) -> Vec2 {
+    let Some(m) = monitor.filter(|m| m.x > 0.0 && m.y > 0.0) else {
+        return want;
+    };
+    let room = if os.is_mac() { Vec2::new(60.0, 140.0) } else { Vec2::new(40.0, 80.0) };
+    let most = (m - room).max(Vec2::new(480.0, 360.0));
+    want.min(most)
+}
+
+pub fn clear_color(os: Os, fill: egui::Color32) -> [f32; 4] {
+    if native_frame(os) {
+        egui::Rgba::from(fill).to_array()
+    } else {
+        [0.0, 0.0, 0.0, 0.0]
+    }
+}
 
 pub fn maximized(ctx: &egui::Context) -> bool {
     crate::WEB || ctx.input(|i| i.viewport().maximized.unwrap_or(false))
 }
 
+pub fn fullscreen(ctx: &egui::Context) -> bool {
+    ctx.input(|i| i.viewport().fullscreen.unwrap_or(false))
+}
+
+pub fn window_radius(ctx: &egui::Context, radius: f32) -> f32 {
+    if maximized(ctx) || native_frame(crate::OS) {
+        0.0
+    } else {
+        radius
+    }
+}
+
+pub fn title_inset(os: Os, fullscreen: bool) -> f32 {
+    if native_frame(os) && !fullscreen {
+        TRAFFIC_LIGHTS
+    } else {
+        2.0
+    }
+}
+
 pub fn backdrop(ctx: &egui::Context, fill: egui::Color32) {
     let p = pal();
     let rect = ctx.screen_rect();
-    let r = if maximized(ctx) { 0.0 } else { theme::RADIUS };
+    let r = window_radius(ctx, theme::RADIUS);
     let painter = ctx.layer_painter(egui::LayerId::background());
     painter.rect_filled(rect, egui::Rounding::same(r), fill);
     column_guides(&painter, rect);
-    if crate::WEB {
+    if crate::WEB || native_frame(crate::OS) {
         return;
     }
     painter.rect_stroke(
@@ -64,7 +123,7 @@ pub fn title_bar(ui: &mut egui::Ui, ctx: &egui::Context, app: &crate::AppInfo, e
             .layout(egui::Layout::left_to_right(egui::Align::Center)),
     );
     row.spacing_mut().item_spacing.x = 9.0;
-    row.add_space(2.0);
+    row.add_space(title_inset(crate::OS, fullscreen(ctx)));
 
     row.spacing_mut().item_spacing.x = 6.0;
     let (mark, _) = row.allocate_exact_size(Vec2::splat(18.0), Sense::hover());
@@ -78,7 +137,7 @@ pub fn title_bar(ui: &mut egui::Ui, ctx: &egui::Context, app: &crate::AppInfo, e
 
     row.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
         ui.spacing_mut().item_spacing.x = 2.0;
-        if !crate::WEB {
+        if !crate::WEB && !native_frame(crate::OS) {
             if window_button(ui, Glyph::Close, p.danger) {
                 ctx.send_viewport_cmd(ViewportCommand::Close);
             }
@@ -168,7 +227,7 @@ fn window_button(ui: &mut egui::Ui, glyph: Glyph, tint: egui::Color32) -> bool {
 pub fn resize_handles(ctx: &egui::Context) {
     use egui::viewport::ResizeDirection as D;
     const GRIP: f32 = 6.0;
-    if maximized(ctx) {
+    if crate::WEB || maximized(ctx) || native_frame(crate::OS) {
         return;
     }
 

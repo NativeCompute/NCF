@@ -1,11 +1,14 @@
 pub mod alerts;
 pub mod anim;
 pub mod brand;
+pub mod bundle;
 pub mod caret;
 pub mod chrome;
+pub mod debug;
 pub mod icons;
 pub mod keys;
 pub mod mark;
+pub mod os;
 pub mod settings;
 pub mod splash;
 pub mod theme;
@@ -17,6 +20,8 @@ pub mod update;
 pub mod app;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod platform;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod updater;
 #[cfg(any(test, feature = "testing"))]
 pub mod testing;
 
@@ -26,6 +31,7 @@ mod tests;
 pub use eframe;
 
 pub const WEB: bool = cfg!(target_arch = "wasm32");
+pub use os::{Os, OS};
 pub const NATIVECOMPUTE_URL: &str = tokens::BRAND_URL;
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 

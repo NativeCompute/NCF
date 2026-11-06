@@ -4,6 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -51,13 +52,33 @@ jobs:
       - name: Tests
         run: cargo test --workspace --all-features
 
+  macos:
+    name: macOS ${{ matrix.os }} — tests and clippy
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-15, macos-26, macos-15-intel, macos-26-intel]
+    env:
+      MACOSX_DEPLOYMENT_TARGET: "11.0"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+      - name: Tests
+        run: cargo test --workspace --all-features
+
   template:
     name: A new app builds, tests and passes clippy
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        os: [ubuntu-latest, windows-latest, macos-15]
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -73,6 +94,42 @@ jobs:
       - name: Tests
         working-directory: ${{ runner.temp }}/field-notes
         run: cargo test
+      - name: Its install scripts pass shellcheck
+        if: runner.os == 'Linux'
+        working-directory: ${{ runner.temp }}/field-notes
+        run: shellcheck -S warning install.sh install-macos.sh packaging/macos/bundle.sh
+      - name: Pack it as a Mac app
+        if: runner.os == 'macOS'
+        working-directory: ${{ runner.temp }}/field-notes
+        env:
+          MACOSX_DEPLOYMENT_TARGET: "11.0"
+        run: |
+          packaging/macos/bundle.sh --native --out dist
+          cp install-macos.sh dist/
+      - name: Install it, open it, update it while open, uninstall it
+        if: runner.os == 'macOS'
+        timeout-minutes: 10
+        working-directory: ${{ runner.temp }}/field-notes
+        env:
+          NCF_INSTALL_NO_OPEN: "1"
+        run: |
+          export NCF_INSTALL_SOURCE="file://$PWD/dist"
+          app="/Applications/Field Notes.app"
+          running() { pgrep -f "/Contents/MacOS/field-notes" >/dev/null 2>&1; }
+          curl -fsSL "$NCF_INSTALL_SOURCE/install-macos.sh" | /bin/bash
+          codesign --verify --deep --strict --verbose=2 "$app"
+          open -n --stderr "$RUNNER_TEMP/field-notes.err" "$app"
+          for i in $(seq 1 30); do running && break; sleep 1; done
+          sleep 8
+          cat "$RUNNER_TEMP/field-notes.err" || true
+          running || { echo "Field Notes did not stay open"; exit 1; }
+          if NCF_INSTALL_WAIT=4 /bin/bash install-macos.sh; then echo "the installer replaced an open app"; exit 1; fi
+          pkill -f "/Contents/MacOS/field-notes"
+          for i in $(seq 1 15); do running || break; sleep 1; done
+          /bin/bash install-macos.sh
+          "$app/Contents/MacOS/field-notes" --version
+          /bin/bash install-macos.sh --uninstall
+          [ ! -e "$app" ]
 
   shots:
     name: Gallery screenshots

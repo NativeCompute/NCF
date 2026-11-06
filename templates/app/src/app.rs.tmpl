@@ -115,13 +115,14 @@ impl NcfApp for App {
                     ui::giant_fit(ui, "Your items", 34.0, 22.0, (w - 200.0).max(120.0));
                 });
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                    if ui::button_response(ui, "New item", Some(Icon::Plus), true, Some(140.0)).on_hover_text("New item · Ctrl+N").clicked() {
+                    if ui::button_response(ui, "New item", Some(Icon::Plus), true, Some(140.0)).on_hover_text(format!("New item · {}+N", ncf::OS.command_key())).clicked() {
                         self.adding = true;
                     }
                 });
             });
             ui.add_space(14.0);
-            let search = ui::field(ui, &mut self.search, "Search  ·  Ctrl+F", w.min(380.0));
+            let hint = format!("Search  ·  {}+F", ncf::OS.command_key());
+            let search = ui::field(ui, &mut self.search, &hint, w.min(380.0));
             if self.focus_search {
                 search.request_focus();
                 self.focus_search = false;

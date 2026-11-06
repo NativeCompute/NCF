@@ -113,7 +113,7 @@ What the app can ask NCF for:
 
 | Call | Does |
 |---|---|
-| `shell.folder()` | The app's data folder: `$XDG_DATA_HOME/<name in lower case>` or `~/.local/share/<name in lower case>` on Linux, `%APPDATA%\<Name>` on Windows. |
+| `shell.folder()` | The app's data folder: `$XDG_DATA_HOME/<name in lower case>` or `~/.local/share/<name in lower case>` on Linux, `%APPDATA%\<Name>` on Windows, `~/Library/Application Support/<Name>` on macOS. |
 | `shell.say / ok / warn(title, body)` | A notice. |
 | `shell.ask(title, body, yes, danger, action)` | A confirmation. The answer arrives in `NcfApp::answer` with `action`. |
 | `shell.deck.prompt(title, body, hint, seed, yes, action)` | A confirmation with a text field. The text arrives in `answer` as `Some(text)`. |
@@ -138,7 +138,7 @@ What the app can ask NCF for:
 | `platform::write_atomic(path, bytes)` | Writes to a temporary file and renames it over the target. Use it for every save. |
 | `platform::open(target)` | Opens a file, folder or URL with the system handler. |
 | `platform::reveal(path)` | Shows a file in the file manager. |
-| `platform::pick_file(&FileFilter::new(title, label, &["md"]))` | A native open dialog: PowerShell on Windows, kdialog or zenity on Linux. |
+| `platform::pick_file(&FileFilter::new(title, label, &["md"]))` | A native open dialog: PowerShell on Windows, kdialog or zenity on Linux, the system open panel on macOS (call it from the UI thread there). |
 
 ### Update check (`ncf::update`)
 
@@ -163,6 +163,32 @@ Point `XDG_DATA_HOME` at a temporary folder first so tests never touch real data
 
 Draw each screen in both casts in at least one test. Most layout bugs show up as a panic or an overflow in one cast only.
 
+## Updating
+
+When the launch check finds a newer release, `Shell::update_plan()` says whether this copy can update itself: an app in `/Applications` or `~/Applications` on a Mac, `~/.local/bin/<app>` on Linux, or an `.exe` in a writable folder on Windows. A copy run from a source folder can't, and gets a download link instead.
+
+`Shell::update_now(ctx)` (or `updater::start(&plan)` from your own button) copies the running program to a temporary folder as `<app>-updater` and starts it with `--ncf-update`, and then the app quits. Your `main` must call `ncf::updater::from_args` before anything else; the template does. The updater:
+
+1. waits for the app to close;
+2. downloads that exact release's files (`releases/download/vX.Y.Z`, never `latest`) and checks them against their `.sha256`;
+3. installs them the platform's way:
+   - on a Mac, the release's own `install-macos.sh`, run from the downloaded files;
+   - on Linux, the tarball's `install.sh`, after checking the new program runs;
+   - on Windows, it copies the library aside, moves the old `.exe` aside, and puts the new one in its place;
+4. reopens the app.
+
+Every step that can fail comes before the old version is touched. A failure leaves the old version installed and says why, and everything is written to `update.log` in the app's folder. `NCF_UPDATE_SOURCE` points the updater at a local folder of release files for testing, and `--headless` runs it without a window.
+
 ## Shipping
 
 See [releasing.md](releasing.md).
+
+## macOS
+
+- **The window.** `chrome::viewport` keeps the native frame on a Mac: the traffic lights, edge resizing, full screen and tiling all come from macOS, with the title bar hidden behind the app's own. `chrome::title_bar` leaves room on the left for the traffic lights and draws no window buttons of its own. `resize_handles` does nothing there. The window is opaque, and macOS rounds its corners.
+- **The splash.** On a Mac the splash card shows centred inside the main window, which opens at full size and is capped to the screen (`chrome::fit`), instead of in a small window that then grows.
+- **Shortcuts.** `Modifiers::COMMAND` is Cmd on a Mac. Show shortcuts with `keys::label` ("Cmd+Shift+F"). `keys::refused` turns away the shortcuts macOS keeps for itself (Cmd+Q, Cmd+H, Cmd+Tab, Cmd+Space, Cmd+\`, screenshots) and Option with a letter or number, which types a character.
+- **Saving on quit.** Cmd+Q ends the app through `NcfApp::on_exit`, not through the close button, so anything unsaved is written there.
+- **The app bundle.** `AppMark::icns()` writes the Mac icon file and `bundle::info_plist` the bundle's `Info.plist` (with `NSHighResolutionCapable`, so text is sharp on Retina screens, and macOS 11 as the minimum).
+- **Graphics.** On a Mac, `app::run` draws with Metal and falls back to OpenGL if Metal can't start. Don't rely on OpenGL alone there: Apple has deprecated it, and the software OpenGL renderer in macOS 26 hands back empty frames when they are read back.
+- **Installing.** `packaging/macos/bundle.sh` (on a Mac) builds `<Name>.app` for both chips, writes its `Info.plist` and icon from the app itself, signs it and zips it. `install-macos.sh` installs that zip from the latest release: it checks the checksum and that the app runs on this Mac before changing anything, waits for the app to be quit, copies the data folder aside first and never deletes it.

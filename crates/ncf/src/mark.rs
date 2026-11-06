@@ -131,7 +131,7 @@ impl AppMark {
     pub fn rgba(&self, size: u32) -> Vec<u8> {
         let n = size as f32;
         let scale = n / 512.0;
-        let parts: Vec<(Vec<Pos2>, [u8; 3])> = self
+        let parts: Vec<(Vec<Pos2>, [u8; 3], Rect)> = self
             .outlines(Rect::from_min_size(Pos2::new(56.0 * scale, 56.0 * scale), Vec2::splat(400.0 * scale)))
             .into_iter()
             .map(|(pts, ink, _)| {
@@ -139,7 +139,8 @@ impl AppMark {
                     Ink::Signal => tokens::DARK.signal,
                     Ink::Chrome | Ink::Text => tokens::DARK.chrome_hi,
                 };
-                (pts, [c.r(), c.g(), c.b()])
+                let bounds = Rect::from_points(&pts);
+                (pts, [c.r(), c.g(), c.b()], bounds)
             })
             .collect();
         let radius = 116.0 * scale;
@@ -161,8 +162,8 @@ impl AppMark {
                             continue;
                         }
                         let mut c = [0u8, 0, 0];
-                        for (pts, col) in &parts {
-                            if inside(pts, x, y) {
+                        for (pts, col, bounds) in &parts {
+                            if x >= bounds.min.x && x <= bounds.max.x && y >= bounds.min.y && y <= bounds.max.y && inside(pts, x, y) {
                                 c = *col;
                             }
                         }
@@ -187,6 +188,51 @@ impl AppMark {
 
     pub fn icon_data(&self, size: u32) -> egui::IconData {
         egui::IconData { rgba: self.rgba(size), width: size, height: size }
+    }
+
+    pub fn png(&self, size: u32) -> Vec<u8> {
+        let mut out = Vec::new();
+        {
+            let mut encoder = png::Encoder::new(&mut out, size, size);
+            encoder.set_color(png::ColorType::Rgba);
+            encoder.set_depth(png::BitDepth::Eight);
+            encoder.set_compression(png::Compression::High);
+            if let Ok(mut writer) = encoder.write_header() {
+                let _ = writer.write_image_data(&self.rgba(size));
+            }
+        }
+        out
+    }
+
+    pub fn icns(&self) -> Vec<u8> {
+        const SLOTS: [(&[u8; 4], u32); 10] = [
+            (b"icp4", 16),
+            (b"icp5", 32),
+            (b"ic11", 32),
+            (b"ic12", 64),
+            (b"ic07", 128),
+            (b"ic13", 256),
+            (b"ic08", 256),
+            (b"ic14", 512),
+            (b"ic09", 512),
+            (b"ic10", 1024),
+        ];
+        let mut body = Vec::new();
+        let mut made: Vec<(u32, Vec<u8>)> = Vec::new();
+        for (kind, size) in SLOTS {
+            if !made.iter().any(|(s, _)| *s == size) {
+                made.push((size, self.png(size)));
+            }
+            let png = &made.iter().find(|(s, _)| *s == size).map(|(_, p)| p.clone()).unwrap_or_default();
+            body.extend_from_slice(kind);
+            body.extend_from_slice(&((png.len() as u32 + 8).to_be_bytes()));
+            body.extend_from_slice(png);
+        }
+        let mut out = Vec::with_capacity(body.len() + 8);
+        out.extend_from_slice(b"icns");
+        out.extend_from_slice(&((body.len() as u32 + 8).to_be_bytes()));
+        out.extend_from_slice(&body);
+        out
     }
 
     pub fn ico(&self) -> Vec<u8> {
@@ -348,4 +394,79 @@ pub fn spinner(painter: &egui::Painter, centre: Pos2, radius: f32, t: f32, color
         );
     }
     painter.circle_filled(Pos2::new(centre.x + head.cos() * radius, centre.y + head.sin() * radius), w * 0.5, color);
+}
+
+// logo here---
+
+const LOGO_SUBROWS: usize = 5;
+
+pub fn logo_width(height: f32) -> f32 {
+    height * crate::brand::LOGO_SIZE.0 / crate::brand::LOGO_SIZE.1
+}
+
+pub fn logo_coverage(height_px: usize) -> (usize, usize, Vec<f32>) {
+    let s = height_px as f32 / crate::brand::LOGO_SIZE.1;
+    let w = (crate::brand::LOGO_SIZE.0 * s).ceil() as usize;
+    let h = height_px;
+    let mut cov = vec![0.0_f32; w * h];
+    let mut xs: Vec<(f32, i32)> = Vec::new();
+    let weight = 1.0 / LOGO_SUBROWS as f32;
+    for sub in 0..h * LOGO_SUBROWS {
+        let y = (sub as f32 + 0.5) / LOGO_SUBROWS as f32;
+        xs.clear();
+        for poly in crate::brand::LOGO {
+            for k in 0..poly.len() {
+                let (x0, y0) = poly[k];
+                let (x1, y1) = poly[(k + 1) % poly.len()];
+                let (x0, y0, x1, y1) = (x0 * s, y0 * s, x1 * s, y1 * s);
+                if (y0 <= y) != (y1 <= y) {
+                    let t = (y - y0) / (y1 - y0);
+                    xs.push((x0 + t * (x1 - x0), if y1 > y0 { 1 } else { -1 }));
+                }
+            }
+        }
+        xs.sort_by(|a, b| a.0.total_cmp(&b.0));
+        let row = &mut cov[(sub / LOGO_SUBROWS) * w..(sub / LOGO_SUBROWS + 1) * w];
+        let (mut wind, mut start) = (0, 0.0_f32);
+        for &(x, dir) in &xs {
+            let before = wind;
+            wind += dir;
+            if before == 0 && wind != 0 {
+                start = x;
+            } else if before != 0 && wind == 0 {
+                let (a, b) = (start.max(0.0), x.min(w as f32));
+                let mut px = a.floor() as usize;
+                while (px as f32) < b && px < w {
+                    let overlap = b.min(px as f32 + 1.0) - a.max(px as f32);
+                    row[px] += overlap.max(0.0) * weight;
+                    px += 1;
+                }
+            }
+        }
+    }
+    (w, h, cov)
+}
+
+fn logo_texture(ctx: &egui::Context, height_px: usize) -> egui::TextureHandle {
+    let id = egui::Id::new(("ncf-logo", height_px));
+    if let Some(tex) = ctx.data(|d| d.get_temp::<egui::TextureHandle>(id)) {
+        return tex;
+    }
+    let (w, h, cov) = logo_coverage(height_px);
+    let pixels = cov.iter().map(|c| Color32::from_white_alpha((c.clamp(0.0, 1.0) * 255.0).round() as u8)).collect();
+    let image = egui::ColorImage { size: [w, h], pixels };
+    let tex = ctx.load_texture(format!("ncf-logo-{height_px}"), image, egui::TextureOptions::LINEAR);
+    ctx.data_mut(|d| d.insert_temp(id, tex.clone()));
+    tex
+}
+
+pub fn logo(painter: &egui::Painter, left_mid: Pos2, height: f32, tint: Color32) -> Rect {
+    let ppp = painter.ctx().pixels_per_point();
+    let px = (height * ppp).round().max(4.0) as usize;
+    let tex = logo_texture(painter.ctx(), px);
+    let size = tex.size_vec2() / ppp;
+    let min = painter.round_pos_to_pixels(Pos2::new(left_mid.x, left_mid.y - size.y * 0.5));
+    let rect = Rect::from_min_size(min, size);
+    painter.image(tex.id(), rect, Rect::from_min_max(Pos2::ZERO, Pos2::new(1.0, 1.0)), tint);
+    rect
 }
