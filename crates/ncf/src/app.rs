@@ -566,7 +566,9 @@ fn about<A: NcfApp>(ui: &mut egui::Ui, app: &mut A, shell: &mut Shell) {
     }
     ui::separator(ui);
     ui::section(ui, "Made by");
-    ui.label(egui::RichText::new("NativeCompute").font(theme::font_bold(theme::T_H)).color(p.text));
+    ui.add_space(2.0);
+    ui::logo(ui, (theme::T_H * 1.25).round(), p.text).on_hover_text("NativeCompute");
+    ui.add_space(4.0);
     ui::body(ui, &format!("{} is made by NativeCompute.", shell.info.name));
     ui.add_space(4.0);
     if ui::link(ui, "nativecompute.net") {

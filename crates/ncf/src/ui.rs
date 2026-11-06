@@ -348,25 +348,29 @@ pub fn link(ui: &mut egui::Ui, text: &str) -> bool {
 
 pub fn maker_line(ui: &mut egui::Ui, rect: Rect, centre: bool, app_name: &str) -> bool {
     let p = pal();
-    let text = &format!("{} BY NATIVECOMPUTE", app_name.to_uppercase());
+    let text = &format!("{} BY", app_name.to_uppercase());
     let font = theme::font_hud(theme::T_MICRO);
-    let width = theme::tracked_width(ui.ctx(), text, font.clone(), 0.8);
+    let logo_h = (theme::T_MICRO * 1.3).round();
+    let text_w = theme::tracked_width(ui.ctx(), text, font.clone(), 0.8);
+    let gap = 7.0;
+    let width = text_w + gap + crate::mark::logo_width(logo_h);
     let left = if centre { rect.center().x - width * 0.5 } else { rect.left() + 3.0 };
     let hit = Rect::from_min_size(Pos2::new(left, rect.center().y - 8.0), Vec2::new(width, 16.0));
     let resp = ui.interact(hit, ui.id().with(("ncf-maker", rect.min.x as i32, rect.min.y as i32)), Sense::click());
     let hot = anim::ease(ui.ctx(), resp.id, resp.hovered(), anim::HOVER);
-    theme::tracked_text(
-        ui.painter(),
-        Pos2::new(left, rect.center().y),
-        text,
-        font,
-        theme::mix(p.text_3, p.text, hot),
-        0.8,
-    );
+    let ink = theme::mix(p.text_3, p.text, hot);
+    theme::tracked_text(ui.painter(), Pos2::new(left, rect.center().y), text, font, ink, 0.8);
+    crate::mark::logo(ui.painter(), Pos2::new(left + text_w + gap, rect.center().y), logo_h, ink);
     if resp.hovered() {
         ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
     }
     resp.on_hover_text(crate::tokens::BRAND_URL).clicked()
+}
+
+pub fn logo(ui: &mut egui::Ui, height: f32, tint: Color32) -> Response {
+    let (rect, resp) = ui.allocate_exact_size(Vec2::new(crate::mark::logo_width(height), height), Sense::hover());
+    crate::mark::logo(ui.painter(), rect.left_center(), height, tint);
+    resp
 }
 
 pub fn vertical_tabs(ui: &mut egui::Ui, options: &[(&str, Icon)], current: usize) -> Option<usize> {

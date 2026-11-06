@@ -152,6 +152,8 @@ impl Updater {
             self.info.mark.paint(&painter, mark);
             let eyebrow = format!("UPDATE / V{} TO V{}", self.info.version, self.plan.version);
             theme::tracked_text(&painter, Pos2::new(left + 32.0, mark.center().y), &eyebrow, theme::font_hud(theme::T_MICRO + 0.5), p.text_2, 0.8);
+            let logo_h = 13.0;
+            crate::mark::logo(&painter, Pos2::new(left + width - crate::mark::logo_width(logo_h), mark.center().y), logo_h, p.text_3);
 
             let title = self.title().to_uppercase();
             let probe = painter.layout_no_wrap(title.clone(), theme::font_display(40.0), p.text);

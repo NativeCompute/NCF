@@ -61,9 +61,19 @@ What one mark gives you:
 
 ## Maker line
 
-Every app says who made it, quietly, in HUD type at the foot of its main screen and in Settings → About: **LEDGER BY NATIVECOMPUTE**, linking to nativecompute.net. `ui::maker_line(ui, rect, centred, "Ledger")` draws it and returns true when clicked. Web pages use `<a class="maker" href="https://nativecompute.net">Built with NCF by NativeCompute</a>` in the footer.
+Every app says who made it, quietly, at the foot of its main screen: **LEDGER BY** in HUD type, then the NativeCompute logo, linking to nativecompute.net. `ui::maker_line(ui, rect, centred, "Ledger")` draws it and returns true when clicked. Web pages use `<a class="maker" href="https://nativecompute.net">Built with NCF by NativeCompute</a>` in the footer.
 
-The splash carries the same line: **BY NATIVECOMPUTE / NATIVECOMPUTE.NET**.
+The splash carries the same line: **BY** + logo + **/ NATIVECOMPUTE.NET**. Settings → About shows the logo under *Made by*, and the updater window shows it in its top-right corner.
+
+## Logo
+
+The NativeCompute logo (mark and wordmark) is drawn wherever the name would otherwise be plain type. The source is `crates/ncf/assets/nativecompute-logo.svg`; its outlines live in `brand::LOGO`, and NCF fills them at the exact pixel height it is drawn, so it stays sharp at any display scale and on the web.
+
+| Call | What it does |
+|---|---|
+| `ui::logo(ui, height, tint)` | Lays out the logo at `height` points, tinted with `tint` (use the colour of the text it replaces). |
+| `mark::logo(painter, left_mid, height, tint)` | Paints it from its left-middle point and returns its rect. |
+| `mark::logo_width(height)` | Its width at that height. |
 
 ## Fonts
 

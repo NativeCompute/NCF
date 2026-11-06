@@ -132,14 +132,10 @@ impl Splash {
                     [Pos2::new(left, foot_y - 26.0), Pos2::new(left + width, foot_y - 26.0)],
                     egui::Stroke::new(1.0_f32, ink(p.line, 1.0)),
                 );
-                theme::tracked_text(
-                    painter,
-                    Pos2::new(left, foot_y),
-                    "BY NATIVECOMPUTE / NATIVECOMPUTE.NET",
-                    theme::font_hud(theme::T_MICRO + 0.5),
-                    ink(p.text_3, 1.0),
-                    0.8,
-                );
+                let foot_font = theme::font_hud(theme::T_MICRO + 0.5);
+                let by = theme::tracked_text(painter, Pos2::new(left, foot_y), "BY", foot_font.clone(), ink(p.text_3, 1.0), 0.8);
+                let logo = crate::mark::logo(painter, Pos2::new(left + by + 8.0, foot_y), ((theme::T_MICRO + 0.5) * 1.35).round(), ink(p.text_2, 1.0));
+                theme::tracked_text(painter, Pos2::new(logo.right() + 8.0, foot_y), "/ NATIVECOMPUTE.NET", foot_font, ink(p.text_3, 1.0), 0.8);
                 if let Some((line, news)) = status_line(&self.status) {
                     let font = theme::font_hud(theme::T_MICRO + 0.5);
                     let w = theme::tracked_width(ui.ctx(), &line, font.clone(), 0.8);

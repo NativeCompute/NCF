@@ -505,3 +505,64 @@ fn the_debug_panel_draws_in_both_casts_and_its_display_switches_apply() {
     assert_eq!(crate::debug::next_version("v3"), "3.0.1");
 }
 
+
+#[test]
+fn the_logo_rasterises_to_its_own_area_with_its_counters_open() {
+    let area = |poly: &[(f32, f32)]| {
+        (0..poly.len())
+            .map(|i| {
+                let (a, b) = (poly[i], poly[(i + 1) % poly.len()]);
+                a.0 * b.1 - b.0 * a.1
+            })
+            .sum::<f32>()
+            .abs()
+            * 0.5
+    };
+    let inside = |pt: (f32, f32), poly: &[(f32, f32)]| {
+        let mut odd = false;
+        for i in 0..poly.len() {
+            let (a, b) = (poly[i], poly[(i + 1) % poly.len()]);
+            if (a.1 > pt.1) != (b.1 > pt.1) && pt.0 < a.0 + (pt.1 - a.1) / (b.1 - a.1) * (b.0 - a.0) {
+                odd = !odd;
+            }
+        }
+        odd
+    };
+    let logo = crate::brand::LOGO;
+    let mut expected = 0.0;
+    let mut counters = 0;
+    for (i, poly) in logo.iter().enumerate() {
+        let depth = logo.iter().enumerate().filter(|(j, other)| *j != i && inside(poly[0], other)).count();
+        if depth % 2 == 1 {
+            counters += 1;
+            expected -= area(poly);
+        } else {
+            expected += area(poly);
+        }
+    }
+    assert!(counters >= 5, "the a, e, o, p and the mark's cut leave holes: {counters}");
+    for height in [12usize, 20, 139] {
+        let (w, h, cov) = mark::logo_coverage(height);
+        assert_eq!(h, height);
+        assert_eq!(w, mark::logo_width(height as f32).ceil() as usize);
+        assert!(cov.iter().all(|c| (0.0..=1.001).contains(c)), "coverage stays a fraction");
+        let s = height as f32 / crate::brand::LOGO_SIZE.1;
+        let filled: f32 = cov.iter().sum::<f32>() / (s * s);
+        assert!((filled - expected).abs() / expected < 0.03, "{height}px: {filled} vs {expected}");
+    }
+}
+
+#[test]
+fn the_logo_paints_as_one_tinted_image_and_reuses_its_texture() {
+    let ctx = egui::Context::default();
+    for _ in 0..2 {
+        let _ = ctx.run(egui::RawInput::default(), |ctx| {
+            egui::CentralPanel::default().show(ctx, |ui| {
+                let r = ui::logo(ui, 20.0, egui::Color32::WHITE);
+                assert!((r.rect.width() - mark::logo_width(20.0)).abs() < 0.5);
+            });
+        });
+    }
+    let textures = ctx.tex_manager().read().allocated().filter(|(_, m)| m.name.starts_with("ncf-logo")).count();
+    assert_eq!(textures, 1, "one texture per pixel height");
+}

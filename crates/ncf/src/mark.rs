@@ -395,3 +395,78 @@ pub fn spinner(painter: &egui::Painter, centre: Pos2, radius: f32, t: f32, color
     }
     painter.circle_filled(Pos2::new(centre.x + head.cos() * radius, centre.y + head.sin() * radius), w * 0.5, color);
 }
+
+// logo here---
+
+const LOGO_SUBROWS: usize = 5;
+
+pub fn logo_width(height: f32) -> f32 {
+    height * crate::brand::LOGO_SIZE.0 / crate::brand::LOGO_SIZE.1
+}
+
+pub fn logo_coverage(height_px: usize) -> (usize, usize, Vec<f32>) {
+    let s = height_px as f32 / crate::brand::LOGO_SIZE.1;
+    let w = (crate::brand::LOGO_SIZE.0 * s).ceil() as usize;
+    let h = height_px;
+    let mut cov = vec![0.0_f32; w * h];
+    let mut xs: Vec<(f32, i32)> = Vec::new();
+    let weight = 1.0 / LOGO_SUBROWS as f32;
+    for sub in 0..h * LOGO_SUBROWS {
+        let y = (sub as f32 + 0.5) / LOGO_SUBROWS as f32;
+        xs.clear();
+        for poly in crate::brand::LOGO {
+            for k in 0..poly.len() {
+                let (x0, y0) = poly[k];
+                let (x1, y1) = poly[(k + 1) % poly.len()];
+                let (x0, y0, x1, y1) = (x0 * s, y0 * s, x1 * s, y1 * s);
+                if (y0 <= y) != (y1 <= y) {
+                    let t = (y - y0) / (y1 - y0);
+                    xs.push((x0 + t * (x1 - x0), if y1 > y0 { 1 } else { -1 }));
+                }
+            }
+        }
+        xs.sort_by(|a, b| a.0.total_cmp(&b.0));
+        let row = &mut cov[(sub / LOGO_SUBROWS) * w..(sub / LOGO_SUBROWS + 1) * w];
+        let (mut wind, mut start) = (0, 0.0_f32);
+        for &(x, dir) in &xs {
+            let before = wind;
+            wind += dir;
+            if before == 0 && wind != 0 {
+                start = x;
+            } else if before != 0 && wind == 0 {
+                let (a, b) = (start.max(0.0), x.min(w as f32));
+                let mut px = a.floor() as usize;
+                while (px as f32) < b && px < w {
+                    let overlap = b.min(px as f32 + 1.0) - a.max(px as f32);
+                    row[px] += overlap.max(0.0) * weight;
+                    px += 1;
+                }
+            }
+        }
+    }
+    (w, h, cov)
+}
+
+fn logo_texture(ctx: &egui::Context, height_px: usize) -> egui::TextureHandle {
+    let id = egui::Id::new(("ncf-logo", height_px));
+    if let Some(tex) = ctx.data(|d| d.get_temp::<egui::TextureHandle>(id)) {
+        return tex;
+    }
+    let (w, h, cov) = logo_coverage(height_px);
+    let pixels = cov.iter().map(|c| Color32::from_white_alpha((c.clamp(0.0, 1.0) * 255.0).round() as u8)).collect();
+    let image = egui::ColorImage { size: [w, h], pixels };
+    let tex = ctx.load_texture(format!("ncf-logo-{height_px}"), image, egui::TextureOptions::LINEAR);
+    ctx.data_mut(|d| d.insert_temp(id, tex.clone()));
+    tex
+}
+
+pub fn logo(painter: &egui::Painter, left_mid: Pos2, height: f32, tint: Color32) -> Rect {
+    let ppp = painter.ctx().pixels_per_point();
+    let px = (height * ppp).round().max(4.0) as usize;
+    let tex = logo_texture(painter.ctx(), px);
+    let size = tex.size_vec2() / ppp;
+    let min = painter.round_pos_to_pixels(Pos2::new(left_mid.x, left_mid.y - size.y * 0.5));
+    let rect = Rect::from_min_size(min, size);
+    painter.image(tex.id(), rect, Rect::from_min_max(Pos2::ZERO, Pos2::new(1.0, 1.0)), tint);
+    rect
+}
