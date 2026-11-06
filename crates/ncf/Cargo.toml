@@ -12,6 +12,7 @@ repository.workspace = true
 
 [features]
 testing = []
+cloud = ["dep:serde", "dep:keyring"]
 
 [dependencies]
 eframe = { workspace = true }
@@ -23,8 +24,13 @@ png = "0.18"
 dirs = "5"
 ureq = "2.10"
 ring = "0.17"
+serde = { version = "1", features = ["derive"], optional = true }
+
+[target.'cfg(windows)'.dependencies]
+keyring = { version = "3", default-features = false, features = ["windows-native"], optional = true }
 
 [target.'cfg(target_os = "macos")'.dependencies]
+keyring = { version = "3", default-features = false, features = ["apple-native"], optional = true }
 rfd = { version = "0.15", default-features = false }
 eframe = { workspace = true, features = ["wgpu"] }
 wgpu = { version = "22.1", default-features = false, features = ["metal"] }

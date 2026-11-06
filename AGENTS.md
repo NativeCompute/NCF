@@ -11,6 +11,7 @@ NCF is the NativeCompute Framework. It holds the NativeCompute look and the plum
 5. [`docs/recipes.md`](docs/recipes.md): screens we have already solved. Copy these before inventing anything.
 6. [`docs/writing.md`](docs/writing.md): how NativeCompute talks.
 7. [`docs/motion.md`](docs/motion.md) and [`docs/brand.md`](docs/brand.md) when your work touches either.
+8. [`docs/cloud.md`](docs/cloud.md) when the app signs in to NativeCloud.
 
 New app? Follow [`.claude/skills/ncf-app/SKILL.md`](.claude/skills/ncf-app/SKILL.md) from step one.
 
