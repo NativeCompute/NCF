@@ -35,10 +35,11 @@ jobs:
           cp target/release/__SLUG__ install.sh README.md LICENSE "$name/"
           cp packaging/__SLUG__.desktop packaging/__SLUG__.svg "$name/packaging/"
           tar -czf "$name.tar.gz" "$name"
+          sha256sum "$name.tar.gz" > "$name.tar.gz.sha256"
       - uses: actions/upload-artifact@v4
         with:
           name: linux
-          path: __SLUG__-*.tar.gz
+          path: __SLUG__-*.tar.gz*
 
   windows:
     name: Windows build
@@ -56,10 +57,12 @@ jobs:
           New-Item -ItemType Directory -Path $name | Out-Null
           Copy-Item target/release/__SLUG__.exe, README.md, LICENSE -Destination $name
           Compress-Archive -Path $name -DestinationPath "$name.zip"
+          $hash = (Get-FileHash -Algorithm SHA256 "$name.zip").Hash.ToLower()
+          "$hash  $name.zip" | Out-File -Encoding ascii -NoNewline "$name.zip.sha256"
       - uses: actions/upload-artifact@v4
         with:
           name: windows
-          path: __SLUG__-*.zip
+          path: __SLUG__-*.zip*
 
   macos:
     name: macOS build (universal)
@@ -116,4 +119,5 @@ jobs:
             __SLUG__-*.tar.gz
             __SLUG__-*.zip
             __SLUG__-*.zip.sha256
+            __SLUG__-*.tar.gz.sha256
             install-macos.sh

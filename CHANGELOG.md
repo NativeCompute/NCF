@@ -18,10 +18,12 @@ macOS. Every check runs on GitHub's Macs, Apple Silicon and Intel, as well as on
 - `platform`: the data folder is `~/Library/Application Support/<Name>` on a Mac; `reveal` selects the file in Finder; `pick_file` uses the system open panel; `alert` shows a real dialog on every platform.
 - `AppMark::png` and `AppMark::icns` (the Mac icon file, 16 to 1024 px), and `bundle::info_plist` for the app bundle.
 - On a Mac, apps draw with Metal, and fall back to OpenGL if Metal can't start (`app::renderers`).
+- `ncf::updater`: one-click updates on macOS, Linux and Windows. `Shell::update_now` (or `updater::start`) hands the update to a copy of the app's own program and quits. That copy opens a small window in the NCF look, waits for the app to close, downloads the new release and checks its checksum, installs it the platform's way, copies the library aside first, and reopens the app. If anything fails, nothing is changed and the old version is still installed. Settings → About offers *Update now* when the copy was installed the standard way.
 - The mark draws much faster, with the same pixels.
 
 ### Tools
 - `ncf mark --icns`, and `--emit-icns` / `--emit-info-plist` in new apps.
+- New apps call `ncf::updater::from_args` first in `main`, and their release workflow writes a `.sha256` next to every download, so the updater can check what it fetched.
 - New apps ship on the Mac: `packaging/macos/bundle.sh` builds one signed, universal app (Apple Silicon and Intel, macOS 11 and newer) and zips it; `install-macos.sh` is the one-line Terminal install, with updates, `--uninstall` and `--from-source`; `install.sh` hands over to it on a Mac; the release workflow attaches the Mac zip, its checksum and the installer.
 
 ## 0.2.0

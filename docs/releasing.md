@@ -19,7 +19,7 @@ Apps made with `ncf new` ship the same way Blackline does.
    - `<app>-macos.zip`, its `.sha256` and `install-macos.sh` under fixed names, for the Terminal install;
 
    and attaches them to the release.
-6. Running copies see the new version at their next launch through the update check, as long as `INFO.repo` names the repository.
+6. Running copies see the new version at their next launch through the update check, as long as `INFO.repo` names the repository. Copies installed the standard way can update with one click (*Update now*). The updater downloads that release's files and their `.sha256`, so keep the asset names the template's release workflow writes.
 
 Write the release notes yourself, in the voice of [writing.md](writing.md): what's new, what's fixed, then anything a person has to do. Leave out internal changes.
 

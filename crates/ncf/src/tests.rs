@@ -10,7 +10,7 @@ use crate::{tokens, ui, update};
 
 static LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
-fn lock() -> std::sync::MutexGuard<'static, ()> {
+pub(crate) fn lock() -> std::sync::MutexGuard<'static, ()> {
     LOCK.lock().unwrap_or_else(|e| e.into_inner())
 }
 
@@ -397,3 +397,42 @@ fn the_mac_info_plist_has_what_finder_and_retina_need() {
     assert_eq!(plist.matches("<key>").count(), plist.matches("</key>").count());
     assert!(!plist.contains("CFBundleDocumentTypes"), "no file types claimed until opening from Finder works");
 }
+
+#[test]
+fn the_updater_window_draws_every_step_in_both_casts() {
+    use crate::updater::work::{Event, Step};
+    use crate::updater::{Install, Plan};
+    let _g = lock();
+    let plan = Plan {
+        name: "Field Notes".into(),
+        slug: "field-notes".into(),
+        repo: "NativeCompute/field-notes".into(),
+        version: "1.4.0".into(),
+        source: "file:///nowhere".into(),
+        install: Install::LinuxLocal { bin: std::path::PathBuf::from("/nowhere/field-notes") },
+        data: std::env::temp_dir().join(format!("ncf-updater-ui-{}", std::process::id())),
+        parent: 0,
+        headless: false,
+        reopen: false,
+    };
+    let info = crate::AppInfo { name: "Field Notes", id: "net.nativecompute.fieldnotes", version: "1.3.0", tagline: "", repo: "NativeCompute/field-notes", mark: crate::mark::AppMark { name: "Field Notes", parts: &[] } };
+    for dark in [true, false] {
+        theme::set_palette(dark);
+        let mut h = Harness::new(540.0, 340.0);
+        theme::apply(&h.ctx);
+        let mut window = crate::updater::window::Updater::new(info, plan.clone(), None, std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)));
+        for step in crate::updater::work::STEPS {
+            window.state.apply(Event::Step(step));
+            if step == Step::Download {
+                window.state.apply(Event::Progress(0.42));
+            }
+            window.state.apply(Event::Line(format!("{step:?} detail")));
+            h.frames(2, |ctx| window.ui(ctx));
+        }
+        window.state.apply(Event::Failed("the download is damaged (its checksum does not match). Nothing was changed".into()));
+        h.frames(2, |ctx| window.ui(ctx));
+        assert!(window.state.finished());
+    }
+    let _ = std::fs::remove_dir_all(&plan.data);
+}
+

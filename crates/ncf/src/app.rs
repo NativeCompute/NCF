@@ -112,6 +112,29 @@ impl Shell {
         self.save_due = true;
     }
 
+    pub fn update_plan(&self) -> Option<crate::updater::Plan> {
+        let Status::Newer(r) = &self.update else {
+            return None;
+        };
+        crate::updater::Plan::for_release(&self.info, &r.version, self.folder())
+    }
+
+    pub fn update_now(&mut self, ctx: &egui::Context) -> bool {
+        let Some(plan) = self.update_plan() else {
+            return false;
+        };
+        match crate::updater::start(&plan) {
+            Ok(()) => {
+                ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+                true
+            }
+            Err(e) => {
+                self.warn("Couldn't start the update", &e);
+                false
+            }
+        }
+    }
+
     pub fn check_for_updates(&mut self) {
         if !self.info.repo.is_empty() {
             self.update_rx = Some(update::spawn(self.info.repo, self.info.version));
@@ -442,7 +465,11 @@ fn about<A: NcfApp>(ui: &mut egui::Ui, app: &mut A, shell: &mut Shell) {
             ui::caption(ui, &line);
         }
         if let Status::Newer(r) = shell.update.clone() {
-            if ui::link(ui, &format!("{} {} is out — download it", shell.info.name, r.version)) {
+            if shell.update_plan().is_some() {
+                if ui::link(ui, &format!("{} {} is out — update now", shell.info.name, r.version)) {
+                    shell.update_now(ui.ctx());
+                }
+            } else if ui::link(ui, &format!("{} {} is out — download it", shell.info.name, r.version)) {
                 shell.open_url(&r.url);
             }
         }

@@ -19,6 +19,8 @@ pub mod update;
 pub mod app;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod platform;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod updater;
 #[cfg(any(test, feature = "testing"))]
 pub mod testing;
 

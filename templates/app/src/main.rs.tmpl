@@ -20,6 +20,15 @@ pub const INFO: AppInfo = AppInfo {
 
 fn main() -> ncf::eframe::Result<()> {
     let args: Vec<String> = std::env::args().collect();
+    if let Some(plan) = ncf::updater::from_args(&args, ncf::OS) {
+        match plan {
+            Ok(plan) => std::process::exit(ncf::updater::run(INFO, plan)),
+            Err(e) => {
+                eprintln!("{e}");
+                std::process::exit(2);
+            }
+        }
+    }
     let out = |flag: &str, default: &str| args.iter().position(|a| a == flag).map(|i| args.get(i + 1).cloned().unwrap_or_else(|| default.to_string()));
     if let Some(path) = out("--emit-icon", "__SLUG__.svg") {
         std::fs::write(&path, MARK.svg()).map_err(|e| eprintln!("{path}: {e}")).ok();
@@ -41,5 +50,6 @@ fn main() -> ncf::eframe::Result<()> {
         println!("__SLUG__ {}", INFO.version);
         return Ok(());
     }
+    ncf::updater::tidy("__SLUG__");
     ncf::app::run(INFO, |_ctx, shell| app::App::load(shell))
 }

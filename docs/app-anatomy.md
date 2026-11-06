@@ -163,6 +163,22 @@ Point `XDG_DATA_HOME` at a temporary folder first so tests never touch real data
 
 Draw each screen in both casts in at least one test. Most layout bugs show up as a panic or an overflow in one cast only.
 
+## Updating
+
+When the launch check finds a newer release, `Shell::update_plan()` says whether this copy can update itself: an app in `/Applications` or `~/Applications` on a Mac, `~/.local/bin/<app>` on Linux, or an `.exe` in a writable folder on Windows. A copy run from a source folder can't, and gets a download link instead.
+
+`Shell::update_now(ctx)` (or `updater::start(&plan)` from your own button) copies the running program to a temporary folder as `<app>-updater` and starts it with `--ncf-update`, and then the app quits. Your `main` must call `ncf::updater::from_args` before anything else; the template does. The updater:
+
+1. waits for the app to close;
+2. downloads that exact release's files (`releases/download/vX.Y.Z`, never `latest`) and checks them against their `.sha256`;
+3. installs them the platform's way:
+   - on a Mac, the release's own `install-macos.sh`, run from the downloaded files;
+   - on Linux, the tarball's `install.sh`, after checking the new program runs;
+   - on Windows, it copies the library aside, moves the old `.exe` aside, and puts the new one in its place;
+4. reopens the app.
+
+Every step that can fail comes before the old version is touched. A failure leaves the old version installed and says why, and everything is written to `update.log` in the app's folder. `NCF_UPDATE_SOURCE` points the updater at a local folder of release files for testing, and `--headless` runs it without a window.
+
 ## Shipping
 
 See [releasing.md](releasing.md).
