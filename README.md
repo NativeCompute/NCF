@@ -22,7 +22,7 @@ Or add NCF to an existing app:
 
 ```toml
 [dependencies]
-ncf = { git = "https://github.com/NativeCompute/ncf", tag = "v0.3.0" }
+ncf = { git = "https://github.com/NativeCompute/ncf", tag = "v0.4.0" }
 ```
 
 ```rust

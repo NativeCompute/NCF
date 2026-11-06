@@ -4,9 +4,13 @@ NCF follows [semantic versioning](https://semver.org). Apps pin a tag, so nothin
 
 ## Unreleased
 
+## 0.4.0
+
+Launch polish: apps ask about a new version before they open, the splash and updater are shorter, and notices are square readouts.
+
 ### Desktop (`ncf`)
 - **Update prompt at launch.** The splash waits for the update check, and when a newer version is out, it turns into a prompt with *Update now*, *Not now* and *Skip this version*. The app opens only after a choice. With the splash off, the same card covers the app until it is answered. `splash::Offer`, `splash::Choice`, `Splash::set_offer`, `Splash::take_choice` and `splash::prompt`. A skipped version is stored as `skipped_update`; the settings file is unchanged until one is.
-- **Compact splash and updater.** The splash card is 540×200 instead of 540×296, and the updater window 540×304 instead of 540×364; the updater grows only when an error needs the room.
+- **Compact splash and updater.** The splash card is 540×200 instead of 540×296, and the updater window 540×308 instead of 540×364; the updater grows only when an error needs the room.
 - **Notices in the NCF look.** Notices and confirmations are square panels with a hairline and a tone bar, a HUD label (DONE, NOTE, WARNING, ERROR) and the message. Confirmations use the standard primary and ghost buttons. No more pills or gradient washes.
 
 ## 0.3.0
