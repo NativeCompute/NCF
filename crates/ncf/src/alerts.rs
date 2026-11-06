@@ -5,13 +5,15 @@ use web_time::{Duration, Instant};
 use eframe::egui::{self, Align, Color32, Layout, Pos2, Rect, Sense, Vec2};
 
 use crate::anim;
-use crate::icons::{self, Icon};
 use crate::theme::{self, pal};
 
 const TOAST_TTL: Duration = Duration::from_millis(3400);
 const RISE: f32 = 0.42;
 const FALL: f32 = 0.22;
-const CARD_W: f32 = 388.0;
+const CARD_W: f32 = 400.0;
+const TOAST_H: f32 = 36.0;
+const PAD: f32 = 16.0;
+const GAP: f32 = 12.0;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Tone {
@@ -31,12 +33,28 @@ impl Tone {
             Tone::Danger => p.danger,
         }
     }
-    fn icon(self) -> Icon {
+    fn ink(self) -> Color32 {
+        let p = pal();
         match self {
-            Tone::Ok => Icon::Check,
-            Tone::Info => Icon::Info,
-            Tone::Warn => Icon::Warning,
-            Tone::Danger => Icon::Trash,
+            Tone::Ok => p.ok,
+            Tone::Info => p.signal_hi,
+            Tone::Warn => p.warn,
+            Tone::Danger => p.danger_hi,
+        }
+    }
+    pub fn label(self) -> &'static str {
+        match self {
+            Tone::Ok => "DONE",
+            Tone::Info => "NOTE",
+            Tone::Warn => "WARNING",
+            Tone::Danger => "ERROR",
+        }
+    }
+    fn ask_label(self) -> &'static str {
+        match self {
+            Tone::Danger => "CAREFUL",
+            Tone::Warn => "WARNING",
+            _ => "CONFIRM",
         }
     }
 }
@@ -309,40 +327,26 @@ impl<A> Deck<A> {
             if text.is_empty() {
                 0.0
             } else {
-                ctx.fonts(|f| {
-                    f.layout_no_wrap(text.to_string(), font, Color32::WHITE)
-                        .rect
-                        .width()
-                })
+                ctx.fonts(|f| f.layout_no_wrap(text.to_string(), font, Color32::WHITE).rect.width())
             }
         };
         if !item.modal() {
+            let label = theme::tracked_width(ctx, item.tone.label(), theme::font_hud(theme::T_MICRO), 0.8);
             let title = width_of(&item.title, theme::font_semi(theme::T_SM));
-            let body = width_of(&item.body, theme::font(theme::T_CAP));
-            let w = (title + body + if body > 0.0 { 12.0 } else { 0.0 } + 60.0).clamp(180.0, 470.0);
-            return Vec2::new(w, 36.0);
+            let body = width_of(&crate::ui::elide(&item.body, 46), theme::font(theme::T_CAP));
+            let w = (PAD + label + GAP + title + if body > 0.0 { 10.0 + body } else { 0.0 } + PAD).clamp(200.0, 520.0);
+            return Vec2::new(w, TOAST_H);
         }
 
-        let wrap = CARD_W - 56.0;
+        let wrap = CARD_W - PAD * 2.0;
         let body_h = if item.body.is_empty() {
             0.0
         } else {
-            ctx.fonts(|f| {
-                f.layout(
-                    item.body.clone(),
-                    theme::font(theme::T_CAP + 1.0),
-                    Color32::WHITE,
-                    wrap,
-                )
-                .rect
-                .height()
-            }) + 10.0
+            ctx.fonts(|f| f.layout(item.body.clone(), theme::font(theme::T_CAP + 1.0), Color32::WHITE, wrap).rect.height()) + 10.0
         };
-        let mut h = 40.0 + body_h + 42.0;
-        if let Kind::Ask { prompt, .. } = &item.kind {
-            if prompt.is_some() {
-                h += 40.0;
-            }
+        let mut h = 22.0 + 22.0 + 32.0 + body_h + 4.0 + 30.0 + 20.0;
+        if let Kind::Ask { prompt: Some(_), .. } = &item.kind {
+            h += 40.0;
         }
         Vec2::new(CARD_W, h)
     }
@@ -353,11 +357,6 @@ impl<A> Deck<A> {
         let tone = self.items[idx].tone;
         let accent = tone.accent();
         let is_modal = self.items[idx].modal();
-        let radius = if is_modal {
-            theme::RADIUS
-        } else {
-            rect.height() * 0.5
-        };
 
         egui::Area::new(egui::Id::new(("ncf-alert", self.items[idx].id)))
             .order(egui::Order::Tooltip)
@@ -367,45 +366,23 @@ impl<A> Deck<A> {
                 ui.set_width(rect.width());
                 let painter = ui.painter();
 
-                theme::panel_rounded(painter, rect, radius);
-                theme::fill_grad_poly(
-                    painter,
-                    &theme::rounded_poly(rect, radius),
-                    theme::wash(accent, if p.dark { 40 } else { 30 }),
-                    theme::wash(accent, 0),
-                    Vec2::new(0.35, 1.0),
-                );
-
-                let icon_c = Pos2::new(
-                    rect.left() + 20.0,
-                    rect.top() + if is_modal { 23.0 } else { rect.height() * 0.5 },
-                );
-                icons::draw(
-                    painter,
-                    Rect::from_center_size(icon_c, Vec2::splat(14.0)),
-                    tone.icon(),
+                theme::panel(painter, rect);
+                painter.rect_filled(
+                    Rect::from_min_size(rect.min, Vec2::new(2.0, rect.height())),
+                    egui::Rounding::ZERO,
                     accent,
                 );
 
                 if !is_modal {
-                    let tw = painter
-                        .layout_no_wrap(
-                            self.items[idx].title.clone(),
-                            theme::font_semi(theme::T_SM),
-                            p.text,
-                        )
-                        .rect
-                        .width();
-                    painter.text(
-                        Pos2::new(rect.left() + 35.0, rect.center().y),
-                        egui::Align2::LEFT_CENTER,
-                        &self.items[idx].title,
-                        theme::font_semi(theme::T_SM),
-                        p.text,
-                    );
+                    let mid = rect.center().y;
+                    let label = theme::tracked_text(painter, Pos2::new(rect.left() + PAD, mid), tone.label(), theme::font_hud(theme::T_MICRO), tone.ink(), 0.8);
+                    let x = rect.left() + PAD + label + GAP;
+                    let title = painter.layout_no_wrap(self.items[idx].title.clone(), theme::font_semi(theme::T_SM), p.text);
+                    let tw = title.rect.width();
+                    painter.galley(Pos2::new(x, mid - title.rect.height() * 0.5), title, p.text);
                     if !self.items[idx].body.is_empty() {
                         painter.text(
-                            Pos2::new(rect.left() + 35.0 + tw + 10.0, rect.center().y),
+                            Pos2::new(x + tw + 10.0, mid),
                             egui::Align2::LEFT_CENTER,
                             crate::ui::elide(&self.items[idx].body, 46),
                             theme::font(theme::T_CAP),
@@ -419,44 +396,27 @@ impl<A> Deck<A> {
                     return;
                 }
 
-                painter.text(
-                    Pos2::new(rect.left() + 37.0, rect.top() + 23.0),
-                    egui::Align2::LEFT_CENTER,
-                    &self.items[idx].title,
-                    theme::font_semi(theme::T_H - 1.0),
-                    p.text,
-                );
-
-                let mut y = 41.0;
+                let left = rect.left() + PAD;
+                let width = rect.width() - PAD * 2.0;
+                let mut y = rect.top() + 22.0;
+                theme::tracked_text(painter, Pos2::new(left, y + 6.0), tone.ask_label(), theme::font_hud(theme::T_MICRO), tone.ink(), 0.8);
+                y += 12.0 + 10.0;
+                let title = painter.layout_no_wrap(self.items[idx].title.clone(), theme::font_bold(theme::T_H), p.text);
+                painter.galley(Pos2::new(left, y), title, p.text);
+                y += 24.0 + 8.0;
                 if !self.items[idx].body.is_empty() {
-                    let galley = painter.layout(
-                        self.items[idx].body.clone(),
-                        theme::font(theme::T_CAP + 1.0),
-                        p.text_2,
-                        rect.width() - 56.0,
-                    );
+                    let galley = painter.layout(self.items[idx].body.clone(), theme::font(theme::T_CAP + 1.0), p.text_2, width);
                     let h = galley.rect.height();
-                    painter.galley(rect.left_top() + Vec2::new(28.0, y), galley, p.text_2);
-                    y += h + 12.0;
+                    painter.galley(Pos2::new(left, y), galley, p.text_2);
+                    y += h + 10.0;
                 }
 
-                let has_prompt =
-                    matches!(&self.items[idx].kind, Kind::Ask { prompt: Some(_), .. });
+                let has_prompt = matches!(&self.items[idx].kind, Kind::Ask { prompt: Some(_), .. });
                 if has_prompt {
-                    let field = Rect::from_min_size(
-                        rect.left_top() + Vec2::new(28.0, y),
-                        Vec2::new(rect.width() - 56.0, 30.0),
-                    );
-                    let mut child = ui.new_child(
-                        egui::UiBuilder::new()
-                            .max_rect(field)
-                            .layout(Layout::left_to_right(Align::Center)),
-                    );
+                    let field = Rect::from_min_size(Pos2::new(left, y), Vec2::new(width, 30.0));
+                    let mut child = ui.new_child(egui::UiBuilder::new().max_rect(field).layout(Layout::left_to_right(Align::Center)));
                     let field_id = egui::Id::new(("ncf-alert-field", self.items[idx].id));
-                    if let Kind::Ask {
-                        prompt: Some(pr), ..
-                    } = &mut self.items[idx].kind
-                    {
+                    if let Kind::Ask { prompt: Some(pr), .. } = &mut self.items[idx].kind {
                         let resp = child.add(
                             egui::TextEdit::singleline(&mut pr.text)
                                 .id(field_id)
@@ -472,26 +432,20 @@ impl<A> Deck<A> {
                             out = CardOut::Confirm;
                         }
                     }
-                    y += 40.0;
                 }
 
                 let yes = match &self.items[idx].kind {
                     Kind::Ask { yes, .. } => yes.clone(),
                     _ => String::new(),
                 };
-                let row = Rect::from_min_size(
-                    rect.left_top() + Vec2::new(28.0, y),
-                    Vec2::new(rect.width() - 56.0, 30.0),
-                );
-                let mut child = ui.new_child(
-                    egui::UiBuilder::new()
-                        .max_rect(row)
-                        .layout(Layout::right_to_left(Align::Center)),
-                );
-                if pill_button(&mut child, &yes, accent, true) {
+                let row = Rect::from_min_size(Pos2::new(left, rect.bottom() - 20.0 - 30.0), Vec2::new(width, 30.0));
+                let mut child = ui.new_child(egui::UiBuilder::new().max_rect(row).layout(Layout::right_to_left(Align::Center)));
+                child.spacing_mut().item_spacing.x = 8.0;
+                let confirmed = if tone == Tone::Danger { danger_button(&mut child, &yes) } else { crate::ui::button(&mut child, &yes, None, true) };
+                if confirmed {
                     out = CardOut::Confirm;
                 }
-                if pill_button(&mut child, "Cancel", p.text_2, false) {
+                if crate::ui::button(&mut child, "Cancel", None, false) {
                     out = CardOut::Dismiss;
                 }
                 ui.allocate_space(Vec2::new(rect.width(), 0.0));
@@ -502,9 +456,7 @@ impl<A> Deck<A> {
                 out = CardOut::Dismiss;
             }
             let has_prompt = matches!(&self.items[idx].kind, Kind::Ask { prompt: Some(_), .. });
-            if !has_prompt
-                && ctx.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::Enter))
-            {
+            if !has_prompt && ctx.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::Enter)) {
                 out = CardOut::Confirm;
             }
         }
@@ -518,41 +470,13 @@ enum CardOut {
     Confirm,
 }
 
-fn pill_button(ui: &mut egui::Ui, label: &str, tint: Color32, filled: bool) -> bool {
+fn danger_button(ui: &mut egui::Ui, label: &str) -> bool {
     let p = pal();
-    let galley = ui.painter().layout_no_wrap(
-        label.to_string(),
-        theme::font_semi(theme::T_SM),
-        if filled { theme::on(tint) } else { tint },
-    );
-    let size = Vec2::new(galley.rect.width() + 28.0, 28.0);
-    let (rect, resp) = ui.allocate_exact_size(size, Sense::click());
-    let hot = anim::ease(ui.ctx(), resp.id, resp.hovered(), anim::HOVER) > 0.45;
-    if filled {
-        theme::grad_rect(
-            ui.painter(),
-            rect,
-            theme::RADIUS,
-            if hot { theme::lighten(tint, 0.16) } else { tint },
-            theme::darken(tint, 0.18),
-            Vec2::new(0.0, 1.0),
-        );
-    } else {
-        ui.painter().rect_filled(
-            rect,
-            egui::Rounding::same(theme::RADIUS),
-            if hot { p.panel } else { Color32::TRANSPARENT },
-        );
-        ui.painter().rect_filled(
-            rect,
-            egui::Rounding::same(theme::RADIUS),
-            theme::wash(p.text, if hot { 30 } else { 14 }),
-        );
-    }
-    ui.painter().galley(
-        rect.center() - galley.rect.size() * 0.5,
-        galley,
-        if filled { theme::on(tint) } else { tint },
-    );
+    let font = theme::font_semi(theme::T_SM);
+    let galley = ui.painter().layout_no_wrap(label.to_string(), font, Color32::WHITE);
+    let (rect, resp) = ui.allocate_exact_size(Vec2::new(galley.rect.width() + 28.0, 30.0), Sense::click());
+    let hot = anim::ease(ui.ctx(), resp.id, resp.hovered(), anim::HOVER);
+    ui.painter().rect_filled(rect, egui::Rounding::same(theme::RADIUS), theme::mix(p.danger, theme::lighten(p.danger, 0.14), hot));
+    ui.painter().galley(rect.center() - galley.rect.size() * 0.5, galley, Color32::WHITE);
     resp.clicked()
 }

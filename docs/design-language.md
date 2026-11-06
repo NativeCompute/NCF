@@ -58,7 +58,7 @@ Rules:
 ## Space and shape
 
 - Spacing steps of 4 and 8: `SPACE_1` 4, `SPACE_2` 8, `SPACE_3` 12, `SPACE_4` 16, `SPACE_6` 24, `SPACE_8` 32, then 48, 64, 96, 128.
-- Corner radius is 2 px (`RADIUS`, `--r-sm`). Two things NCF draws are deliberately softer: notices have fully rounded ends so they read as passing messages, and keycaps are rounded at 6 px so they read as keys.
+- Corner radius is 2 px (`RADIUS`, `--r-sm`). One thing NCF draws is deliberately softer: keycaps are rounded at 6 px so they read as keys.
 - Lines are 1 px. Focus rings are 2 px `signal-hi` with a 2 px offset.
 - Six columns with a 40 px gutter (20 px on narrow screens). The guides are drawn by `chrome::column_guides` and by `body::before` on the web.
 

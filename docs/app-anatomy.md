@@ -142,7 +142,7 @@ What the app can ask NCF for:
 
 ### Update check (`ncf::update`)
 
-The check fetches `api.github.com/repos/<repo>/releases/latest` once per launch on a background thread, compares versions, and shows a notice when a newer one is out. Settings → About shows the status, a switch to turn it off, and a link to the release. Publish releases with tags like `v1.2.0`.
+The check fetches `api.github.com/repos/<repo>/releases/latest` once per launch on a background thread, compares versions, and when a newer one is out, asks before the app is used: the splash turns into a prompt with *Update now*, *Not now* and *Skip this version* (or the same card over the app when the splash is off). A skipped version is stored as `skipped_update` and not offered again. Settings → About shows the status, a switch to turn it off, and a link to the release. Publish releases with tags like `v1.2.0`.
 
 ## Testing
 

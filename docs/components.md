@@ -134,7 +134,7 @@ if self.open {
 
 ## Notices and confirmation
 
-Notices stack at the bottom centre, with fully rounded ends and a faint wash of their tone colour that fades from the top, and leave on their own. Confirmations sit in the centre over a scrim, with the same wash, and wait for an answer.
+Notices are readouts: a `panel` with a hairline and a 2 px bar of their tone colour on the left, then a HUD label in that colour (DONE, NOTE, WARNING, ERROR) and the message. They stack at the bottom centre and leave on their own. Confirmations are the same panel in the centre over a scrim, with a HUD eyebrow, the title, the body, and a primary and a ghost button (the primary is red for anything that deletes); they wait for an answer.
 
 | Component | Rust | Web | Use when |
 |---|---|---|---|
@@ -158,7 +158,8 @@ Supplied by `ncf::app::run`. You do not call these unless you build your own she
 | Backdrop and column guides | `chrome::backdrop(ctx, pal().void)`, `chrome::column_guides(painter, rect)` |
 | Title bar with the app mark, name, extras and window buttons | `chrome::title_bar(ui, ctx, &info, \|ui\| …)` |
 | Resize grips for the undecorated window | `chrome::resize_handles(ctx)` |
-| Splash card | `splash::Splash::new(info).show(ctx)`; `set_status(update_status)` adds the update line |
+| Splash card | `splash::Splash::new(info).show(ctx)`; `set_status(update_status)` adds the update line; `set_offer(offer)` turns it into the update prompt, and `take_choice()` returns *Update now*, *Download*, *Not now* or *Skip this version* |
+| Update prompt without a splash | `splash::prompt(ctx, &info, &offer)`: the same card over a scrim; keys don't reach the app until it is answered |
 | Maker line ("LEDGER BY" + the NativeCompute logo, links to nativecompute.net) | `ui::maker_line(ui, rect, centred, "Ledger")` |
 | NativeCompute logo, tinted | `ui::logo(ui, height, tint)`, clickable: `ui::logo_link(ui, height, tint)` |
 

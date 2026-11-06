@@ -4,6 +4,11 @@ NCF follows [semantic versioning](https://semver.org). Apps pin a tag, so nothin
 
 ## Unreleased
 
+### Desktop (`ncf`)
+- **Update prompt at launch.** The splash waits for the update check, and when a newer version is out, it turns into a prompt with *Update now*, *Not now* and *Skip this version*. The app opens only after a choice. With the splash off, the same card covers the app until it is answered. `splash::Offer`, `splash::Choice`, `Splash::set_offer`, `Splash::take_choice` and `splash::prompt`. A skipped version is stored as `skipped_update`; the settings file is unchanged until one is.
+- **Compact splash and updater.** The splash card is 540×200 instead of 540×296, and the updater window 540×304 instead of 540×364; the updater grows only when an error needs the room.
+- **Notices in the NCF look.** Notices and confirmations are square panels with a hairline and a tone bar, a HUD label (DONE, NOTE, WARNING, ERROR) and the message. Confirmations use the standard primary and ghost buttons. No more pills or gradient washes.
+
 ## 0.3.0
 
 macOS. Every check runs on GitHub's Macs, Apple Silicon and Intel, as well as on Linux and Windows.
@@ -18,6 +23,8 @@ macOS. Every check runs on GitHub's Macs, Apple Silicon and Intel, as well as on
 - `platform`: the data folder is `~/Library/Application Support/<Name>` on a Mac; `reveal` selects the file in Finder; `pick_file` uses the system open panel; `alert` shows a real dialog on every platform.
 - `AppMark::png` and `AppMark::icns` (the Mac icon file, 16 to 1024 px), and `bundle::info_plist` for the app bundle.
 - On a Mac, apps draw with Metal, and fall back to OpenGL if Metal can't start (`app::renderers`).
+- The NativeCompute logo replaces the name in plain type: the maker line, splash, Settings → About and the updater. Clicking it opens nativecompute.net. `ui::logo`, `ui::logo_link`, `ui::menu_logo_item` and `mark::logo`.
+- The splash's and updater's progress bars sit directly under their title.
 - `ncf::updater`: one-click updates on macOS, Linux and Windows. `Shell::update_now` (or `updater::start`) hands the update to a copy of the app's own program and quits. That copy opens a small window in the NCF look, waits for the app to close, downloads the new release and checks its checksum, installs it the platform's way, copies the library aside first, and reopens the app. If anything fails, nothing is changed and the old version is still installed. Settings → About offers *Update now* when the copy was installed the standard way.
 - The mark draws much faster, with the same pixels.
 

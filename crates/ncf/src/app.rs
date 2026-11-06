@@ -43,6 +43,7 @@ pub struct Shell {
     pub frame_no: u64,
     pub debug: crate::debug::Debug,
     splash_replay: Option<Status>,
+    pub offer: Option<splash::Offer>,
     settings_open: bool,
     settings_tab: String,
     look_dirty: bool,
@@ -60,6 +61,7 @@ impl Shell {
             info,
             debug: crate::debug::Debug::new(look.debug),
             splash_replay: None,
+            offer: None,
             look,
             deck: Deck::default(),
             update: Status::Off,
@@ -137,6 +139,30 @@ impl Shell {
                 self.warn("Couldn't start the update", &e);
                 false
             }
+        }
+    }
+
+    pub fn offer_for_update(&self) -> Option<splash::Offer> {
+        let Status::Newer(r) = &self.update else {
+            return None;
+        };
+        if r.version.trim() == self.look.skipped_update.trim() {
+            return None;
+        }
+        Some(splash::Offer { version: r.version.clone(), can_update: self.update_plan().is_some() })
+    }
+
+    pub fn answer_offer(&mut self, ctx: &egui::Context, choice: splash::Choice) {
+        match choice {
+            splash::Choice::UpdateNow(_) => {
+                self.update_now(ctx);
+            }
+            splash::Choice::Download(_) => self.open_url(&update::releases_latest(self.info.repo)),
+            splash::Choice::Skip(version) => {
+                self.look.skipped_update = version;
+                self.save_due = true;
+            }
+            splash::Choice::NotNow => {}
         }
     }
 
@@ -244,9 +270,11 @@ pub fn start<A: NcfApp>(ctx: &egui::Context, shell: &mut Shell, make: impl FnOnc
 
 impl<A: NcfApp> eframe::App for Runner<A> {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        frame(ctx, &mut self.app, &mut self.shell);
         if let Some(status) = self.shell.splash_replay.take() {
             let mut s = Splash::inline(self.shell.info);
+            if let Status::Newer(r) = &status {
+                s.set_offer(splash::Offer { version: r.version.clone(), can_update: false });
+            }
             s.set_status(status);
             self.splash = Some(s);
             self.replaying = true;
@@ -258,8 +286,19 @@ impl<A: NcfApp> eframe::App for Runner<A> {
         if let Some(s) = self.splash.as_mut() {
             if !self.replaying {
                 s.set_status(self.shell.update.clone());
+                if s.wants_offer() {
+                    if let Some(offer) = self.shell.offer.take() {
+                        s.set_offer(offer);
+                    }
+                }
             }
-            if s.show(ctx) {
+            let showing = s.show(ctx);
+            if let Some(choice) = s.take_choice() {
+                if !self.replaying {
+                    self.shell.answer_offer(ctx, choice);
+                }
+            }
+            if showing {
                 if own_window && self.shell.frame_no < 3 {
                     splash::centre(ctx, splash::CARD);
                 }
@@ -274,6 +313,15 @@ impl<A: NcfApp> eframe::App for Runner<A> {
                 }
             }
         }
+        if self.splash.is_none() {
+            if let Some(offer) = self.shell.offer.clone() {
+                if let Some(choice) = splash::prompt(ctx, &self.shell.info, &offer) {
+                    self.shell.offer = None;
+                    self.shell.answer_offer(ctx, choice);
+                }
+            }
+        }
+        frame(ctx, &mut self.app, &mut self.shell);
     }
 
     fn clear_color(&self, _visuals: &egui::Visuals) -> [f32; 4] {
@@ -299,11 +347,8 @@ pub fn frame<A: NcfApp>(ctx: &egui::Context, app: &mut A, shell: &mut Shell) {
     if let Some(rx) = &shell.update_rx {
         if let Ok(status) = rx.try_recv() {
             shell.update_rx = None;
-            if let Status::Newer(r) = &status {
-                let (title, body) = (format!("{} {} is out", shell.info.name, r.version), "Download it from Settings → About.".to_string());
-                shell.say(&title, &body);
-            }
             shell.update = status;
+            shell.offer = shell.offer_for_update();
         }
     }
 
@@ -371,7 +416,7 @@ pub fn apply_debug(ctx: &egui::Context, shell: &mut Shell, request: &crate::debu
         Request::FakeUpdate => {
             let version = crate::debug::next_version(shell.info.version);
             shell.update = Status::Newer(update::Release { version: version.clone(), url: update::releases_page(shell.info.repo) });
-            shell.say(&format!("{} {} is out", shell.info.name, version), "A pretend release, from debug mode.");
+            shell.offer = Some(splash::Offer { version, can_update: shell.update_plan().is_some() });
         }
         Request::UpdaterDemo(demo) => match crate::updater::start_demo(*demo) {
             Ok(()) => shell.say("Updater demo", "It opens in its own window. Nothing is installed."),

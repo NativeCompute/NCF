@@ -570,3 +570,104 @@ fn the_logo_paints_as_one_tinted_image_and_reuses_its_texture() {
     let textures = ctx.tex_manager().read().allocated().filter(|(_, m)| m.name.starts_with("ncf-logo")).count();
     assert_eq!(textures, 1, "one texture per pixel height");
 }
+
+// launch here---
+
+fn splash_frames(h: &mut Harness, s: &mut crate::splash::Splash, n: usize) -> bool {
+    let mut showing = true;
+    for _ in 0..n {
+        h.run(|ctx| {
+            crate::anim::set_enabled(true);
+            showing = s.show(ctx);
+        });
+    }
+    showing
+}
+
+#[test]
+fn the_splash_waits_for_the_update_check() {
+    use crate::splash::Splash;
+    let _guard = lock();
+    let mut h = Harness::new(900.0, 600.0);
+    let info = crate::AppInfo { name: "Field Notes", id: "x", version: "1.3.0", tagline: "", repo: "NativeCompute/field-notes", mark: crate::mark::NATIVECOMPUTE };
+    let mut s = Splash::inline(info);
+    s.set_status(update::Status::Checking);
+    splash_frames(&mut h, &mut s, 3);
+    std::thread::sleep(std::time::Duration::from_millis(1900));
+    assert!(splash_frames(&mut h, &mut s, 3), "still checking, so the splash stays");
+    s.set_status(update::Status::Latest);
+    splash_frames(&mut h, &mut s, 3);
+    std::thread::sleep(std::time::Duration::from_millis(900));
+    assert!(!splash_frames(&mut h, &mut s, 3), "the check came back, so the splash goes");
+    crate::anim::set_enabled(false);
+}
+
+#[test]
+fn the_splash_turns_into_the_update_prompt_and_waits_for_a_choice() {
+    use crate::splash::{Choice, Offer, Splash};
+    let _guard = lock();
+    let mut h = Harness::new(900.0, 600.0);
+    let info = crate::AppInfo { name: "Field Notes", id: "x", version: "1.3.0", tagline: "", repo: "NativeCompute/field-notes", mark: crate::mark::NATIVECOMPUTE };
+    let mut s = Splash::inline(info);
+    s.set_status(update::Status::Newer(update::Release { version: "1.4.0".into(), url: String::new() }));
+    crate::anim::set_enabled(true);
+    assert!(s.wants_offer());
+    s.set_offer(Offer { version: "1.4.0".into(), can_update: true });
+    splash_frames(&mut h, &mut s, 40);
+    std::thread::sleep(std::time::Duration::from_millis(2100));
+    assert!(splash_frames(&mut h, &mut s, 3), "it waits for a choice");
+    assert_eq!(s.take_choice(), None);
+    h.press(Key::Escape, Modifiers::NONE, |ctx| {
+        crate::anim::set_enabled(true);
+        s.show(ctx);
+    });
+    assert_eq!(s.take_choice(), Some(Choice::NotNow));
+    std::thread::sleep(std::time::Duration::from_millis(500));
+    assert!(!splash_frames(&mut h, &mut s, 3), "then it gets out of the way");
+
+    let mut s = Splash::inline(info);
+    s.set_offer(Offer { version: "1.4.0".into(), can_update: true });
+    splash_frames(&mut h, &mut s, 40);
+    h.press(Key::Enter, Modifiers::NONE, |ctx| {
+        crate::anim::set_enabled(true);
+        s.show(ctx);
+    });
+    assert_eq!(s.take_choice(), Some(Choice::UpdateNow("1.4.0".into())));
+    crate::anim::set_enabled(false);
+}
+
+#[test]
+fn the_update_prompt_blocks_until_answered_in_both_casts() {
+    use crate::splash::{prompt, Choice, Offer};
+    let _guard = lock();
+    let info = crate::AppInfo { name: "Field Notes", id: "x", version: "1.3.0", tagline: "", repo: "NativeCompute/field-notes", mark: crate::mark::NATIVECOMPUTE };
+    for dark in [true, false] {
+        let mut h = Harness::new(1000.0, 700.0);
+        theme::set_palette(dark);
+        let offer = Offer { version: "1.4.0".into(), can_update: false };
+        let mut got = None;
+        h.frames(3, |ctx| got = prompt(ctx, &info, &offer));
+        assert_eq!(got, None);
+        let mut typed = false;
+        h.press(Key::Enter, Modifiers::NONE, |ctx| {
+            got = got.clone().or_else(|| prompt(ctx, &info, &offer));
+            typed |= ctx.input(|i| i.events.iter().any(|e| matches!(e, egui::Event::Key { .. })));
+        });
+        assert_eq!(got, Some(Choice::Download("1.4.0".into())), "a copy that can't update itself offers the download");
+        assert!(!typed, "keys don't reach the app underneath");
+    }
+    theme::set_palette(true);
+}
+
+const _: () = assert!(crate::splash::CARD.y <= 210.0, "the splash stays compact");
+const _: () = assert!(crate::splash::CARD.y + crate::splash::PROMPT_H <= 300.0, "and so does the update prompt");
+const _: () = assert!(crate::updater::window::SIZE.y <= 310.0, "and the updater window");
+
+#[test]
+fn a_skipped_update_is_remembered_and_absent_until_then() {
+    let look = Look::default();
+    assert!(!look.write().contains("skipped_update"));
+    let skipped = Look { skipped_update: "2.3.0".into(), ..Look::default() };
+    assert!(skipped.write().contains("skipped_update = 2.3.0\n"));
+    assert_eq!(Look::parse(&skipped.write()).skipped_update, "2.3.0");
+}
