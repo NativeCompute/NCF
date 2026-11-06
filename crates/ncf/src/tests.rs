@@ -492,11 +492,15 @@ fn the_debug_panel_draws_in_both_casts_and_its_display_switches_apply() {
         });
         assert!(got.is_empty(), "nothing is triggered without a click");
         assert!(apply(&h.ctx, &mut d, &Request::Inspector(true)));
-        assert!(d.inspector && h.ctx.style().debug.show_interactive_widgets);
+        assert_eq!(d.inspector, crate::debug::OUTLINES);
+        #[cfg(debug_assertions)]
+        assert!(h.ctx.style().debug.show_interactive_widgets);
         assert!(apply(&h.ctx, &mut d, &Request::WindowSize(crate::debug::LAPTOP)));
         assert!(!apply(&h.ctx, &mut d, &Request::Crash), "left to the app");
         assert!(apply(&h.ctx, &mut d, &Request::Off));
-        assert!(!d.on && !d.open && !d.inspector && !h.ctx.style().debug.show_interactive_widgets);
+        assert!(!d.on && !d.open && !d.inspector);
+        #[cfg(debug_assertions)]
+        assert!(!h.ctx.style().debug.show_interactive_widgets);
         let mut hidden = Vec::new();
         h.frames(1, |ctx| hidden = d.panel(ctx, egui::vec2(1320.0, 900.0), |_, _| {}));
         assert!(hidden.is_empty());

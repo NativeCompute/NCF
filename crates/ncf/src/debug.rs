@@ -10,6 +10,7 @@ pub const KNOCKS: usize = 5;
 pub const KNOCK_WINDOW: f64 = 3.0;
 pub const LAPTOP: Vec2 = Vec2::new(1280.0, 800.0);
 pub const SMALL: Vec2 = Vec2::new(1024.0, 640.0);
+pub const OUTLINES: bool = cfg!(debug_assertions);
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Demo {
@@ -216,17 +217,16 @@ impl Debug {
         let dark = pal().dark;
         let animations = anim::enabled();
         let inspector = self.inspector;
-        row(
-            ui,
-            &[
-                ("Text −", Request::TextScale(-0.1)),
-                ("Text +", Request::TextScale(0.1)),
-                (if dark { "Light" } else { "Dark" }, Request::Light(dark)),
-                (if animations { "Animations off" } else { "Animations on" }, Request::Animations(!animations)),
-                (if inspector { "Outlines off" } else { "Outlines on" }, Request::Inspector(!inspector)),
-            ],
-            out,
-        );
+        let mut display = vec![
+            ("Text −", Request::TextScale(-0.1)),
+            ("Text +", Request::TextScale(0.1)),
+            (if dark { "Light" } else { "Dark" }, Request::Light(dark)),
+            (if animations { "Animations off" } else { "Animations on" }, Request::Animations(!animations)),
+        ];
+        if OUTLINES {
+            display.push((if inspector { "Outlines off" } else { "Outlines on" }, Request::Inspector(!inspector)));
+        }
+        row(ui, &display, out);
         ui.add_space(6.0);
         row(ui, &[("Turn debug mode off", Request::Off)], out);
     }
@@ -244,7 +244,8 @@ pub fn apply(ctx: &egui::Context, debug: &mut Debug, request: &Request) -> bool 
             true
         }
         Request::Inspector(on) => {
-            debug.inspector = *on;
+            debug.inspector = *on && OUTLINES;
+            #[cfg(debug_assertions)]
             ctx.style_mut(|s| {
                 s.debug.show_expand_width = *on;
                 s.debug.show_expand_height = *on;
