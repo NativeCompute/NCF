@@ -12,7 +12,11 @@ use crate::settings::Look;
 use crate::theme::{self, pal};
 use crate::{anim, chrome, ui, AppInfo};
 
-pub const SIZE: Vec2 = Vec2::new(540.0, 364.0);
+pub const SIZE: Vec2 = Vec2::new(540.0, 308.0);
+
+pub fn size(os: crate::Os) -> Vec2 {
+    SIZE + Vec2::new(0.0, if chrome::native_frame(os) { 14.0 } else { 0.0 })
+}
 const HOLD_DONE: f32 = 1.5;
 
 pub struct Updater {
@@ -26,6 +30,7 @@ pub struct Updater {
     shot: Option<PathBuf>,
     shot_asked: bool,
     frames: u32,
+    height: f32,
     reopened: Arc<AtomicBool>,
 }
 
@@ -42,6 +47,7 @@ impl Updater {
             shot: std::env::var_os("NCF_UPDATE_SHOT").map(PathBuf::from),
             shot_asked: false,
             frames: 0,
+            height: size(crate::OS).y,
             reopened: Arc::new(AtomicBool::new(false)),
         }
     }
@@ -147,7 +153,7 @@ impl Updater {
 
             let left = rect.left() + 40.0;
             let width = rect.width() - 80.0;
-            let top = rect.top() + if native { 44.0 } else { 34.0 };
+            let top = rect.top() + if native { 40.0 } else { 26.0 };
 
             let mark = Rect::from_min_size(Pos2::new(left, top), Vec2::splat(22.0));
             self.info.mark.paint(&painter, mark);
@@ -167,19 +173,19 @@ impl Updater {
 
             let title = self.title().to_uppercase();
             let probe = painter.layout_no_wrap(title.clone(), theme::font_display(40.0), p.text);
-            let size = (40.0 * width / probe.rect.width().max(1.0)).min(40.0);
+            let size = (40.0 * width * 0.97 / probe.rect.width().max(1.0)).min(40.0);
             let galley = painter.layout_no_wrap(title, theme::font_display(size), p.text);
-            let title_bottom = top + 38.0 + galley.rect.height();
-            painter.galley(Pos2::new(left, top + 38.0), galley, p.text);
-            let track_y = title_bottom + 8.0;
+            let title_top = top + 22.0 + 12.0;
+            painter.galley(Pos2::new(left, title_top + (40.0 - galley.rect.height()) * 0.5), galley, p.text);
+            let track_y = title_top + 40.0 + 8.0;
 
             let failed = matches!(self.state.outcome, Some(Err(_)));
             let done = matches!(self.state.outcome, Some(Ok(())));
             let current = self.state.step.map(|s| s.index());
-            let row_top = track_y + 24.0;
+            let row_top = track_y + 2.0 + 16.0;
             let t = ui.input(|i| i.time) as f32;
             for (k, step) in STEPS.iter().enumerate() {
-                let y = row_top + k as f32 * 21.0;
+                let y = row_top + k as f32 * 20.0;
                 let marker = Rect::from_center_size(Pos2::new(left + 4.0, y), Vec2::splat(7.0));
                 let (state, colour) = match current {
                     _ if done => (2, p.text_3),
@@ -213,17 +219,22 @@ impl Updater {
                 }
             }
 
-            let row_mid = rect.bottom() - 34.0;
-            let rule_y = row_mid - 22.0;
-            let note_rect = Rect::from_min_max(Pos2::new(left, row_top + STEPS.len() as f32 * 21.0 - 4.0), Pos2::new(left + width, rule_y - 6.0));
+            let note_top = row_top + (STEPS.len() - 1) as f32 * 20.0 + 6.0 + 12.0;
             let (note, note_colour) = match &self.state.outcome {
                 Some(Err(why)) => (format!("{} The version you had is still installed.", sentence(why)), p.text),
                 Some(Ok(())) => (format!("Opening {}…", self.plan.name), p.text_2),
                 None => (self.state.detail.clone(), p.text_3),
             };
-            if !note.is_empty() {
-                let wrapped = painter.layout(note, theme::font(theme::T_CAP), note_colour, note_rect.width());
-                painter.galley(note_rect.min, wrapped, note_colour);
+            let wrapped = painter.layout(note, theme::font(theme::T_CAP), note_colour, width);
+            let note_h = wrapped.rect.height().max(15.0);
+            painter.galley(Pos2::new(left, note_top), wrapped, note_colour);
+            let rule_y = note_top + note_h + 12.0;
+            let row_mid = rule_y + 22.0;
+            let needed = (row_mid + 15.0 + 20.0 - rect.top()).ceil();
+            if needed > self.height + 0.5 {
+                self.height = needed;
+                ctx.send_viewport_cmd(egui::ViewportCommand::MinInnerSize(Vec2::new(SIZE.x, needed)));
+                ctx.send_viewport_cmd(egui::ViewportCommand::InnerSize(Vec2::new(SIZE.x, needed)));
             }
 
             painter.line_segment([Pos2::new(left, rule_y), Pos2::new(left + width, rule_y)], Stroke::new(1.0_f32, p.line));
@@ -338,8 +349,8 @@ pub fn run_with(info: AppInfo, plan: Plan, rx: Receiver<Event>, worker: work::Wo
             .with_title(format!("Updating {}", info.name))
             .with_icon(Arc::new(info.mark.icon_data(128)))
             .with_app_id(info.id)
-            .with_inner_size(SIZE)
-            .with_min_inner_size(SIZE);
+            .with_inner_size(size(crate::OS))
+            .with_min_inner_size(size(crate::OS));
         let viewport = chrome::viewport(builder, crate::OS).with_resizable(false).with_maximize_button(false);
         let options = eframe::NativeOptions { viewport, renderer, centered: true, ..Default::default() };
         let (flag, plan2, rx2, cancel2, reopened2) = (started.clone(), plan.clone(), rx.clone(), cancel.clone(), reopened.clone());

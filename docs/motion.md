@@ -15,7 +15,7 @@ Motion in NativeCompute apps confirms that something happened. It is quick, it s
 | hover, 240 ms | `tokens::MOTION_HOVER`, `anim::HOVER` | n/a | Hover fills on cards, menu items, dropdowns and icon buttons. |
 
 Nothing runs longer than 300 ms, except:
-- the splash: it holds for 1.55 s, then fades over 0.4 s; a click skips it;
+- the splash: it holds for 1.55 s, or until the update check comes back (5 s at most), then fades over 0.4 s; a click skips it. When an update is out it waits for a choice instead;
 - notices and confirmations arriving, 420 ms;
 - a page-load reveal on the web, up to 600 ms;
 - continuous indicators (the spinner) while work is running.
