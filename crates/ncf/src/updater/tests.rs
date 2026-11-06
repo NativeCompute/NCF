@@ -244,3 +244,38 @@ mod linux_release {
         let _ = std::fs::remove_dir_all(dir);
     }
 }
+
+#[test]
+fn the_updater_demo_walks_the_same_steps_and_installs_nothing() {
+    use crate::debug::Demo;
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::Arc;
+    assert_eq!(demo_from_args(&["app".into(), DEMO_FLAG.into(), "fail".into()]), Some(Demo::Fails));
+    assert_eq!(demo_from_args(&["app".into(), DEMO_FLAG.into(), "nonsense".into()]), None);
+    assert_eq!(demo_from_args(&["app".into()]), None);
+    let info = crate::AppInfo { name: "Field Notes", id: "x", version: "1.3.0", tagline: "", repo: "NativeCompute/field-notes", mark: crate::mark::AppMark { name: "Field Notes", parts: &[] } };
+    let plan = demo_plan(&info);
+    assert_eq!((plan.version.as_str(), plan.reopen, plan.slug.as_str()), ("1.3.1", false, "field-notes-demo"));
+
+    let steps = |events: &[Event]| events.iter().filter_map(|e| if let Event::Step(s) = e { Some(*s) } else { None }).collect::<Vec<_>>();
+    let (rx, worker) = work::simulate(plan.clone(), Demo::Works, Arc::new(AtomicBool::new(false)));
+    let events: Vec<Event> = rx.into_iter().collect();
+    assert_eq!(worker.join().unwrap(), Ok(()));
+    assert_eq!(steps(&events), [Step::Wait, Step::Download, Step::Check, Step::Install]);
+    assert_eq!(events.last(), Some(&Event::Done));
+
+    let (rx, worker) = work::simulate(plan.clone(), Demo::Fails, Arc::new(AtomicBool::new(false)));
+    let events: Vec<Event> = rx.into_iter().collect();
+    assert!(worker.join().unwrap().unwrap_err().contains("damaged"));
+    assert_eq!(steps(&events), [Step::Wait, Step::Download, Step::Check]);
+
+    let cancel = Arc::new(AtomicBool::new(false));
+    let (rx, worker) = work::simulate(plan, Demo::Slow, cancel.clone());
+    for e in rx.iter() {
+        if e == Event::Step(Step::Download) {
+            cancel.store(true, Ordering::SeqCst);
+        }
+    }
+    assert!(worker.join().unwrap().unwrap_err().contains("Cancelled"), "Cancel stops the slow demo");
+}
+

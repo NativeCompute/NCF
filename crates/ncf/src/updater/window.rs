@@ -307,11 +307,15 @@ pub fn look(info: &AppInfo) -> Look {
 }
 
 pub fn run(info: AppInfo, plan: Plan) -> i32 {
+    let cancel = Arc::new(AtomicBool::new(false));
+    let (rx, worker) = work::spawn(plan.clone(), cancel.clone());
+    run_with(info, plan, rx, worker, cancel)
+}
+
+pub fn run_with(info: AppInfo, plan: Plan, rx: Receiver<Event>, worker: work::Worker, cancel: Arc<AtomicBool>) -> i32 {
     let look = look(&info);
     let started = Arc::new(AtomicBool::new(false));
-    let cancel = Arc::new(AtomicBool::new(false));
     let reopened = Arc::new(AtomicBool::new(false));
-    let (rx, worker) = work::spawn(plan.clone(), cancel.clone());
     let rx = Arc::new(std::sync::Mutex::new(Some(rx)));
     for renderer in crate::app::renderers() {
         let builder = egui::ViewportBuilder::default()

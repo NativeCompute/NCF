@@ -436,3 +436,72 @@ fn the_updater_window_draws_every_step_in_both_casts() {
     let _ = std::fs::remove_dir_all(&plan.data);
 }
 
+#[test]
+fn debug_mode_opens_only_on_five_held_knocks_within_three_seconds() {
+    use crate::debug::Debug;
+    let mut d = Debug::default();
+    for k in 0..4 {
+        assert!(!d.count(true, k as f64 * 0.5), "not before the fifth knock");
+    }
+    assert!(d.count(true, 2.1));
+    assert!(d.on && d.open, "on, with its panel open");
+    for k in 0..5 {
+        d.count(true, 10.0 + k as f64 * 0.2);
+    }
+    assert!(!d.on && !d.open, "the same knock turns it off");
+
+    let mut slow = Debug::default();
+    for k in 0..8 {
+        assert!(!slow.count(true, k as f64 * 1.0), "knocks spread over more than three seconds never add up");
+    }
+    let mut loose = Debug::default();
+    for k in 0..10 {
+        assert!(!loose.count(k % 2 == 0, k as f64 * 0.1), "letting go of the keys starts the count again");
+    }
+    assert!(!loose.on);
+}
+
+#[test]
+fn the_settings_file_only_mentions_debug_mode_while_it_is_on() {
+    let off = Look::default();
+    assert_eq!(off.write(), "light_mode = no\nanimations = yes\nfont_scale = 1.00\nsplash = yes\ncheck_updates = yes\n", "byte-identical to before debug mode existed");
+    assert!(!off.write().contains("debug"));
+    let on = Look { debug: true, ..Look::default() };
+    assert!(on.write().ends_with("debug = yes\n"));
+    assert_eq!(Look::parse(&on.write()), on);
+    assert_eq!(Look::parse(&off.write()), off);
+}
+
+#[test]
+fn the_debug_panel_draws_in_both_casts_and_its_display_switches_apply() {
+    use crate::debug::{apply, Debug, Request};
+    let _g = lock();
+    for dark in [true, false] {
+        theme::set_palette(dark);
+        let mut h = Harness::new(1320.0, 900.0);
+        theme::apply(&h.ctx);
+        let mut d = Debug::new(true);
+        d.open = true;
+        let mut got = Vec::new();
+        h.frames(3, |ctx| {
+            got = d.panel(ctx, egui::vec2(1320.0, 900.0), |ui, out| {
+                if ui::quiet_button(ui, "App trigger", None) {
+                    out.push(Request::Confirm);
+                }
+            });
+        });
+        assert!(got.is_empty(), "nothing is triggered without a click");
+        assert!(apply(&h.ctx, &mut d, &Request::Inspector(true)));
+        assert!(d.inspector && h.ctx.style().debug.show_interactive_widgets);
+        assert!(apply(&h.ctx, &mut d, &Request::WindowSize(crate::debug::LAPTOP)));
+        assert!(!apply(&h.ctx, &mut d, &Request::Crash), "left to the app");
+        assert!(apply(&h.ctx, &mut d, &Request::Off));
+        assert!(!d.on && !d.open && !d.inspector && !h.ctx.style().debug.show_interactive_widgets);
+        let mut hidden = Vec::new();
+        h.frames(1, |ctx| hidden = d.panel(ctx, egui::vec2(1320.0, 900.0), |_, _| {}));
+        assert!(hidden.is_empty());
+    }
+    assert_eq!(crate::debug::next_version("2.2.0"), "2.2.1");
+    assert_eq!(crate::debug::next_version("v3"), "3.0.1");
+}
+

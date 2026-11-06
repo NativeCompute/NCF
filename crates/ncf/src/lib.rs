@@ -4,6 +4,7 @@ pub mod brand;
 pub mod bundle;
 pub mod caret;
 pub mod chrome;
+pub mod debug;
 pub mod icons;
 pub mod keys;
 pub mod mark;

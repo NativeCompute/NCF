@@ -27,11 +27,12 @@ pub struct Look {
     pub font_scale: f32,
     pub splash: bool,
     pub check_updates: bool,
+    pub debug: bool,
 }
 
 impl Default for Look {
     fn default() -> Self {
-        Look { light_mode: false, animations: true, font_scale: 1.0, splash: true, check_updates: true }
+        Look { light_mode: false, animations: true, font_scale: 1.0, splash: true, check_updates: true, debug: false }
     }
 }
 
@@ -43,14 +44,16 @@ impl Look {
             "font_scale" => self.font_scale = value.parse::<f32>().unwrap_or(1.0).clamp(0.8, 1.4),
             "splash" => self.splash = yes(value),
             "check_updates" => self.check_updates = yes(value),
+            "debug" => self.debug = yes(value),
             _ => return false,
         }
         true
     }
 
     pub fn write(&self) -> String {
+        let debug = if self.debug { "debug = yes\n" } else { "" };
         format!(
-            "light_mode = {}\nanimations = {}\nfont_scale = {:.2}\nsplash = {}\ncheck_updates = {}\n",
+            "light_mode = {}\nanimations = {}\nfont_scale = {:.2}\nsplash = {}\ncheck_updates = {}\n{debug}",
             b(self.light_mode),
             b(self.animations),
             self.font_scale,

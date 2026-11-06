@@ -261,6 +261,46 @@ pub fn tidy(slug: &str) {
     }
 }
 
+pub const DEMO_FLAG: &str = "--ncf-update-demo";
+
+pub fn demo_from_args(args: &[String]) -> Option<crate::debug::Demo> {
+    let at = args.iter().position(|a| a == DEMO_FLAG)?;
+    crate::debug::Demo::parse(args.get(at + 1)?)
+}
+
+pub fn demo_plan(info: &AppInfo) -> Plan {
+    let slug = slug(info.name);
+    let exe = std::env::current_exe().unwrap_or_else(|_| PathBuf::from(&slug));
+    let install = Install::from_target(exe.clone(), crate::OS).unwrap_or(Install::LinuxLocal { bin: exe });
+    Plan {
+        name: info.name.to_string(),
+        slug: format!("{slug}-demo"),
+        repo: info.repo.to_string(),
+        version: crate::debug::next_version(info.version),
+        source: "demo".to_string(),
+        install,
+        data: crate::platform::app_folder(info.name),
+        parent: 0,
+        headless: false,
+        reopen: false,
+    }
+}
+
+pub fn start_demo(demo: crate::debug::Demo) -> Result<(), String> {
+    let exe = std::env::current_exe().map_err(|e| format!("could not find this program: {e}"))?;
+    let mut cmd = Command::new(exe);
+    cmd.args([DEMO_FLAG, demo.arg()]).current_dir(std::env::temp_dir());
+    detach(&mut cmd);
+    cmd.spawn().map(|_| ()).map_err(|e| format!("could not start the updater demo: {e}"))
+}
+
+pub fn run_demo(info: AppInfo, demo: crate::debug::Demo) -> i32 {
+    let plan = demo_plan(&info);
+    let cancel = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let (rx, worker) = work::simulate(plan.clone(), demo, cancel.clone());
+    window::run_with(info, plan, rx, worker, cancel)
+}
+
 pub fn run(info: AppInfo, plan: Plan) -> i32 {
     if plan.headless {
         return work::headless(&plan);

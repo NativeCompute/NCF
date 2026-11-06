@@ -502,6 +502,49 @@ pub fn spawn(plan: Plan, cancel: std::sync::Arc<AtomicBool>) -> (std::sync::mpsc
     (rx, worker)
 }
 
+pub fn simulate(plan: Plan, demo: crate::debug::Demo, cancel: std::sync::Arc<AtomicBool>) -> (std::sync::mpsc::Receiver<Event>, Worker) {
+    let (tx, rx) = std::sync::mpsc::channel();
+    let worker = std::thread::spawn(move || {
+        let nap = |ms: u64| std::thread::sleep(Duration::from_millis(ms));
+        let result = (|| -> Result<(), String> {
+            let _ = tx.send(Event::Step(Step::Wait));
+            nap(700);
+            cancelled(&cancel)?;
+            let _ = tx.send(Event::Step(Step::Download));
+            let steps = if demo == crate::debug::Demo::Slow { 400 } else { 40 };
+            for k in 1..=steps {
+                cancelled(&cancel)?;
+                nap(50);
+                let _ = tx.send(Event::Progress(k as f32 / steps as f32));
+            }
+            let _ = tx.send(Event::Step(Step::Check));
+            nap(600);
+            cancelled(&cancel)?;
+            if demo == crate::debug::Demo::Fails {
+                return Err("the download is damaged (its checksum does not match). Nothing was changed. Try again.".to_string());
+            }
+            let _ = tx.send(Event::Line("Checksum matches".to_string()));
+            let _ = tx.send(Event::Step(Step::Install));
+            nap(500);
+            let _ = tx.send(Event::Line(format!("Your library was copied to {}-backup first", plan.data.display())));
+            nap(900);
+            let _ = tx.send(Event::Line(format!("Installed to {}", plan.install.path().display())));
+            nap(400);
+            Ok(())
+        })();
+        match &result {
+            Ok(()) => {
+                let _ = tx.send(Event::Done);
+            }
+            Err(why) => {
+                let _ = tx.send(Event::Failed(why.clone()));
+            }
+        }
+        result
+    });
+    (rx, worker)
+}
+
 pub fn print(plan: &Plan, rx: std::sync::mpsc::Receiver<Event>) {
     for event in rx {
         match event {

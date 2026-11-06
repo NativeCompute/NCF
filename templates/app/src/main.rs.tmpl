@@ -20,6 +20,9 @@ pub const INFO: AppInfo = AppInfo {
 
 fn main() -> ncf::eframe::Result<()> {
     let args: Vec<String> = std::env::args().collect();
+    if let Some(demo) = ncf::updater::demo_from_args(&args) {
+        std::process::exit(ncf::updater::run_demo(INFO, demo));
+    }
     if let Some(plan) = ncf::updater::from_args(&args, ncf::OS) {
         match plan {
             Ok(plan) => std::process::exit(ncf::updater::run(INFO, plan)),
