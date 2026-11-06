@@ -160,7 +160,7 @@ Supplied by `ncf::app::run`. You do not call these unless you build your own she
 | Resize grips for the undecorated window | `chrome::resize_handles(ctx)` |
 | Splash card | `splash::Splash::new(info).show(ctx)`; `set_status(update_status)` adds the update line |
 | Maker line ("LEDGER BY" + the NativeCompute logo, links to nativecompute.net) | `ui::maker_line(ui, rect, centred, "Ledger")` |
-| NativeCompute logo, tinted | `ui::logo(ui, height, tint)` |
+| NativeCompute logo, tinted | `ui::logo(ui, height, tint)`, clickable: `ui::logo_link(ui, height, tint)` |
 
 On the web the same jobs are done by `.site-header` (`data-header` hides it on scroll down), `.nav`, `.mobile-nav`, `.site-footer` and `.maker`.
 

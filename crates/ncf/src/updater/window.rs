@@ -12,7 +12,7 @@ use crate::settings::Look;
 use crate::theme::{self, pal};
 use crate::{anim, chrome, ui, AppInfo};
 
-pub const SIZE: Vec2 = Vec2::new(540.0, 340.0);
+pub const SIZE: Vec2 = Vec2::new(540.0, 364.0);
 const HOLD_DONE: f32 = 1.5;
 
 pub struct Updater {
@@ -132,6 +132,7 @@ impl Updater {
         let mut reopen_old = false;
         let mut page = false;
         let mut cancel = false;
+        let mut site = false;
         egui::CentralPanel::default().frame(egui::Frame::none()).show(ctx, |ui| {
             let rect = ui.max_rect();
             let round = egui::Rounding::same(if native { 0.0 } else { theme::RADIUS });
@@ -153,18 +154,29 @@ impl Updater {
             let eyebrow = format!("UPDATE / V{} TO V{}", self.info.version, self.plan.version);
             theme::tracked_text(&painter, Pos2::new(left + 32.0, mark.center().y), &eyebrow, theme::font_hud(theme::T_MICRO + 0.5), p.text_2, 0.8);
             let logo_h = 13.0;
-            crate::mark::logo(&painter, Pos2::new(left + width - crate::mark::logo_width(logo_h), mark.center().y), logo_h, p.text_3);
+            let logo_at = Rect::from_min_size(Pos2::new(left + width - crate::mark::logo_width(logo_h), mark.center().y - logo_h * 0.5), Vec2::new(crate::mark::logo_width(logo_h), logo_h));
+            let logo_hit = ui.interact(logo_at, egui::Id::new("ncf-updater-logo"), Sense::click());
+            let logo_hot = anim::ease(ctx, logo_hit.id, logo_hit.hovered(), anim::HOVER);
+            crate::mark::logo(&painter, logo_at.left_center(), logo_h, theme::mix(p.text_3, p.text, logo_hot));
+            if logo_hit.hovered() {
+                ctx.set_cursor_icon(egui::CursorIcon::PointingHand);
+            }
+            if logo_hit.clicked() {
+                site = true;
+            }
 
             let title = self.title().to_uppercase();
             let probe = painter.layout_no_wrap(title.clone(), theme::font_display(40.0), p.text);
             let size = (40.0 * width / probe.rect.width().max(1.0)).min(40.0);
             let galley = painter.layout_no_wrap(title, theme::font_display(size), p.text);
+            let title_bottom = top + 38.0 + galley.rect.height();
             painter.galley(Pos2::new(left, top + 38.0), galley, p.text);
+            let track_y = title_bottom + 8.0;
 
             let failed = matches!(self.state.outcome, Some(Err(_)));
             let done = matches!(self.state.outcome, Some(Ok(())));
             let current = self.state.step.map(|s| s.index());
-            let row_top = top + 98.0;
+            let row_top = track_y + 24.0;
             let t = ui.input(|i| i.time) as f32;
             for (k, step) in STEPS.iter().enumerate() {
                 let y = row_top + k as f32 * 21.0;
@@ -201,8 +213,7 @@ impl Updater {
                 }
             }
 
-            let track_y = rect.bottom() - 26.0;
-            let row_mid = track_y - 24.0;
+            let row_mid = rect.bottom() - 34.0;
             let rule_y = row_mid - 22.0;
             let note_rect = Rect::from_min_max(Pos2::new(left, row_top + STEPS.len() as f32 * 21.0 - 4.0), Pos2::new(left + width, rule_y - 6.0));
             let (note, note_colour) = match &self.state.outcome {
@@ -247,6 +258,9 @@ impl Updater {
         });
         if page {
             crate::platform::open(self.plan.page());
+        }
+        if site {
+            crate::platform::open(crate::tokens::BRAND_URL);
         }
         if reopen_old {
             self.close(ctx, true);

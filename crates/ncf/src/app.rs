@@ -489,7 +489,7 @@ fn appearance(ui: &mut egui::Ui, shell: &mut Shell) {
         shell.look.light_mode = k == 1;
     }
     ui.add_space(4.0);
-    ui::caption(ui, "Dark is NativeCompute's own: void black and one signal blue. Light is the same language on paper white.");
+    ui::caption(ui, "Dark is the house look: void black and one signal blue. Light is the same language on paper white.");
     ui::separator(ui);
     ui::section(ui, "Motion");
     let mut v = shell.look.animations;
@@ -567,11 +567,7 @@ fn about<A: NcfApp>(ui: &mut egui::Ui, app: &mut A, shell: &mut Shell) {
     ui::separator(ui);
     ui::section(ui, "Made by");
     ui.add_space(2.0);
-    ui::logo(ui, (theme::T_H * 1.25).round(), p.text).on_hover_text("NativeCompute");
-    ui.add_space(4.0);
-    ui::body(ui, &format!("{} is made by NativeCompute.", shell.info.name));
-    ui.add_space(4.0);
-    if ui::link(ui, "nativecompute.net") {
+    if ui::logo_link(ui, (theme::T_H * 1.25).round(), p.text) {
         shell.open_url(crate::tokens::BRAND_URL);
     }
 }

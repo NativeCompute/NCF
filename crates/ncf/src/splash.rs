@@ -125,7 +125,17 @@ impl Splash {
                 let probe = painter.layout_no_wrap(word.clone(), theme::font_display(100.0), p.text);
                 let size = (100.0 * width / probe.rect.width().max(1.0)).min(rect.height() * 0.42);
                 let name = painter.layout_no_wrap(word, theme::font_display(size), ink(p.text, 1.0));
+                let title_bottom = rect.top() + 84.0 + name.rect.height();
                 painter.galley(Pos2::new(left + drift, rect.top() + 84.0), name, ink(p.text, 1.0));
+
+                let track = Rect::from_min_size(Pos2::new(left, title_bottom + 10.0), Vec2::new(width, 2.0));
+                painter.rect_filled(track, egui::Rounding::ZERO, ink(p.line_strong, 1.0));
+                let done = anim::ease_out_expo((t / HOLD).clamp(0.0, 1.0));
+                painter.rect_filled(
+                    Rect::from_min_size(track.min, Vec2::new(track.width() * done, 2.0)),
+                    egui::Rounding::ZERO,
+                    ink(p.signal_hi, 1.0),
+                );
 
                 let foot_y = rect.bottom() - 40.0;
                 painter.line_segment(
@@ -134,22 +144,22 @@ impl Splash {
                 );
                 let foot_font = theme::font_hud(theme::T_MICRO + 0.5);
                 let by = theme::tracked_text(painter, Pos2::new(left, foot_y), "BY", foot_font.clone(), ink(p.text_3, 1.0), 0.8);
-                let logo = crate::mark::logo(painter, Pos2::new(left + by + 8.0, foot_y), ((theme::T_MICRO + 0.5) * 1.35).round(), ink(p.text_2, 1.0));
-                theme::tracked_text(painter, Pos2::new(logo.right() + 8.0, foot_y), "/ NATIVECOMPUTE.NET", foot_font, ink(p.text_3, 1.0), 0.8);
-                if let Some((line, news)) = status_line(&self.status) {
-                    let font = theme::font_hud(theme::T_MICRO + 0.5);
-                    let w = theme::tracked_width(ui.ctx(), &line, font.clone(), 0.8);
-                    let colour = if news { p.signal_hi } else { p.text_3 };
-                    theme::tracked_text(painter, Pos2::new(left + width - w, foot_y - 13.0), &line, font, ink(colour, 1.0), 0.8);
+                let logo_h = ((theme::T_MICRO + 0.5) * 1.35).round();
+                let logo_at = Rect::from_min_size(Pos2::new(left + by + 8.0, foot_y - logo_h * 0.5), Vec2::new(crate::mark::logo_width(logo_h), logo_h));
+                let logo_hit = ui.interact(logo_at.expand(4.0), egui::Id::new("ncf-splash-logo"), Sense::click());
+                let logo_hot = anim::ease(ui.ctx(), logo_hit.id, logo_hit.hovered(), anim::HOVER);
+                crate::mark::logo(painter, logo_at.left_center(), logo_h, ink(theme::mix(p.text_2, p.text, logo_hot), 1.0));
+                if logo_hit.hovered() {
+                    ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
                 }
-                let track = Rect::from_min_size(Pos2::new(left + width - 140.0, foot_y - 1.0), Vec2::new(140.0, 2.0));
-                painter.rect_filled(track, egui::Rounding::ZERO, ink(p.line_strong, 1.0));
-                let done = anim::ease_out_expo((t / HOLD).clamp(0.0, 1.0));
-                painter.rect_filled(
-                    Rect::from_min_size(track.min, Vec2::new(track.width() * done, 2.0)),
-                    egui::Rounding::ZERO,
-                    ink(p.signal_hi, 1.0),
-                );
+                if logo_hit.clicked() {
+                    crate::ui::open_site(ui.ctx());
+                }
+                if let Some((line, news)) = status_line(&self.status) {
+                    let w = theme::tracked_width(ui.ctx(), &line, foot_font.clone(), 0.8);
+                    let colour = if news { p.signal_hi } else { p.text_3 };
+                    theme::tracked_text(painter, Pos2::new(left + width - w, foot_y), &line, foot_font, ink(colour, 1.0), 0.8);
+                }
 
                 if resp.clicked() && self.skip_at.is_none() {
                     self.skip_at = Some(t);

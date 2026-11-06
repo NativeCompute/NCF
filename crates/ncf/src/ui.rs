@@ -364,7 +364,28 @@ pub fn maker_line(ui: &mut egui::Ui, rect: Rect, centre: bool, app_name: &str) -
     if resp.hovered() {
         ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
     }
-    resp.on_hover_text(crate::tokens::BRAND_URL).clicked()
+    resp.clicked()
+}
+
+pub fn logo_link(ui: &mut egui::Ui, height: f32, tint: Color32) -> bool {
+    let p = pal();
+    let (rect, resp) = ui.allocate_exact_size(Vec2::new(crate::mark::logo_width(height), height), Sense::click());
+    let hot = anim::ease(ui.ctx(), resp.id, resp.hovered(), anim::HOVER);
+    crate::mark::logo(ui.painter(), rect.left_center(), height, theme::mix(tint, p.signal_hi, hot));
+    if resp.hovered() {
+        ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+    }
+    resp.clicked()
+}
+
+pub fn open_site(ctx: &egui::Context) {
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        let _ = ctx;
+        crate::platform::open(crate::tokens::BRAND_URL);
+    }
+    #[cfg(target_arch = "wasm32")]
+    ctx.open_url(egui::OpenUrl::new_tab(crate::tokens::BRAND_URL));
 }
 
 pub fn logo(ui: &mut egui::Ui, height: f32, tint: Color32) -> Response {
@@ -676,6 +697,26 @@ pub fn menu_item_enabled(
         color,
     );
     enabled && resp.clicked()
+}
+
+pub fn menu_logo_item(ui: &mut egui::Ui, rects: &mut Vec<Rect>) -> bool {
+    let p = pal();
+    let w = ui.available_width();
+    let (rect, resp) = ui.allocate_exact_size(Vec2::new(w, 25.0), Sense::click());
+    rects.push(rect);
+    let hot = anim::ease(ui.ctx(), resp.id, resp.hovered(), anim::HOVER);
+    if hot > 0.01 {
+        ui.painter().rect_filled(rect, egui::Rounding::ZERO, theme::wash(if p.dark { p.panel_2 } else { p.sunken }, (255.0 * hot) as u8));
+        ui.painter().rect_filled(
+            Rect::from_min_size(rect.left_top(), Vec2::new(2.0, rect.height())),
+            egui::Rounding::ZERO,
+            theme::wash(p.signal_hi, (255.0 * hot) as u8),
+        );
+    }
+    let color = theme::mix(p.text_2, p.text, hot);
+    icons::draw(ui.painter(), Rect::from_center_size(Pos2::new(rect.left() + 15.0, rect.center().y), Vec2::splat(13.0)), Icon::External, color);
+    crate::mark::logo(ui.painter(), Pos2::new(rect.left() + 29.0, rect.center().y), 13.0, color);
+    resp.clicked()
 }
 
 pub fn dropdown(ui: &mut egui::Ui, icon: Icon, label: &str, open: bool, width: f32) -> Response {
