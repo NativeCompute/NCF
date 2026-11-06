@@ -16,11 +16,11 @@ mod tests;
 
 pub use auth::{Code, Session, SignUp};
 pub use client::{Client, Device};
-pub use engine::{Engine, Event, Heartbeat, SyncState, Worker};
+pub use engine::{Engine, Event, Heartbeat, Mood, SyncState, Worker};
 pub use error::CloudError;
 pub use http::{Reply, Request, Transport, Ureq};
 pub use outbox::{Outbox, Pending};
-pub use time::{parse_http_date, parse_time, unix_now};
+pub use time::{format_time, parse_http_date, parse_time, unix_now};
 pub use types::*;
 pub use vault::Vault;
 pub use view::{Account, Panel};
@@ -58,6 +58,10 @@ impl CloudConfig {
     pub fn endpoint(&self, path: &str) -> String {
         format!("{}{}", self.url, path)
     }
+}
+
+pub fn time_now_text() -> String {
+    format_time(unix_now())
 }
 
 pub fn password_rules(password: &str) -> [(&'static str, bool); 4] {
