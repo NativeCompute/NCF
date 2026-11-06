@@ -114,6 +114,7 @@ impl Debug {
         egui::Area::new(Id::new("ncf-debug-panel"))
             .order(egui::Order::Foreground)
             .default_pos(egui::pos2(screen.right() - 290.0, screen.top() + 52.0))
+            .default_size(Vec2::new(274.0, (screen.height() - 80.0).max(240.0)))
             .movable(true)
             .constrain(true)
             .show(ctx, |ui| {
@@ -167,9 +168,9 @@ impl Debug {
             ],
             out,
         );
-        ui::field(ui, &mut self.folder, "Folder of release files", ui.available_width());
+        ui::field(ui, &mut self.folder, "Folder of release files", ui.available_width() - 24.0);
         ui.horizontal(|ui| {
-            ui::field(ui, &mut self.version, "Version", 90.0);
+            ui::field(ui, &mut self.version, "Version", 56.0);
             if ui::quiet_button(ui, "Update from folder", None) && !self.folder.trim().is_empty() && !self.version.trim().is_empty() {
                 out.push(Request::UpdateFrom { dir: self.folder.trim().to_string(), version: self.version.trim().to_string() });
             }
