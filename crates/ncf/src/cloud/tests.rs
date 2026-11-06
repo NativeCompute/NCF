@@ -796,6 +796,7 @@ fn live_user(cfg: &CloudConfig, service: &str, who: &str) -> (Client, String) {
 #[ignore]
 fn live_nativecloud_round_trip() {
     let Some((cfg, service)) = live() else {
+        assert!(std::env::var("NCF_CLOUD_REQUIRED").is_err(), "NCF_CLOUD_URL, NCF_CLOUD_ANON_KEY and NCF_CLOUD_SERVICE_KEY must be set");
         eprintln!("NCF_CLOUD_URL, NCF_CLOUD_ANON_KEY and NCF_CLOUD_SERVICE_KEY are not set; skipping");
         return;
     };
