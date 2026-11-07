@@ -272,6 +272,13 @@ fn an_organization_invites_and_people_join() {
     let theirs = cal.spaces().unwrap();
     assert_eq!(theirs.iter().filter(|s| !s.is_personal()).count(), 1);
     assert_eq!(cloud.space_role(&pitches, "cal@example.com").as_deref(), Some("editor"));
+    let dee = cloud.signed_in("dee@example.com", "Dee");
+    let reader = ann.invite_guest(&made.id, "dee@example.com", std::slice::from_ref(&made.space), Role::Viewer).unwrap();
+    dee.accept_invite(&reader).unwrap();
+    let only = dee.spaces().unwrap().into_iter().find(|s| s.workspace.id == made.space).unwrap();
+    assert_eq!(only.my_role, Role::Viewer);
+    assert_eq!(dee.create_project(&made.space, "blackline", "Nope", "", &json!({})).unwrap_err(), CloudError::Forbidden);
+    ann.remove_member(&made.id, &dee.user_id()).unwrap();
     let orgs = ann.orgs().unwrap();
     let room = orgs.iter().find(|o| o.org.id == made.id).unwrap();
     assert_eq!(room.members.len(), 3);

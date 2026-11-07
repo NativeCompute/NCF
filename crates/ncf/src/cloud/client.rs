@@ -381,6 +381,11 @@ impl Client {
         Client::id_reply(self.rpc("invite_member", json!({"org": org, "email": email.trim().to_lowercase(), "role": role.as_str(), "spaces": spaces}))?)
     }
 
+    pub fn invite_guest(&self, org: &str, email: &str, spaces: &[String], space_role: Role) -> Result<String, CloudError> {
+        let args = json!({"org": org, "email": email.trim().to_lowercase(), "role": "guest", "spaces": spaces, "space_role": space_role.as_str()});
+        Client::id_reply(self.rpc("invite_member", args)?)
+    }
+
     pub fn send_invite(&self, invite: &str) -> Result<bool, CloudError> {
         let v = self.function("send-invite", &json!({"invite_id": invite}))?;
         Ok(v.get("sent").and_then(Value::as_bool).unwrap_or(false))
