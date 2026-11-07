@@ -19,7 +19,7 @@ pub const INFO: AppInfo = AppInfo {
     mark: MARK,
 };
 
-const SECTIONS: [(&str, Icon); 8] = [
+const SECTIONS: [(&str, Icon); 9] = [
     ("Type", Icon::Heading),
     ("Controls", Icon::Check),
     ("Surfaces", Icon::Layers),
@@ -28,6 +28,7 @@ const SECTIONS: [(&str, Icon); 8] = [
     ("Marks", Icon::Star4),
     ("Notices", Icon::Info),
     ("Motion", Icon::Refresh),
+    ("Cloud", Icon::Cloud),
 ];
 
 struct Gallery {
@@ -43,6 +44,8 @@ struct Gallery {
     menu_pick: String,
     opened_on: u64,
     moved: bool,
+    cloud: Option<ncf::cloud::fake::Demo>,
+    cloud_part: String,
 }
 
 impl Gallery {
@@ -60,6 +63,8 @@ impl Gallery {
             menu_pick: "Newest first".into(),
             opened_on: 0,
             moved: false,
+            cloud: None,
+            cloud_part: String::new(),
         }
     }
 }
@@ -117,12 +122,18 @@ impl NcfApp for Gallery {
                 4 => self.icons_page(ui),
                 5 => self.marks_page(ui),
                 6 => self.notices_page(ui, shell),
-                _ => self.motion_page(ui),
+                7 => self.motion_page(ui),
+                _ => self.cloud_page(ui, shell),
             }
         });
     }
 
     fn answer(&mut self, action: &str, _text: Option<String>, shell: &mut Shell) {
+        if let Some(d) = self.cloud.as_mut() {
+            if d.signed_in.answer(action) {
+                return;
+            }
+        }
         if action == "delete" {
             shell.ok("Deleted", "The item went to the bin. Nothing else changed.");
         }
@@ -400,6 +411,60 @@ impl Gallery {
         });
     }
 
+    fn cloud_page(&mut self, ui: &mut egui::Ui, shell: &mut Shell) {
+        use ncf::cloud::{fake, view, SyncState};
+        let part = self.cloud_part.clone();
+        let demo = self.cloud.get_or_insert_with(|| {
+            let mut d = fake::demo(INFO);
+            if part == "waiting" {
+                d.signed_out.sign_in_with_browser(false);
+                d.signed_out.take_urls();
+            }
+            d
+        });
+        demo.signed_in.poll();
+        demo.signed_out.poll();
+        for (title, body, tone) in demo.signed_in.take_notices().into_iter().chain(demo.signed_out.take_notices()) {
+            shell.deck.say(&title, &body, tone);
+        }
+        for url in demo.signed_in.take_urls().into_iter().chain(demo.signed_out.take_urls()) {
+            shell.deck.say("Opens in your browser", &url, ncf::alerts::Tone::Info);
+        }
+        for q in demo.signed_in.take_asks() {
+            shell.ask(&q.title, &q.body, &q.yes, q.danger, &q.action);
+        }
+        let column = |ui: &mut egui::Ui, body: &mut dyn FnMut(&mut egui::Ui)| {
+            let w = ui.available_width().min(460.0);
+            ui.allocate_ui_with_layout(Vec2::new(w, 0.0), Layout::top_down(Align::Min), |ui| {
+                ui.set_width(w);
+                body(ui);
+            });
+        };
+        let show = |name: &str| part.is_empty() || part == name || (name == "signin" && part == "waiting");
+        if show("readout") {
+            block(ui, "Sync readout", "cloud::view::readout(ui, &state, now)", |ui| {
+                let now = ncf::cloud::unix_now();
+                for s in [
+                    SyncState { signed_in: true, online: true, last_sync: Some(now - 2), ..Default::default() },
+                    SyncState { signed_in: true, online: true, waiting: 2, ..Default::default() },
+                    SyncState { signed_in: true, online: false, waiting: 3, ..Default::default() },
+                    SyncState::default(),
+                ] {
+                    view::readout(ui, &s, now);
+                }
+            });
+        }
+        if show("signin") {
+            block(ui, "Sign in", "Account::account_ui · signed out", |ui| column(ui, &mut |ui| demo.signed_out.account_ui(ui)));
+        }
+        if show("account") {
+            block(ui, "Account", "Account::account_ui · signed in", |ui| column(ui, &mut |ui| demo.signed_in.account_ui(ui)));
+        }
+        if show("orgs") {
+            block(ui, "Organizations", "Account::orgs_ui", |ui| column(ui, &mut |ui| demo.signed_in.orgs_ui(ui)));
+        }
+    }
+
     fn motion_page(&mut self, ui: &mut egui::Ui) {
         let p = pal();
         block(ui, "Ease", "anim::ease(ctx, id, on, tokens::MOTION_BASE)", |ui| {
@@ -450,7 +515,19 @@ fn main() -> ncf::eframe::Result<()> {
         .and_then(|i| args.get(i + 1))
         .and_then(|s| SECTIONS.iter().position(|(n, _)| n.eq_ignore_ascii_case(s)))
         .unwrap_or(0);
-    app::run_with(shell, move |_ctx, _shell| Gallery::new(section))
+    let cloud_part = args.iter().position(|a| a == "--cloud").and_then(|i| args.get(i + 1)).cloned().unwrap_or_default();
+    let section = if cloud_part.is_empty() { section } else { SECTIONS.len() - 1 };
+    app::run_with(shell, move |_ctx, shell| {
+        let mut g = Gallery::new(section);
+        match cloud_part.as_str() {
+            "settings" | "settings-orgs" => {
+                shell.cloud = Some(ncf::cloud::fake::demo(INFO).signed_in);
+                shell.open_settings(if cloud_part == "settings" { "Account" } else { "Organizations" });
+            }
+            _ => g.cloud_part = cloud_part,
+        }
+        g
+    })
 }
 
 #[cfg(test)]

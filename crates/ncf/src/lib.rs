@@ -18,6 +18,8 @@ pub mod update;
 
 #[cfg(not(target_arch = "wasm32"))]
 pub mod app;
+#[cfg(all(feature = "cloud", not(target_arch = "wasm32")))]
+pub mod cloud;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod platform;
 #[cfg(not(target_arch = "wasm32"))]

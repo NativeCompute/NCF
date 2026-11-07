@@ -9,7 +9,4 @@ authors.workspace = true
 publish = false
 
 [dependencies]
-ncf = { path = "../../crates/ncf" }
-
-[dev-dependencies]
-ncf = { path = "../../crates/ncf", features = ["testing"] }
+ncf = { path = "../../crates/ncf", features = ["cloud", "testing"] }
