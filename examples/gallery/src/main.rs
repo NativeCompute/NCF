@@ -416,16 +416,9 @@ impl Gallery {
         let part = self.cloud_part.clone();
         let demo = self.cloud.get_or_insert_with(|| {
             let mut d = fake::demo(INFO);
-            match part.as_str() {
-                "signup" => {
-                    d.signed_out.show(ncf::cloud::Panel::SignUp);
-                    d.signed_out.fill("dee@example.com", "Correct1hor", "Dee Park");
-                }
-                "code" => {
-                    d.signed_out.fill("dee@example.com", "", "");
-                    d.signed_out.show(ncf::cloud::Panel::Code(ncf::cloud::Code::SignUp));
-                }
-                _ => {}
+            if part == "waiting" {
+                d.signed_out.sign_in_with_browser(false);
+                d.signed_out.take_urls();
             }
             d
         });
@@ -433,6 +426,9 @@ impl Gallery {
         demo.signed_out.poll();
         for (title, body, tone) in demo.signed_in.take_notices().into_iter().chain(demo.signed_out.take_notices()) {
             shell.deck.say(&title, &body, tone);
+        }
+        for url in demo.signed_in.take_urls().into_iter().chain(demo.signed_out.take_urls()) {
+            shell.deck.say("Opens in your browser", &url, ncf::alerts::Tone::Info);
         }
         for q in demo.signed_in.take_asks() {
             shell.ask(&q.title, &q.body, &q.yes, q.danger, &q.action);
@@ -444,7 +440,7 @@ impl Gallery {
                 body(ui);
             });
         };
-        let show = |name: &str| part.is_empty() || part == name || (name == "signin" && (part == "signup" || part == "code"));
+        let show = |name: &str| part.is_empty() || part == name || (name == "signin" && part == "waiting");
         if show("readout") {
             block(ui, "Sync readout", "cloud::view::readout(ui, &state, now)", |ui| {
                 let now = ncf::cloud::unix_now();
@@ -464,8 +460,8 @@ impl Gallery {
         if show("account") {
             block(ui, "Account", "Account::account_ui · signed in", |ui| column(ui, &mut |ui| demo.signed_in.account_ui(ui)));
         }
-        if show("teams") {
-            block(ui, "Teams", "Account::teams_ui", |ui| column(ui, &mut |ui| demo.signed_in.teams_ui(ui)));
+        if show("orgs") {
+            block(ui, "Organizations", "Account::orgs_ui", |ui| column(ui, &mut |ui| demo.signed_in.orgs_ui(ui)));
         }
     }
 
@@ -524,9 +520,9 @@ fn main() -> ncf::eframe::Result<()> {
     app::run_with(shell, move |_ctx, shell| {
         let mut g = Gallery::new(section);
         match cloud_part.as_str() {
-            "settings" | "settings-teams" => {
+            "settings" | "settings-orgs" => {
                 shell.cloud = Some(ncf::cloud::fake::demo(INFO).signed_in);
-                shell.open_settings(if cloud_part == "settings" { "Account" } else { "Teams" });
+                shell.open_settings(if cloud_part == "settings" { "Account" } else { "Organizations" });
             }
             _ => g.cloud_part = cloud_part,
         }

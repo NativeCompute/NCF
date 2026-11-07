@@ -43,13 +43,17 @@ impl Person {
 pub struct Plan {
     pub id: String,
     pub name: String,
+    pub scope: String,
+    pub max_people: i64,
+    pub max_spaces: i64,
     pub max_projects: i64,
-    pub max_owned_teams: i64,
-    pub max_members: i64,
+    pub max_bytes: i64,
+    pub max_owned_orgs: i64,
     pub max_auto_snapshots: i64,
     pub max_kept_snapshots: i64,
-    pub max_bytes: i64,
     pub max_saves_per_minute: i64,
+    pub trial_days: i64,
+    pub price_cents: i64,
     pub paid: bool,
 }
 
@@ -58,7 +62,95 @@ pub struct Plan {
 pub struct Usage {
     pub projects: i64,
     pub bytes: i64,
-    pub owned_teams: i64,
+    pub owned_orgs: i64,
+    pub people: i64,
+    pub pending: i64,
+    pub spaces: i64,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum OrgRole {
+    Owner,
+    Admin,
+    #[default]
+    Member,
+    Guest,
+}
+
+impl OrgRole {
+    pub const INVITABLE: [OrgRole; 3] = [OrgRole::Admin, OrgRole::Member, OrgRole::Guest];
+
+    pub fn as_str(self) -> &'static str {
+        match self {
+            OrgRole::Owner => "owner",
+            OrgRole::Admin => "admin",
+            OrgRole::Member => "member",
+            OrgRole::Guest => "guest",
+        }
+    }
+
+    pub fn label(self) -> &'static str {
+        match self {
+            OrgRole::Owner => "Owner",
+            OrgRole::Admin => "Admin",
+            OrgRole::Member => "Member",
+            OrgRole::Guest => "Guest",
+        }
+    }
+
+    pub fn hint(self) -> &'static str {
+        match self {
+            OrgRole::Owner => "Everything, including the plan and deleting the organization.",
+            OrgRole::Admin => "Manages people, spaces and settings.",
+            OrgRole::Member => "Writes in every space.",
+            OrgRole::Guest => "Only the spaces they're invited to.",
+        }
+    }
+
+    pub fn parse(s: &str) -> Option<OrgRole> {
+        match s.trim() {
+            "owner" => Some(OrgRole::Owner),
+            "admin" => Some(OrgRole::Admin),
+            "member" => Some(OrgRole::Member),
+            "guest" => Some(OrgRole::Guest),
+            _ => None,
+        }
+    }
+
+    pub fn can_manage(self) -> bool {
+        matches!(self, OrgRole::Owner | OrgRole::Admin)
+    }
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct OrgRef {
+    pub id: String,
+    pub name: String,
+    pub slug: String,
+    pub role: OrgRole,
+    #[serde(deserialize_with = "text_or_null")]
+    pub plan: String,
+    pub trial_ends_at: Option<String>,
+    pub suspended: bool,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct OrgCreated {
+    pub id: String,
+    pub slug: String,
+    pub space: String,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct OrgMember {
+    pub org_id: String,
+    pub user_id: String,
+    pub role: OrgRole,
+    pub joined_at: String,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
@@ -74,6 +166,8 @@ pub struct Me {
     pub usage: Usage,
     #[serde(deserialize_with = "text_or_null")]
     pub personal_workspace: String,
+    pub staff: Option<String>,
+    pub orgs: Vec<OrgRef>,
 }
 
 impl Me {
@@ -101,19 +195,15 @@ pub struct Summary {
 #[serde(rename_all = "lowercase")]
 pub enum Role {
     Owner,
-    Admin,
     Editor,
     #[default]
     Viewer,
 }
 
 impl Role {
-    pub const INVITABLE: [Role; 3] = [Role::Admin, Role::Editor, Role::Viewer];
-
     pub fn as_str(self) -> &'static str {
         match self {
             Role::Owner => "owner",
-            Role::Admin => "admin",
             Role::Editor => "editor",
             Role::Viewer => "viewer",
         }
@@ -122,25 +212,14 @@ impl Role {
     pub fn label(self) -> &'static str {
         match self {
             Role::Owner => "Owner",
-            Role::Admin => "Admin",
             Role::Editor => "Editor",
             Role::Viewer => "Viewer",
-        }
-    }
-
-    pub fn hint(self) -> &'static str {
-        match self {
-            Role::Owner => "Everything, including deleting the team.",
-            Role::Admin => "Writes, invites and manages people.",
-            Role::Editor => "Writes and edits scripts.",
-            Role::Viewer => "Reads only.",
         }
     }
 
     pub fn parse(s: &str) -> Option<Role> {
         match s.trim() {
             "owner" => Some(Role::Owner),
-            "admin" => Some(Role::Admin),
             "editor" => Some(Role::Editor),
             "viewer" => Some(Role::Viewer),
             _ => None,
@@ -150,10 +229,6 @@ impl Role {
     pub fn can_write(self) -> bool {
         self != Role::Viewer
     }
-
-    pub fn can_manage(self) -> bool {
-        matches!(self, Role::Owner | Role::Admin)
-    }
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
@@ -162,7 +237,9 @@ pub struct Workspace {
     pub id: String,
     pub name: String,
     pub kind: String,
-    pub owner_id: String,
+    pub org_id: Option<String>,
+    pub owner_id: Option<String>,
+    pub archived_at: Option<String>,
 }
 
 impl Workspace {
@@ -209,16 +286,20 @@ pub struct Invite {
     pub id: String,
     #[serde(deserialize_with = "text_or_null")]
     pub email: String,
-    pub role: Role,
+    pub role: OrgRole,
     #[serde(deserialize_with = "text_or_null")]
     pub expires_at: String,
     pub accepted_at: Option<String>,
     #[serde(deserialize_with = "text_or_null")]
-    pub workspace_id: String,
+    pub org_id: String,
     #[serde(deserialize_with = "text_or_null")]
-    pub workspace: String,
+    pub org: String,
+    #[serde(deserialize_with = "text_or_null")]
+    pub org_slug: String,
     #[serde(deserialize_with = "text_or_null")]
     pub invited_by: String,
+    #[serde(deserialize_with = "text_or_null")]
+    pub state: String,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
@@ -343,7 +424,8 @@ pub struct EditSession {
 #[serde(default)]
 pub struct Change {
     pub seq: i64,
-    pub workspace_id: String,
+    pub workspace_id: Option<String>,
+    pub org_id: Option<String>,
     pub project_id: Option<String>,
     pub kind: String,
     pub by: Option<String>,
@@ -375,9 +457,34 @@ pub struct Settings {
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]
-pub struct Team {
+pub struct Space {
     pub workspace: Workspace,
-    pub members: Vec<(Member, Person)>,
-    pub invites: Vec<Invite>,
     pub my_role: Role,
+    pub org: Option<OrgRef>,
+    pub members: Vec<(Member, Person)>,
+}
+
+impl Space {
+    pub fn is_personal(&self) -> bool {
+        self.workspace.is_personal()
+    }
+
+    pub fn shown(&self) -> String {
+        match &self.org {
+            Some(o) if !self.workspace.is_personal() => format!("{} / {}", o.name, self.workspace.name),
+            _ => self.workspace.shown(),
+        }
+    }
+
+    pub fn archived(&self) -> bool {
+        self.workspace.archived_at.is_some()
+    }
+}
+
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct OrgView {
+    pub org: OrgRef,
+    pub members: Vec<(OrgMember, Person)>,
+    pub invites: Vec<Invite>,
+    pub spaces: Vec<Workspace>,
 }

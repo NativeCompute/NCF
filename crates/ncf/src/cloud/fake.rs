@@ -7,6 +7,8 @@ use super::time::format_time;
 use super::*;
 
 pub const LEASE_SECONDS: i64 = 90;
+pub const WEB_URL: &str = "https://cloud.nativecloud.test";
+const GRANT_ALPHABET: &[u8] = b"ABCDEFGHJKMNPQRSTUVWXYZ23456789";
 
 #[derive(Clone, Debug)]
 struct User {
@@ -24,8 +26,40 @@ struct Ws {
     id: String,
     name: String,
     kind: String,
+    org: Option<String>,
     owner: String,
     at: i64,
+    archived: bool,
+}
+
+#[derive(Clone, Debug)]
+struct Org {
+    id: String,
+    name: String,
+    slug: String,
+    plan: String,
+    at: i64,
+    members_create_spaces: bool,
+}
+
+#[derive(Clone, Debug)]
+struct OMem {
+    org: String,
+    user: String,
+    role: String,
+    at: i64,
+}
+
+#[derive(Clone, Debug)]
+struct Grant {
+    code: String,
+    user: String,
+    app: String,
+    device: String,
+    challenge: Option<String>,
+    expires: i64,
+    used: bool,
+    attempts: u32,
 }
 
 #[derive(Clone, Debug)]
@@ -39,9 +73,11 @@ struct Mem {
 #[derive(Clone, Debug)]
 struct Inv {
     id: String,
-    ws: String,
+    org: String,
     email: String,
     role: String,
+    spaces: Vec<String>,
+    space_role: String,
     by: String,
     expires: i64,
     open: bool,
@@ -86,7 +122,8 @@ struct Hold {
 #[derive(Clone, Debug)]
 struct Ch {
     seq: i64,
-    ws: String,
+    ws: Option<String>,
+    org: Option<String>,
     project: Option<String>,
     kind: String,
     by: String,
@@ -112,6 +149,9 @@ struct World {
     refresh: HashMap<String, String>,
     spaces: Vec<Ws>,
     members: Vec<Mem>,
+    orgs: Vec<Org>,
+    org_members: Vec<OMem>,
+    grants: Vec<Grant>,
     invites: Vec<Inv>,
     projects: Vec<Proj>,
     versions: Vec<Ver>,
@@ -124,6 +164,8 @@ struct World {
     fail: Vec<(String, u16, String)>,
     counter: u64,
     max_projects: i64,
+    max_orgs: i64,
+    max_people: i64,
     token_life: i64,
 }
 
@@ -151,13 +193,20 @@ fn http_date(t: i64) -> String {
     format!("{wd}, {} {} {} {} GMT", &iso[8..10], months[m - 1], &iso[0..4], &iso[11..19])
 }
 
-fn rank(role: &str) -> u8 {
-    match role {
-        "owner" => 4,
-        "admin" => 3,
-        "editor" => 2,
-        "viewer" => 1,
-        _ => 0,
+fn slugify(name: &str) -> String {
+    let mut out = String::new();
+    for c in name.to_lowercase().chars() {
+        if c.is_ascii_alphanumeric() {
+            out.push(c);
+        } else if !out.ends_with('-') && !out.is_empty() {
+            out.push('-');
+        }
+    }
+    let out = out.trim_matches('-').chars().take(40).collect::<String>();
+    if out.is_empty() {
+        "org".into()
+    } else {
+        out
     }
 }
 
@@ -200,17 +249,151 @@ impl World {
     }
 
     fn can_write(&self, ws: &str, user: &str) -> bool {
-        self.role(ws, user).map(|r| r != "viewer").unwrap_or(false)
+        let live = self.spaces.iter().any(|w| w.id == ws && !w.archived);
+        live && self.role(ws, user).map(|r| r != "viewer").unwrap_or(false)
     }
 
-    fn can_manage(&self, ws: &str, user: &str) -> bool {
-        self.role(ws, user).map(|r| r == "owner" || r == "admin").unwrap_or(false)
+    fn org_role(&self, org: &str, user: &str) -> Option<String> {
+        self.org_members.iter().find(|m| m.org == org && m.user == user).map(|m| m.role.clone())
+    }
+
+    fn manages(&self, org: &str, user: &str) -> bool {
+        self.org_role(org, user).map(|r| r == "owner" || r == "admin").unwrap_or(false)
+    }
+
+    fn space_org(&self, ws: &str) -> Option<String> {
+        self.spaces.iter().find(|w| w.id == ws).and_then(|w| w.org.clone())
+    }
+
+    fn sees_space(&self, ws: &Ws, user: &str) -> bool {
+        self.is_member(&ws.id, user) || ws.org.as_deref().map(|o| self.manages(o, user)).unwrap_or(false)
+    }
+
+    fn need_manage(&self, org: &str, user: &str) -> Result<String, String> {
+        match self.org_role(org, user) {
+            None => Err(nc("not_found")),
+            Some(r) if r == "owner" || r == "admin" => Ok(r),
+            Some(_) => Err(nc("forbidden")),
+        }
     }
 
     fn note(&mut self, ws: &str, project: Option<&str>, kind: &str, by: &str) {
         let seq = self.changes.last().map(|c| c.seq).unwrap_or(0) + 1;
         let at = self.now();
-        self.changes.push(Ch { seq, ws: ws.into(), project: project.map(str::to_string), kind: kind.into(), by: by.into(), at });
+        let org = self.space_org(ws);
+        self.changes.push(Ch { seq, ws: Some(ws.into()), org, project: project.map(str::to_string), kind: kind.into(), by: by.into(), at });
+    }
+
+    fn note_org(&mut self, org: &str, kind: &str, by: &str) {
+        let seq = self.changes.last().map(|c| c.seq).unwrap_or(0) + 1;
+        let at = self.now();
+        self.changes.push(Ch { seq, ws: None, org: Some(org.into()), project: None, kind: kind.into(), by: by.into(), at });
+    }
+
+    fn add_space(&mut self, org: &str, name: &str) -> String {
+        let id = self.id();
+        let at = self.now();
+        self.spaces.push(Ws { id: id.clone(), name: name.trim().into(), kind: "space".into(), org: Some(org.into()), owner: String::new(), at, archived: false });
+        let people: Vec<String> = self.org_members.iter().filter(|m| m.org == org && m.role != "guest").map(|m| m.user.clone()).collect();
+        for user in people {
+            self.members.push(Mem { ws: id.clone(), user, role: "editor".into(), at });
+        }
+        id
+    }
+
+    fn drop_from_org(&mut self, org: &str, member: &str) {
+        let spaces: Vec<String> = self.spaces.iter().filter(|w| w.org.as_deref() == Some(org)).map(|w| w.id.clone()).collect();
+        let projects: Vec<String> = self.projects.iter().filter(|p| spaces.contains(&p.ws)).map(|p| p.id.clone()).collect();
+        self.leases.retain(|l| !(l.user == member && projects.contains(&l.project)));
+        self.members.retain(|m| !(m.user == member && spaces.contains(&m.ws)));
+        self.org_members.retain(|m| !(m.org == org && m.user == member));
+    }
+
+    fn delete_org(&mut self, org: &str) {
+        let spaces: Vec<String> = self.spaces.iter().filter(|w| w.org.as_deref() == Some(org)).map(|w| w.id.clone()).collect();
+        let gone: Vec<String> = self.projects.iter().filter(|p| spaces.contains(&p.ws)).map(|p| p.id.clone()).collect();
+        self.projects.retain(|p| !gone.contains(&p.id));
+        self.versions.retain(|v| !gone.contains(&v.project));
+        self.leases.retain(|l| !gone.contains(&l.project));
+        self.members.retain(|m| !spaces.contains(&m.ws));
+        self.spaces.retain(|w| w.org.as_deref() != Some(org));
+        self.org_members.retain(|m| m.org != org);
+        self.invites.retain(|i| i.org != org);
+        self.orgs.retain(|o| o.id != org);
+    }
+
+    fn grant_code(&mut self) -> String {
+        let seed = new_id();
+        let d = ring::digest::digest(&ring::digest::SHA256, format!("{seed}{}", self.counter).as_bytes());
+        self.counter += 1;
+        d.as_ref().iter().take(8).map(|b| GRANT_ALPHABET[(*b as usize) % GRANT_ALPHABET.len()] as char).collect()
+    }
+
+    fn make_grant(&mut self, user: &str, app: &str, device: &str, challenge: Option<String>, life: i64) -> String {
+        let code = self.grant_code();
+        let expires = self.now() + life;
+        self.grants.push(Grant { code: code.clone(), user: user.into(), app: app.into(), device: device.into(), challenge, expires, used: false, attempts: 0 });
+        code
+    }
+
+    fn redeem(&mut self, body: &Value) -> (u16, Value) {
+        let bad = |code: &str| (400, json!({"error": nc(code)}));
+        let code: String = s(body, "code").chars().filter(|c| c.is_ascii_alphanumeric()).collect::<String>().to_uppercase();
+        if code.is_empty() || code.len() > 32 {
+            return bad("invalid:code");
+        }
+        let verifier = body.get("verifier").and_then(Value::as_str).map(str::to_string);
+        if let Some(v) = &verifier {
+            if v.len() < 43 || v.len() > 128 || !v.chars().all(|c| c.is_ascii_alphanumeric() || "._~-".contains(c)) {
+                return bad("invalid:verifier");
+            }
+        }
+        let now = self.now();
+        let Some(i) = self.grants.iter().position(|g| g.code == code && !g.used && g.expires > now && g.attempts < 5) else {
+            return bad("not_found");
+        };
+        let challenge = verifier.as_deref().map(challenge_of);
+        if self.grants[i].challenge != challenge {
+            self.grants[i].attempts += 1;
+            if self.grants[i].attempts >= 5 {
+                self.grants[i].used = true;
+            }
+            return bad("forbidden");
+        }
+        if challenge.is_none() && self.grants[i].app != "web" {
+            return bad("invalid:verifier");
+        }
+        self.grants[i].used = true;
+        let g = self.grants[i].clone();
+        if self.user(&g.user).is_none() {
+            return bad("not_found");
+        }
+        let mut v = self.session(&g.user);
+        v["app"] = json!(g.app);
+        v["device_name"] = json!(g.device);
+        (200, v)
+    }
+
+    fn bill(&self, ws: &str) -> String {
+        match self.spaces.iter().find(|w| w.id == ws) {
+            Some(w) => w.org.clone().unwrap_or_else(|| w.owner.clone()),
+            None => String::new(),
+        }
+    }
+
+    fn billed_projects(&self, bill: &str) -> i64 {
+        let spaces: Vec<&str> = self.spaces.iter().filter(|w| w.org.as_deref() == Some(bill) || (w.org.is_none() && w.owner == bill)).map(|w| w.id.as_str()).collect();
+        self.projects.iter().filter(|p| p.deleted_at.is_none() && spaces.contains(&p.ws.as_str())).count() as i64
+    }
+
+    fn room_for(&self, ws: &str) -> bool {
+        self.billed_projects(&self.bill(ws)) < self.max_projects
+    }
+
+    fn free_plan(&self) -> Value {
+        json!({"id": "free", "name": "Free", "scope": "personal", "max_people": 1, "max_spaces": 1, "max_projects": self.max_projects,
+               "max_bytes": 104857600, "max_owned_orgs": self.max_orgs, "max_auto_snapshots": 30, "max_kept_snapshots": 20,
+               "max_saves_per_minute": 30, "trial_days": 0, "price_cents": 0, "paid": false})
     }
 
     fn make_user(&mut self, email: &str, password: &str, name: &str, confirmed: bool) -> String {
@@ -219,7 +402,7 @@ impl World {
         self.users.push(User { id: id.clone(), email: email.trim().to_lowercase(), password: password.into(), confirmed, name: name.into(), hue, pending_email: None });
         let ws = self.id();
         let at = self.now();
-        self.spaces.push(Ws { id: ws.clone(), name: "My cloud".into(), kind: "personal".into(), owner: id.clone(), at });
+        self.spaces.push(Ws { id: ws.clone(), name: "My cloud".into(), kind: "personal".into(), org: None, owner: id.clone(), at, archived: false });
         self.members.push(Mem { ws, user: id.clone(), role: "owner".into(), at });
         id
     }
@@ -278,15 +461,6 @@ impl World {
         Ok(row)
     }
 
-    fn owner_of(&self, ws: &str) -> String {
-        self.spaces.iter().find(|w| w.id == ws).map(|w| w.owner.clone()).unwrap_or_default()
-    }
-
-    fn owned_projects(&self, owner: &str) -> i64 {
-        let spaces: Vec<&str> = self.spaces.iter().filter(|w| w.owner == owner).map(|w| w.id.as_str()).collect();
-        self.projects.iter().filter(|p| p.deleted_at.is_none() && spaces.contains(&p.ws.as_str())).count() as i64
-    }
-
     fn put_project(&mut self, p: Proj) {
         match self.projects.iter_mut().find(|x| x.id == p.id) {
             Some(x) => *x = p,
@@ -309,6 +483,9 @@ impl World {
         let body: Value = req.body.as_deref().and_then(|b| serde_json::from_str(b).ok()).unwrap_or(Value::Null);
         if let Some(rest) = route.strip_prefix("/auth/v1/") {
             return self.auth(rest, &query, &body, req);
+        }
+        if route == "/functions/v1/app-token" {
+            return self.redeem(&body);
         }
         let me = match self.signed_in(req) {
             Ok(u) => u,
@@ -472,23 +649,44 @@ impl World {
         let wants_body = select.split(',').any(|c| c == "body") || select.is_empty();
         let mine: Vec<String> = self.members.iter().filter(|m| m.user == me).map(|m| m.ws.clone()).collect();
         let my_email = self.user(me).map(|u| u.email.clone()).unwrap_or_default();
+        let seen_spaces: Vec<String> = self.spaces.iter().filter(|w| self.sees_space(w, me)).map(|w| w.id.clone()).collect();
+        let my_orgs: Vec<(String, String)> = self.org_members.iter().filter(|m| m.user == me).map(|m| (m.org.clone(), m.role.clone())).collect();
+        let org_rows: Vec<&OMem> = self
+            .org_members
+            .iter()
+            .filter(|m| m.user == me || my_orgs.iter().any(|(o, r)| *o == m.org && (r != "guest")))
+            .collect();
         let rows: Vec<Value> = match table {
             "workspaces" => self
                 .spaces
                 .iter()
-                .filter(|w| mine.contains(&w.id))
-                .map(|w| json!({"id": w.id, "name": w.name, "kind": w.kind, "owner_id": w.owner, "created_at": format_time(w.at)}))
+                .filter(|w| seen_spaces.contains(&w.id))
+                .map(|w| {
+                    json!({"id": w.id, "name": w.name, "kind": w.kind, "org_id": w.org, "owner_id": if w.owner.is_empty() { Value::Null } else { json!(w.owner) },
+                           "archived_at": if w.archived { json!(format_time(w.at)) } else { Value::Null }, "created_at": format_time(w.at)})
+                })
                 .collect(),
             "memberships" => self
                 .members
                 .iter()
-                .filter(|m| mine.contains(&m.ws))
+                .filter(|m| mine.contains(&m.ws) || (seen_spaces.contains(&m.ws) && self.space_org(&m.ws).map(|o| self.manages(&o, me)).unwrap_or(false)))
                 .map(|m| json!({"workspace_id": m.ws, "user_id": m.user, "role": m.role, "joined_at": format_time(m.at)}))
                 .collect(),
+            "org_members" => org_rows.iter().map(|m| json!({"org_id": m.org, "user_id": m.user, "role": m.role, "joined_at": format_time(m.at)})).collect(),
             "profiles" => {
-                let people: Vec<&String> = self.members.iter().filter(|m| mine.contains(&m.ws)).map(|m| &m.user).collect();
+                let mut people: Vec<&String> = self.members.iter().filter(|m| mine.contains(&m.ws)).map(|m| &m.user).collect();
+                people.extend(org_rows.iter().map(|m| &m.user));
                 self.users.iter().filter(|u| u.id == me || people.contains(&&u.id)).map(|u| json!({"id": u.id, "display_name": u.name, "avatar_hue": u.hue})).collect()
             }
+            "invites" => self
+                .invites
+                .iter()
+                .filter(|i| i.open && (self.manages(&i.org, me) || i.email == my_email))
+                .map(|i| {
+                    json!({"id": i.id, "org_id": i.org, "email": i.email, "role": i.role, "spaces": i.spaces, "space_role": i.space_role,
+                           "expires_at": format_time(i.expires), "accepted_at": null, "declined_at": null, "revoked_at": null})
+                })
+                .collect(),
             "projects" => self
                 .projects
                 .iter()
@@ -528,12 +726,6 @@ impl World {
                     .map(|l| json!({"project_id": l.project, "user_id": l.user, "device_id": l.device, "device_name": l.device_name, "expires_at": format_time(l.expires)}))
                     .collect()
             }
-            "invites" => self
-                .invites
-                .iter()
-                .filter(|i| i.open && (self.can_manage(&i.ws, me) || i.email == my_email))
-                .map(|i| json!({"id": i.id, "workspace_id": i.ws, "email": i.email, "role": i.role, "expires_at": format_time(i.expires), "accepted_at": null, "declined_at": null, "revoked_at": null}))
-                .collect(),
             "devices" => self
                 .devices
                 .iter()
@@ -573,17 +765,28 @@ impl World {
         match name {
             "me" | "usage_summary" => {
                 let u = self.user(me).cloned().ok_or_else(|| nc("auth"))?;
-                let plan = json!({"id": "free_beta", "name": "Free beta", "max_projects": self.max_projects, "max_owned_teams": 3, "max_members": 10,
-                                  "max_auto_snapshots": 30, "max_kept_snapshots": 20, "max_bytes": 104857600, "max_saves_per_minute": 30, "paid": false});
-                let owned: Vec<&String> = self.spaces.iter().filter(|w| w.owner == me).map(|w| &w.id).collect();
-                let bytes: usize = self.projects.iter().filter(|p| owned.contains(&&p.ws)).map(|p| p.body.len()).sum();
-                let teams = self.spaces.iter().filter(|w| w.owner == me && w.kind == "team").count();
-                let usage = json!({"projects": self.owned_projects(me), "bytes": bytes, "owned_teams": teams});
+                let plan = self.free_plan();
+                let personal: Vec<&String> = self.spaces.iter().filter(|w| w.owner == me && w.org.is_none()).map(|w| &w.id).collect();
+                let bytes: usize = self.projects.iter().filter(|p| personal.contains(&&p.ws)).map(|p| p.body.len()).sum();
+                let owned = self.org_members.iter().filter(|m| m.user == me && m.role == "owner").count();
+                let usage = json!({"projects": self.billed_projects(me), "bytes": bytes, "owned_orgs": owned});
                 if name == "usage_summary" {
                     return Ok(json!({"plan": plan, "usage": usage}));
                 }
                 let personal = self.spaces.iter().find(|w| w.owner == me && w.kind == "personal").map(|w| w.id.clone());
-                Ok(json!({"id": u.id, "email": u.email, "display_name": u.name, "avatar_hue": u.hue, "plan": plan, "usage": usage, "personal_workspace": personal}))
+                let mut orgs: Vec<Value> = self
+                    .org_members
+                    .iter()
+                    .filter(|m| m.user == me)
+                    .filter_map(|m| self.orgs.iter().find(|o| o.id == m.org).map(|o| (o, m)))
+                    .map(|(o, m)| {
+                        json!({"id": o.id, "name": o.name, "slug": o.slug, "role": m.role, "plan": o.plan,
+                               "trial_ends_at": format_time(o.at + 30 * 86400), "suspended": false})
+                    })
+                    .collect();
+                orgs.sort_by_key(|o| s(o, "name").to_lowercase());
+                Ok(json!({"id": u.id, "email": u.email, "display_name": u.name, "avatar_hue": u.hue, "plan": plan, "usage": usage,
+                          "personal_workspace": personal, "staff": null, "orgs": orgs}))
             }
             "update_profile" => {
                 let n = s(a, "display_name");
@@ -613,88 +816,91 @@ impl World {
                 self.settings.insert((me.into(), s(a, "app_id")), (s(a, "body"), now));
                 Ok(Value::Null)
             }
-            "create_workspace" => {
+            "create_org" => {
                 let n = s(a, "name").trim().to_string();
                 if n.is_empty() || n.chars().count() > 80 {
                     return Err(nc("invalid:name"));
                 }
-                if self.spaces.iter().filter(|w| w.owner == me && w.kind == "team").count() >= 3 {
-                    return Err(nc("limit:teams"));
+                if self.org_members.iter().filter(|m| m.user == me && m.role == "owner").count() as i64 >= self.max_orgs {
+                    return Err(nc("limit:orgs"));
+                }
+                let base = slugify(&n);
+                let mut slug = base.clone();
+                let mut k = 2;
+                while self.orgs.iter().any(|o| o.slug == slug) {
+                    slug = format!("{base}-{k}");
+                    k += 1;
                 }
                 let id = self.id();
-                self.spaces.push(Ws { id: id.clone(), name: n, kind: "team".into(), owner: me.into(), at: now });
-                self.members.push(Mem { ws: id.clone(), user: me.into(), role: "owner".into(), at: now });
-                self.note(&id, None, "workspace", me);
-                Ok(json!(id))
+                self.orgs.push(Org { id: id.clone(), name: n, slug: slug.clone(), plan: "team".into(), at: now, members_create_spaces: true });
+                self.org_members.push(OMem { org: id.clone(), user: me.into(), role: "owner".into(), at: now });
+                let space = self.add_space(&id, "General");
+                self.note_org(&id, "org", me);
+                Ok(json!({"id": id, "slug": slug, "space": space}))
             }
-            "rename_workspace" => {
-                if !self.can_manage(&ws, me) {
-                    return Err(nc(if self.is_member(&ws, me) { "forbidden" } else { "not_found" }));
+            "create_space" => {
+                let org = s(a, "org");
+                let mine = self.org_role(&org, me).ok_or_else(|| nc("not_found"))?;
+                let open = self.orgs.iter().any(|o| o.id == org && o.members_create_spaces);
+                if !(mine == "owner" || mine == "admin" || (mine == "member" && open)) {
+                    return Err(nc("forbidden"));
                 }
                 let n = s(a, "name").trim().to_string();
                 if n.is_empty() || n.chars().count() > 80 {
                     return Err(nc("invalid:name"));
                 }
-                if let Some(w) = self.spaces.iter_mut().find(|w| w.id == ws) {
-                    w.name = n;
+                if self.spaces.iter().filter(|w| w.org.as_deref() == Some(org.as_str())).count() >= 5 {
+                    return Err(nc("limit:spaces"));
                 }
-                self.note(&ws, None, "workspace", me);
-                Ok(Value::Null)
-            }
-            "delete_workspace" => {
-                if self.role(&ws, me).as_deref() != Some("owner") {
-                    return Err(nc(if self.is_member(&ws, me) { "forbidden" } else { "not_found" }));
-                }
-                if self.spaces.iter().any(|w| w.id == ws && w.kind == "personal") {
-                    return Err(nc("invalid:personal"));
-                }
-                self.spaces.retain(|w| w.id != ws);
-                self.members.retain(|m| m.ws != ws);
-                let gone: Vec<String> = self.projects.iter().filter(|p| p.ws == ws).map(|p| p.id.clone()).collect();
-                self.projects.retain(|p| p.ws != ws);
-                self.versions.retain(|v| !gone.contains(&v.project));
-                self.leases.retain(|l| !gone.contains(&l.project));
-                Ok(Value::Null)
+                let id = self.add_space(&org, &n);
+                self.note_org(&org, "workspace", me);
+                Ok(json!(id))
             }
             "invite_member" => {
-                if !self.can_manage(&ws, me) {
-                    return Err(nc(if self.is_member(&ws, me) { "forbidden" } else { "not_found" }));
-                }
+                let org = s(a, "org");
+                let mine = self.need_manage(&org, me)?;
                 let role = s(a, "role");
-                if !["admin", "editor", "viewer"].contains(&role.as_str()) {
+                let space_role = a.get("space_role").and_then(Value::as_str).unwrap_or("editor").to_string();
+                if !["admin", "member", "guest"].contains(&role.as_str()) || !["editor", "viewer"].contains(&space_role.as_str()) {
                     return Err(nc("invalid:role"));
                 }
-                if role == "admin" && self.role(&ws, me).as_deref() != Some("owner") {
+                if role == "admin" && mine != "owner" {
                     return Err(nc("forbidden"));
                 }
                 let email = s(a, "email").trim().to_lowercase();
                 if !email_ok(&email) {
                     return Err(nc("invalid:email"));
                 }
-                if self.spaces.iter().any(|w| w.id == ws && w.kind == "personal") {
-                    return Err(nc("invalid:personal"));
+                if self.org_members.iter().any(|m| m.org == org && self.user(&m.user).map(|u| u.email == email).unwrap_or(false)) {
+                    return Err(nc("invalid:member"));
                 }
-                let seats = self.members.iter().filter(|m| m.ws == ws).count() + self.invites.iter().filter(|i| i.ws == ws && i.open && i.email != email).count();
-                if seats >= 10 {
+                let spaces: Vec<String> = a.get("spaces").and_then(Value::as_array).map(|l| l.iter().filter_map(Value::as_str).map(str::to_string).collect()).unwrap_or_default();
+                if spaces.iter().any(|w| self.space_org(w).as_deref() != Some(org.as_str())) || (role == "guest" && spaces.is_empty()) {
+                    return Err(nc("invalid:spaces"));
+                }
+                let people = self.org_members.iter().filter(|m| m.org == org).count() as i64;
+                let waiting = self.invites.iter().filter(|i| i.org == org && i.open && i.expires > now && i.email != email).count() as i64;
+                if people + waiting >= self.max_people {
                     return Err(nc("limit:members"));
                 }
-                for i in self.invites.iter_mut().filter(|i| i.ws == ws && i.email == email) {
+                for i in self.invites.iter_mut().filter(|i| i.org == org && i.email == email) {
                     i.open = false;
                 }
                 let id = self.id();
-                self.invites.push(Inv { id: id.clone(), ws: ws.clone(), email, role, by: me.into(), expires: now + 14 * 86400, open: true });
-                self.note(&ws, None, "members", me);
+                self.invites.push(Inv { id: id.clone(), org: org.clone(), email, role, spaces, space_role, by: me.into(), expires: now + 14 * 86400, open: true });
+                self.note_org(&org, "members", me);
                 Ok(json!(id))
             }
             "revoke_invite" => {
                 let id = s(a, "invite");
                 let i = self.invites.iter().find(|i| i.id == id).cloned().ok_or_else(|| nc("not_found"))?;
-                if !self.can_manage(&i.ws, me) {
+                if !self.manages(&i.org, me) {
                     return Err(nc("not_found"));
                 }
                 if let Some(i) = self.invites.iter_mut().find(|i| i.id == id) {
                     i.open = false;
                 }
+                self.note_org(&i.org, "members", me);
                 Ok(Value::Null)
             }
             "my_invites" => {
@@ -704,9 +910,10 @@ impl World {
                     .iter()
                     .filter(|i| i.open && i.email == email && i.expires > now)
                     .map(|i| {
-                        let w = self.spaces.iter().find(|w| w.id == i.ws).map(|w| w.name.clone()).unwrap_or_default();
+                        let o = self.orgs.iter().find(|o| o.id == i.org);
                         let by = self.user(&i.by).map(|u| u.name.clone()).unwrap_or_default();
-                        json!({"id": i.id, "role": i.role, "expires_at": format_time(i.expires), "workspace_id": i.ws, "workspace": w, "invited_by": by})
+                        json!({"id": i.id, "role": i.role, "expires_at": format_time(i.expires), "org_id": i.org,
+                               "org": o.map(|o| o.name.clone()), "org_slug": o.map(|o| o.slug.clone()), "invited_by": by})
                     })
                     .collect();
                 Ok(Value::Array(list))
@@ -715,74 +922,92 @@ impl World {
                 let id = s(a, "invite");
                 let u = self.user(me).cloned().ok_or_else(|| nc("auth"))?;
                 let i = self.invites.iter().find(|i| i.id == id && i.open && i.email == u.email && i.expires > now).cloned().ok_or_else(|| nc("not_found"))?;
+                if name == "accept_invite" && !u.confirmed {
+                    return Err(nc("unconfirmed"));
+                }
                 if let Some(x) = self.invites.iter_mut().find(|x| x.id == id) {
                     x.open = false;
                 }
                 if name == "decline_invite" {
                     return Ok(Value::Null);
                 }
-                if !u.confirmed {
-                    return Err(nc("unconfirmed"));
+                if self.org_role(&i.org, me).is_none() {
+                    self.org_members.push(OMem { org: i.org.clone(), user: me.into(), role: i.role.clone(), at: now });
                 }
-                if !self.is_member(&i.ws, me) {
-                    self.members.push(Mem { ws: i.ws.clone(), user: me.into(), role: i.role.clone(), at: now });
-                }
-                self.note(&i.ws, None, "members", me);
-                Ok(json!(i.ws))
-            }
-            "set_role" => {
-                let member = s(a, "member");
-                let role = s(a, "role");
-                let mine = self.role(&ws, me).ok_or_else(|| nc("not_found"))?;
-                let theirs = self.role(&ws, &member).ok_or_else(|| nc("invalid:member"))?;
-                if !["admin", "editor", "viewer"].contains(&role.as_str()) {
-                    return Err(nc("invalid:role"));
-                }
-                if rank(&mine) < 3 || theirs == "owner" || (mine == "admin" && (theirs == "admin" || role == "admin")) {
-                    return Err(nc("forbidden"));
-                }
-                if let Some(m) = self.members.iter_mut().find(|m| m.ws == ws && m.user == member) {
-                    m.role = role;
-                }
-                self.note(&ws, None, "members", me);
-                Ok(Value::Null)
-            }
-            "remove_member" | "leave_workspace" => {
-                let member = if name == "leave_workspace" { me.to_string() } else { s(a, "member") };
-                let mine = self.role(&ws, me).ok_or_else(|| nc("not_found"))?;
-                let theirs = self.role(&ws, &member).ok_or_else(|| nc("invalid:member"))?;
-                if theirs == "owner" {
-                    return Err(nc("invalid:owner"));
-                }
-                if member != me && (rank(&mine) < 3 || (mine == "admin" && theirs == "admin")) {
-                    return Err(nc("forbidden"));
-                }
-                self.members.retain(|m| !(m.ws == ws && m.user == member));
-                let projects: Vec<String> = self.projects.iter().filter(|p| p.ws == ws).map(|p| p.id.clone()).collect();
-                self.leases.retain(|l| !(l.user == member && projects.contains(&l.project)));
-                self.note(&ws, None, "members", me);
-                Ok(Value::Null)
-            }
-            "transfer_ownership" => {
-                let member = s(a, "member");
-                if self.role(&ws, me).as_deref() != Some("owner") {
-                    return Err(nc("forbidden"));
-                }
-                if !self.is_member(&ws, &member) || member == me {
-                    return Err(nc("invalid:member"));
-                }
-                for m in self.members.iter_mut().filter(|m| m.ws == ws) {
-                    if m.user == me {
-                        m.role = "admin".into();
-                    } else if m.user == member {
-                        m.role = "owner".into();
+                let spaces: Vec<String> = self
+                    .spaces
+                    .iter()
+                    .filter(|w| w.org.as_deref() == Some(i.org.as_str()) && (i.role != "guest" || i.spaces.contains(&w.id)))
+                    .map(|w| w.id.clone())
+                    .collect();
+                let role = if i.role == "guest" { i.space_role.clone() } else { "editor".to_string() };
+                for ws in spaces {
+                    if !self.is_member(&ws, me) {
+                        self.members.push(Mem { ws, user: me.into(), role: role.clone(), at: now });
                     }
                 }
-                if let Some(w) = self.spaces.iter_mut().find(|w| w.id == ws) {
-                    w.owner = member;
+                self.note_org(&i.org, "members", me);
+                Ok(json!(i.org))
+            }
+            "set_org_role" => {
+                let org = s(a, "org");
+                let mine = self.need_manage(&org, me)?;
+                let member = s(a, "member");
+                let role = s(a, "role");
+                let theirs = self.org_role(&org, &member).ok_or_else(|| nc("not_found"))?;
+                if !["admin", "member", "guest"].contains(&role.as_str()) || theirs == "owner" {
+                    return Err(nc("invalid:role"));
                 }
-                self.note(&ws, None, "members", me);
+                if mine == "admin" && (theirs == "admin" || role == "admin") {
+                    return Err(nc("forbidden"));
+                }
+                if let Some(m) = self.org_members.iter_mut().find(|m| m.org == org && m.user == member) {
+                    m.role = role.clone();
+                }
+                if theirs == "guest" && role != "guest" {
+                    let spaces: Vec<String> = self.spaces.iter().filter(|w| w.org.as_deref() == Some(org.as_str())).map(|w| w.id.clone()).collect();
+                    for ws in spaces {
+                        if !self.is_member(&ws, &member) {
+                            self.members.push(Mem { ws, user: member.clone(), role: "editor".into(), at: now });
+                        }
+                    }
+                }
+                self.note_org(&org, "members", me);
                 Ok(Value::Null)
+            }
+            "remove_member" => {
+                let org = s(a, "org");
+                let mine = self.need_manage(&org, me)?;
+                let member = s(a, "member");
+                let theirs = self.org_role(&org, &member).ok_or_else(|| nc("not_found"))?;
+                if theirs == "owner" || (theirs == "admin" && mine != "owner") {
+                    return Err(nc("forbidden"));
+                }
+                self.drop_from_org(&org, &member);
+                self.note_org(&org, "members", me);
+                Ok(Value::Null)
+            }
+            "leave_org" => {
+                let org = s(a, "org");
+                let mine = self.org_role(&org, me).ok_or_else(|| nc("not_found"))?;
+                if mine == "owner" {
+                    return Err(nc("invalid:owner"));
+                }
+                self.drop_from_org(&org, me);
+                self.note_org(&org, "members", me);
+                Ok(Value::Null)
+            }
+            "create_app_grant" => {
+                let challenge = s(a, "challenge");
+                if challenge.len() != 43 || !challenge.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_') {
+                    return Err(nc("invalid:challenge"));
+                }
+                let app = s(a, "app");
+                if app.is_empty() || app.len() > 40 {
+                    return Err(nc("invalid:app"));
+                }
+                let device: String = s(a, "device").trim().chars().take(80).collect();
+                Ok(json!(self.make_grant(me, &app, &device, Some(challenge), 120)))
             }
             "create_project" => {
                 if !self.is_member(&ws, me) {
@@ -791,7 +1016,7 @@ impl World {
                 if !self.can_write(&ws, me) {
                     return Err(nc("forbidden"));
                 }
-                if self.owned_projects(&self.owner_of(&ws)) >= self.max_projects {
+                if !self.room_for(&ws) {
                     return Err(nc("limit:projects"));
                 }
                 let id = self.id();
@@ -953,7 +1178,7 @@ impl World {
                 if !self.can_write(&row.ws, me) {
                     return Err(nc("forbidden"));
                 }
-                if name == "restore_project" && self.owned_projects(&self.owner_of(&row.ws)) >= self.max_projects {
+                if name == "restore_project" && !self.room_for(&row.ws) {
                     return Err(nc("limit:projects"));
                 }
                 row.deleted_at = if name == "delete_project" { Some(now) } else { None };
@@ -985,7 +1210,7 @@ impl World {
                 if !self.can_write(&row.ws, me) || !self.can_write(&to, me) {
                     return Err(nc("forbidden"));
                 }
-                if self.owner_of(&to) != self.owner_of(&row.ws) && self.owned_projects(&self.owner_of(&to)) >= self.max_projects {
+                if self.bill(&to) != self.bill(&row.ws) && !self.room_for(&to) {
                     return Err(nc("limit:projects"));
                 }
                 let from = row.ws.clone();
@@ -1003,7 +1228,7 @@ impl World {
                 if !self.can_write(&row.ws, me) {
                     return Err(nc("forbidden"));
                 }
-                if self.owned_projects(&self.owner_of(&row.ws)) >= self.max_projects {
+                if !self.room_for(&row.ws) {
                     return Err(nc("limit:projects"));
                 }
                 let id = self.id();
@@ -1024,12 +1249,13 @@ impl World {
             "changes_since" => {
                 let since = a.get("since").and_then(Value::as_i64).unwrap_or(0);
                 let mine: Vec<String> = self.members.iter().filter(|m| m.user == me).map(|m| m.ws.clone()).collect();
+                let orgs: Vec<String> = self.org_members.iter().filter(|m| m.user == me).map(|m| m.org.clone()).collect();
                 let list: Vec<Value> = self
                     .changes
                     .iter()
-                    .filter(|c| c.seq > since && mine.contains(&c.ws))
+                    .filter(|c| c.seq > since && (c.ws.as_ref().map(|w| mine.contains(w)).unwrap_or(false) || (c.ws.is_none() && c.org.as_ref().map(|o| orgs.contains(o)).unwrap_or(false))))
                     .take(1000)
-                    .map(|c| json!({"seq": c.seq, "workspace_id": c.ws, "project_id": c.project, "kind": c.kind, "by": c.by, "at": format_time(c.at)}))
+                    .map(|c| json!({"seq": c.seq, "workspace_id": c.ws, "org_id": c.org, "project_id": c.project, "kind": c.kind, "by": c.by, "at": format_time(c.at)}))
                     .collect();
                 Ok(json!({"latest": self.changes.last().map(|c| c.seq).unwrap_or(0), "oldest": self.changes.first().map(|c| c.seq).unwrap_or(0), "changes": list}))
             }
@@ -1042,10 +1268,17 @@ impl World {
             "send-invite" => {
                 let id = s(body, "invite_id");
                 let i = self.invites.iter().find(|i| i.id == id).cloned().ok_or_else(|| nc("not_found"))?;
-                if !self.can_manage(&i.ws, me) {
+                if !self.manages(&i.org, me) {
                     return Err(nc("not_found"));
                 }
                 Ok(json!({"sent": false}))
+            }
+            "web-link" => {
+                let next = s(body, "next");
+                let safe = next.starts_with('/') && !next.starts_with("//") && !next.contains('\\') && next.len() <= 300;
+                let path = if safe { next } else { "/".to_string() };
+                let code = self.make_grant(me, "web", "", None, 300);
+                Ok(json!({"url": format!("{WEB_URL}/auth/handoff#t={code}&next={}", super::client::enc(&path))}))
             }
             "delete-account" => {
                 let token = req.get_header("authorization").and_then(|h| h.strip_prefix("Bearer ")).unwrap_or("");
@@ -1053,28 +1286,26 @@ impl World {
                 if self.now() - issued > 600 {
                     return Err(nc("reauth"));
                 }
-                let owned: Vec<String> = self.spaces.iter().filter(|w| w.owner == me).map(|w| w.id.clone()).collect();
-                for ws in owned {
-                    let heir = self.members.iter().filter(|m| m.ws == ws && m.user != me).max_by_key(|m| (rank(&m.role), -m.at)).map(|m| m.user.clone());
-                    match heir {
-                        Some(h) if self.spaces.iter().any(|w| w.id == ws && w.kind == "team") => {
-                            for m in self.members.iter_mut().filter(|m| m.ws == ws && m.user == h) {
+                let owned: Vec<String> = self.org_members.iter().filter(|m| m.user == me && m.role == "owner").map(|m| m.org.clone()).collect();
+                for org in owned {
+                    let pick = |role: &str| self.org_members.iter().filter(|m| m.org == org && m.user != me && m.role == role).min_by_key(|m| m.at).map(|m| m.user.clone());
+                    match pick("admin").or_else(|| pick("member")) {
+                        Some(heir) => {
+                            for m in self.org_members.iter_mut().filter(|m| m.org == org && m.user == heir) {
                                 m.role = "owner".into();
                             }
-                            if let Some(w) = self.spaces.iter_mut().find(|w| w.id == ws) {
-                                w.owner = h;
-                            }
                         }
-                        _ => {
-                            self.spaces.retain(|w| w.id != ws);
-                            self.members.retain(|m| m.ws != ws);
-                            self.projects.retain(|p| p.ws != ws);
-                        }
+                        None => self.delete_org(&org),
                     }
                 }
+                let personal: Vec<String> = self.spaces.iter().filter(|w| w.owner == me && w.org.is_none()).map(|w| w.id.clone()).collect();
+                self.projects.retain(|p| !personal.contains(&p.ws));
+                self.spaces.retain(|w| !personal.contains(&w.id));
                 self.members.retain(|m| m.user != me);
+                self.org_members.retain(|m| m.user != me);
                 self.leases.retain(|l| l.user != me);
                 self.devices.retain(|d| d.user != me);
+                self.grants.retain(|g| g.user != me);
                 self.users.retain(|u| u.id != me);
                 self.access.retain(|_, (u, _)| u != me);
                 self.refresh.retain(|_, u| u != me);
@@ -1098,7 +1329,7 @@ impl Default for FakeCloud {
 
 impl FakeCloud {
     pub fn new() -> FakeCloud {
-        FakeCloud { world: Arc::new(Mutex::new(World { max_projects: 50, token_life: 3600, ..Default::default() })) }
+        FakeCloud { world: Arc::new(Mutex::new(World { max_projects: 50, max_orgs: 3, max_people: 10, token_life: 3600, ..Default::default() })) }
     }
 
     fn w(&self) -> MutexGuard<'_, World> {
@@ -1106,7 +1337,7 @@ impl FakeCloud {
     }
 
     pub fn config() -> CloudConfig {
-        CloudConfig::new("https://fake.nativecloud.test", "anon-key")
+        CloudConfig::new("https://fake.nativecloud.test", "anon-key").with_web(WEB_URL)
     }
 
     pub fn client(&self) -> Client {
@@ -1142,6 +1373,32 @@ impl FakeCloud {
 
     pub fn set_max_projects(&self, n: i64) {
         self.w().max_projects = n;
+    }
+
+    pub fn set_max_people(&self, n: i64) {
+        self.w().max_people = n;
+    }
+
+    pub fn approve(&self, email: &str, app: &str, device: &str, challenge: &str) -> String {
+        let mut w = self.w();
+        let me = w.by_email(email).map(|u| u.id.clone()).unwrap_or_default();
+        w.make_grant(&me, app, device, Some(challenge.to_string()), 120)
+    }
+
+    pub fn grant_used(&self, code: &str) -> bool {
+        self.w().grants.iter().any(|g| g.code == code && g.used)
+    }
+
+    pub fn org_role(&self, org: &str, email: &str) -> Option<String> {
+        let w = self.w();
+        let me = w.by_email(email).map(|u| u.id.clone())?;
+        w.org_role(org, &me)
+    }
+
+    pub fn space_role(&self, ws: &str, email: &str) -> Option<String> {
+        let w = self.w();
+        let me = w.by_email(email).map(|u| u.id.clone())?;
+        w.role(ws, &me)
     }
 
     pub fn fail_next(&self, route: &str, status: u16, body: &str) {
@@ -1248,7 +1505,8 @@ pub struct Demo {
     pub cloud: FakeCloud,
     pub signed_in: super::Account,
     pub signed_out: super::Account,
-    pub team: String,
+    pub org: String,
+    pub space: String,
 }
 
 pub fn account_for(info: crate::AppInfo, client: Client, device_name: &str) -> super::Account {
@@ -1263,24 +1521,26 @@ pub fn demo(info: crate::AppInfo) -> Demo {
     let ann = cloud.signed_in("ann@example.com", "Ann Lee");
     let ben = cloud.signed_in("ben@example.com", "Ben Ito");
     cloud.signed_in("cal@example.com", "Cal Diaz");
-    let room = ann.create_workspace("Writers room").unwrap_or_default();
-    for (email, role) in [("ben@example.com", Role::Editor), ("cal@example.com", Role::Viewer)] {
-        if let Ok(i) = ann.invite_member(&room, email, role) {
+    let made = ann.create_org("Writers room").unwrap_or_default();
+    let pitches = ann.create_space(&made.id, "Pitches").unwrap_or_default();
+    for (email, role, spaces) in [("ben@example.com", OrgRole::Admin, Vec::new()), ("cal@example.com", OrgRole::Guest, vec![pitches.clone()])] {
+        if let Ok(i) = ann.invite_member(&made.id, email, role, &spaces) {
             let other = cloud.client();
             let _ = other.sign_in(email, "Password123");
             let _ = other.accept_invite(&i);
         }
     }
-    let _ = ann.invite_member(&room, "dee@example.com", Role::Editor);
-    let season = ben.create_workspace("Pilot season").unwrap_or_default();
-    let _ = ben.invite_member(&season, "ann@example.com", Role::Editor);
+    let _ = ann.invite_member(&made.id, "dee@example.com", OrgRole::Member, &[]);
+    if let Ok(season) = ben.create_org("Pilot season") {
+        let _ = ben.invite_member(&season.id, "ann@example.com", OrgRole::Member, &[]);
+    }
     let personal = ann.me().map(|m| m.personal_workspace).unwrap_or_default();
-    for (ws, title, words) in [(&personal, "Night shift", 18_000), (&personal, "Untitled pilot", 4_000), (&room, "Harbour", 26_000)] {
+    for (ws, title, words) in [(&personal, "Night shift", 18_000), (&personal, "Untitled pilot", 4_000), (&made.space, "Harbour", 26_000)] {
         let _ = ann.create_project(ws, "blackline", title, &"word ".repeat(words), &serde_json::json!({}));
     }
     let _ = ann.register_device(&Device { id: new_id(), name: "Ann's PC".into(), platform: "windows".into() });
     let mut signed_in = account_for(info, ann, "Ann's Mac");
-    signed_in.select_team(Some(&room));
+    signed_in.select_org(Some(&made.id));
     let signed_out = account_for(info, cloud.client(), "This Mac");
-    Demo { cloud, signed_in, signed_out, team: room }
+    Demo { cloud, signed_in, signed_out, org: made.id, space: made.space }
 }

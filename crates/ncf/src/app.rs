@@ -554,7 +554,7 @@ fn settings_window<A: NcfApp>(ctx: &egui::Context, app: &mut A, shell: &mut Shel
     #[cfg(feature = "cloud")]
     if shell.cloud.is_some() {
         tabs.push(("Account", Icon::Cloud));
-        tabs.push(("Teams", Icon::Users));
+        tabs.push(("Organizations", Icon::Users));
     }
     let extra = app.settings_tabs();
     tabs.extend(extra.iter().copied());
@@ -614,9 +614,9 @@ fn settings_window<A: NcfApp>(ctx: &egui::Context, app: &mut A, shell: &mut Shel
                         }
                     }
                     #[cfg(feature = "cloud")]
-                    "Teams" if shell.cloud.is_some() => {
+                    "Organizations" if shell.cloud.is_some() => {
                         if let Some(a) = shell.cloud.as_mut() {
-                            a.teams_ui(ui);
+                            a.orgs_ui(ui);
                         }
                     }
                     other => app.settings_ui(other, ui, shell),

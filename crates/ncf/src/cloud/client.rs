@@ -70,7 +70,7 @@ fn lock<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {
     m.lock().unwrap_or_else(|e| e.into_inner())
 }
 
-fn enc(s: &str) -> String {
+pub(super) fn enc(s: &str) -> String {
     s.bytes()
         .map(|b| match b {
             b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => (b as char).to_string(),
@@ -310,60 +310,79 @@ impl Client {
         Ok(rows.pop())
     }
 
-    // teams here---
+    // organizations here---
 
     pub fn workspaces(&self) -> Result<Vec<Workspace>, CloudError> {
-        self.rows("workspaces?select=id,name,kind,owner_id&order=created_at")
+        self.rows("workspaces?select=id,name,kind,org_id,owner_id,archived_at&order=created_at")
     }
 
     pub fn memberships(&self) -> Result<Vec<Member>, CloudError> {
         self.rows("memberships?select=workspace_id,user_id,role,joined_at&order=joined_at")
     }
 
+    pub fn org_members(&self) -> Result<Vec<OrgMember>, CloudError> {
+        self.rows("org_members?select=org_id,user_id,role,joined_at&order=joined_at")
+    }
+
     pub fn profiles(&self) -> Result<Vec<Profile>, CloudError> {
         self.rows("profiles?select=id,display_name,avatar_hue")
     }
 
-    pub fn teams(&self) -> Result<Vec<Team>, CloudError> {
-        let me = self.user_id();
-        let spaces = self.workspaces()?;
+    pub fn spaces(&self) -> Result<Vec<Space>, CloudError> {
+        let me = self.me()?;
+        let all = self.workspaces()?;
         let members = self.memberships()?;
         let people = self.profiles()?;
-        let mut teams = Vec::new();
-        for w in spaces {
-            let mine: Vec<(Member, Person)> = members
+        let person = |id: &str| people.iter().find(|p| p.id == id).map(Profile::person).unwrap_or(Person { id: id.to_string(), ..Default::default() });
+        let mut out = Vec::new();
+        for w in all {
+            let Some(mine) = members.iter().find(|m| m.workspace_id == w.id && m.user_id == me.id) else {
+                continue;
+            };
+            let org = w.org_id.as_ref().and_then(|o| me.orgs.iter().find(|x| &x.id == o)).cloned();
+            let list = members.iter().filter(|m| m.workspace_id == w.id).map(|m| (m.clone(), person(&m.user_id))).collect();
+            out.push(Space { my_role: mine.role, workspace: w, org, members: list });
+        }
+        out.sort_by_key(|s| (!s.is_personal(), s.org.as_ref().map(|o| o.name.to_lowercase()), s.workspace.name.to_lowercase()));
+        Ok(out)
+    }
+
+    pub fn orgs(&self) -> Result<Vec<OrgView>, CloudError> {
+        let me = self.me()?;
+        let members = self.org_members()?;
+        let people = self.profiles()?;
+        let spaces = self.workspaces()?;
+        let mut out = Vec::new();
+        for org in me.orgs {
+            let list = members
                 .iter()
-                .filter(|m| m.workspace_id == w.id)
+                .filter(|m| m.org_id == org.id)
                 .map(|m| {
                     let p = people.iter().find(|p| p.id == m.user_id).map(Profile::person).unwrap_or(Person { id: m.user_id.clone(), ..Default::default() });
                     (m.clone(), p)
                 })
                 .collect();
-            let my_role = mine.iter().find(|(m, _)| m.user_id == me).map(|(m, _)| m.role).unwrap_or_default();
-            let invites = if my_role.can_manage() && !w.is_personal() { self.team_invites(&w.id).unwrap_or_default() } else { Vec::new() };
-            teams.push(Team { workspace: w, members: mine, invites, my_role });
+            let invites = if org.role.can_manage() { self.org_invites(&org.id).unwrap_or_default() } else { Vec::new() };
+            let mine = spaces.iter().filter(|w| w.org_id.as_deref() == Some(org.id.as_str())).cloned().collect();
+            out.push(OrgView { org, members: list, invites, spaces: mine });
         }
-        Ok(teams)
+        Ok(out)
     }
 
-    pub fn create_workspace(&self, name: &str) -> Result<String, CloudError> {
-        Client::id_reply(self.rpc("create_workspace", json!({"name": name.trim()}))?)
+    pub fn create_org(&self, name: &str) -> Result<OrgCreated, CloudError> {
+        self.call("create_org", json!({"name": name.trim()}))
     }
 
-    pub fn rename_workspace(&self, ws: &str, name: &str) -> Result<(), CloudError> {
-        self.rpc("rename_workspace", json!({"ws": ws, "name": name.trim()})).map(|_| ())
+    pub fn create_space(&self, org: &str, name: &str) -> Result<String, CloudError> {
+        Client::id_reply(self.rpc("create_space", json!({"org": org, "name": name.trim()}))?)
     }
 
-    pub fn delete_workspace(&self, ws: &str) -> Result<(), CloudError> {
-        self.rpc("delete_workspace", json!({"ws": ws})).map(|_| ())
+    pub fn invite_member(&self, org: &str, email: &str, role: OrgRole, spaces: &[String]) -> Result<String, CloudError> {
+        Client::id_reply(self.rpc("invite_member", json!({"org": org, "email": email.trim().to_lowercase(), "role": role.as_str(), "spaces": spaces}))?)
     }
 
-    pub fn invite_member(&self, ws: &str, email: &str, role: Role) -> Result<String, CloudError> {
-        Client::id_reply(self.rpc("invite_member", json!({"ws": ws, "email": email.trim().to_lowercase(), "role": role.as_str()}))?)
-    }
-
-    pub fn send_invite(&self, invite: &str, app: &str) -> Result<bool, CloudError> {
-        let v = self.function("send-invite", &json!({"invite_id": invite, "app": app}))?;
+    pub fn send_invite(&self, invite: &str) -> Result<bool, CloudError> {
+        let v = self.function("send-invite", &json!({"invite_id": invite}))?;
         Ok(v.get("sent").and_then(Value::as_bool).unwrap_or(false))
     }
 
@@ -375,10 +394,10 @@ impl Client {
         self.call("my_invites", json!({}))
     }
 
-    pub fn team_invites(&self, ws: &str) -> Result<Vec<Invite>, CloudError> {
+    pub fn org_invites(&self, org: &str) -> Result<Vec<Invite>, CloudError> {
         let rows: Vec<Invite> = self.rows(&format!(
-            "invites?select=id,email,role,expires_at,accepted_at,workspace_id&workspace_id=eq.{}&accepted_at=is.null&declined_at=is.null&revoked_at=is.null&order=created_at",
-            enc(ws)
+            "invites?select=id,email,role,expires_at,accepted_at,org_id&org_id=eq.{}&accepted_at=is.null&declined_at=is.null&revoked_at=is.null&order=created_at",
+            enc(org)
         ))?;
         let now = self.server_now();
         Ok(rows.into_iter().filter(|i| parse_time(&i.expires_at).map(|t| t > now).unwrap_or(true)).collect())
@@ -392,20 +411,51 @@ impl Client {
         self.rpc("decline_invite", json!({"invite": invite})).map(|_| ())
     }
 
-    pub fn set_role(&self, ws: &str, member: &str, role: Role) -> Result<(), CloudError> {
-        self.rpc("set_role", json!({"ws": ws, "member": member, "role": role.as_str()})).map(|_| ())
+    pub fn set_org_role(&self, org: &str, member: &str, role: OrgRole) -> Result<(), CloudError> {
+        self.rpc("set_org_role", json!({"org": org, "member": member, "role": role.as_str()})).map(|_| ())
     }
 
-    pub fn remove_member(&self, ws: &str, member: &str) -> Result<(), CloudError> {
-        self.rpc("remove_member", json!({"ws": ws, "member": member})).map(|_| ())
+    pub fn remove_member(&self, org: &str, member: &str) -> Result<(), CloudError> {
+        self.rpc("remove_member", json!({"org": org, "member": member})).map(|_| ())
     }
 
-    pub fn leave_workspace(&self, ws: &str) -> Result<(), CloudError> {
-        self.rpc("leave_workspace", json!({"ws": ws})).map(|_| ())
+    pub fn leave_org(&self, org: &str) -> Result<(), CloudError> {
+        self.rpc("leave_org", json!({"org": org})).map(|_| ())
     }
 
-    pub fn transfer_ownership(&self, ws: &str, member: &str) -> Result<(), CloudError> {
-        self.rpc("transfer_ownership", json!({"ws": ws, "member": member})).map(|_| ())
+    // web here---
+
+    pub fn web_link(&self, next: &str) -> Result<String, CloudError> {
+        let v = self.function("web-link", &json!({"next": next}))?;
+        v.get("url").and_then(Value::as_str).map(str::to_string).ok_or_else(|| CloudError::Server("no link in the reply".into()))
+    }
+
+    pub fn create_app_grant(&self, app: &str, device: &str, challenge: &str) -> Result<String, CloudError> {
+        Client::id_reply(self.rpc("create_app_grant", json!({"app": app, "device": device, "challenge": challenge}))?)
+    }
+
+    pub fn redeem_code(&self, code: &str, verifier: &str) -> Result<Session, CloudError> {
+        let code: String = code.chars().filter(|c| c.is_ascii_alphanumeric()).collect::<String>().to_uppercase();
+        if code.is_empty() || code.len() > 32 {
+            return Err(CloudError::Invalid("code".into()));
+        }
+        let req = self.base("POST", "/functions/v1/app-token").json(&json!({"code": code, "verifier": verifier}));
+        let reply = self.send(&req)?;
+        if !reply.ok() {
+            return Err(data_error(&reply));
+        }
+        let s = Session::from_value(&reply.json(), self.server_now()).ok_or_else(|| CloudError::Server("no session in the reply".into()))?;
+        self.set_session(Some(s.clone()));
+        Ok(s)
+    }
+
+    pub fn open_on_web_url(&self, next: &str) -> String {
+        if self.signed_in() {
+            if let Ok(url) = self.web_link(next) {
+                return url;
+            }
+        }
+        self.inner.cfg.web(next)
     }
 
     // projects here---

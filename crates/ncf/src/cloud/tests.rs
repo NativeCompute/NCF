@@ -25,10 +25,27 @@ fn worker(c: &Client, d: &Device) -> Worker<()> {
 fn team(cloud: &FakeCloud) -> (Client, Client, String) {
     let ann = cloud.signed_in("ann@example.com", "Ann");
     let ben = cloud.signed_in("ben@example.com", "Ben");
-    let ws = ann.create_workspace("Room").unwrap();
-    let i = ann.invite_member(&ws, "ben@example.com", Role::Editor).unwrap();
+    let org = ann.create_org("Room").unwrap();
+    let i = ann.invite_member(&org.id, "ben@example.com", OrgRole::Member, &[]).unwrap();
     ben.accept_invite(&i).unwrap();
-    (ann, ben, ws)
+    (ann, ben, org.space)
+}
+
+fn get(port: u16, target: &str) -> String {
+    use std::io::{Read, Write};
+    let mut s = std::net::TcpStream::connect(("127.0.0.1", port)).unwrap();
+    write!(s, "GET {target} HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n").unwrap();
+    let mut out = String::new();
+    let _ = s.read_to_string(&mut out);
+    out
+}
+
+fn until(a: &mut Account, what: impl Fn(&Account) -> bool) {
+    let t = Instant::now();
+    while !what(a) && t.elapsed() < Duration::from_secs(5) {
+        a.poll();
+        std::thread::sleep(Duration::from_millis(10));
+    }
 }
 
 // basics here---
@@ -219,34 +236,231 @@ fn deleting_an_account_needs_a_fresh_sign_in() {
     assert_eq!(c.sign_in("hal@example.com", "Password123").unwrap_err(), CloudError::Auth("invalid_credentials".into()));
 }
 
-// teams here---
+// organizations here---
 
 #[test]
-fn a_team_invites_and_people_join() {
+fn an_organization_invites_and_people_join() {
     let cloud = FakeCloud::new();
     let ann = cloud.signed_in("ann@example.com", "Ann");
     let ben = cloud.signed_in("ben@example.com", "Ben");
-    let ws = ann.create_workspace("Writers room").unwrap();
-    let invite = ann.invite_member(&ws, "BEN@example.com", Role::Editor).unwrap();
-    assert!(!ann.send_invite(&invite, "blackline").unwrap());
-    assert_eq!(ann.team_invites(&ws).unwrap().len(), 1);
+    let cal = cloud.signed_in("cal@example.com", "Cal");
+    let made = ann.create_org("Writers room!").unwrap();
+    assert_eq!(made.slug, "writers-room");
+    assert_eq!(ann.create_org("Writers room").unwrap().slug, "writers-room-2");
+    let pitches = ann.create_space(&made.id, "Pitches").unwrap();
+    let invite = ann.invite_member(&made.id, "BEN@example.com", OrgRole::Admin, &[]).unwrap();
+    assert!(!ann.send_invite(&invite).unwrap());
+    assert_eq!(ann.org_invites(&made.id).unwrap().len(), 1);
     let mine = ben.my_invites().unwrap();
     assert_eq!(mine.len(), 1);
-    assert_eq!(mine[0].workspace, "Writers room");
+    assert_eq!(mine[0].org, "Writers room!");
     assert_eq!(mine[0].invited_by, "Ann");
-    assert_eq!(ben.accept_invite(&invite).unwrap(), ws);
-    let teams = ben.teams().unwrap();
-    let team = teams.iter().find(|t| t.workspace.id == ws).unwrap();
-    assert_eq!(team.my_role, Role::Editor);
-    assert_eq!(team.members.len(), 2);
-    assert!(team.members.iter().any(|(m, p)| m.role == Role::Owner && p.name == "Ann"));
-    assert!(teams.iter().any(|t| t.workspace.is_personal() && t.workspace.shown() == "My cloud"));
-    assert_eq!(ben.invite_member(&ws, "cal@example.com", Role::Viewer).unwrap_err(), CloudError::Forbidden);
-    ann.set_role(&ws, &ben.user_id(), Role::Admin).unwrap();
-    assert_eq!(ben.invite_member(&ws, "cal@example.com", Role::Admin).unwrap_err(), CloudError::Forbidden);
-    ann.transfer_ownership(&ws, &ben.user_id()).unwrap();
-    assert_eq!(ann.leave_workspace(&ws), Ok(()));
-    assert_eq!(ann.rename_workspace(&ws, "Gone").unwrap_err(), CloudError::NotFound);
+    assert_eq!(mine[0].role, OrgRole::Admin);
+    assert_eq!(ben.accept_invite(&invite).unwrap(), made.id);
+    let spaces = ben.spaces().unwrap();
+    assert!(spaces.iter().any(|s| s.is_personal() && s.shown() == "My cloud"));
+    let general = spaces.iter().find(|s| s.workspace.id == made.space).unwrap();
+    assert_eq!(general.my_role, Role::Editor);
+    assert_eq!(general.shown(), "Writers room! / General");
+    assert_eq!(general.org.as_ref().unwrap().role, OrgRole::Admin);
+    assert!(spaces.iter().any(|s| s.workspace.id == pitches));
+
+    assert_eq!(ann.invite_member(&made.id, "cal@example.com", OrgRole::Guest, &[]).unwrap_err(), CloudError::Invalid("spaces".into()));
+    assert_eq!(ben.invite_member(&made.id, "cal@example.com", OrgRole::Admin, &[]).unwrap_err(), CloudError::Forbidden);
+    let guest = ben.invite_member(&made.id, "cal@example.com", OrgRole::Guest, std::slice::from_ref(&pitches)).unwrap();
+    cal.accept_invite(&guest).unwrap();
+    let theirs = cal.spaces().unwrap();
+    assert_eq!(theirs.iter().filter(|s| !s.is_personal()).count(), 1);
+    assert_eq!(cloud.space_role(&pitches, "cal@example.com").as_deref(), Some("editor"));
+    let orgs = ann.orgs().unwrap();
+    let room = orgs.iter().find(|o| o.org.id == made.id).unwrap();
+    assert_eq!(room.members.len(), 3);
+    assert_eq!(room.spaces.len(), 2);
+    assert!(room.members.iter().any(|(m, p)| m.role == OrgRole::Owner && p.name == "Ann"));
+    assert_eq!(cal.orgs().unwrap()[0].members.len(), 1, "guests don't see the member list");
+    assert_eq!(cal.create_space(&made.id, "Mine").unwrap_err(), CloudError::Forbidden);
+
+    ann.set_org_role(&made.id, &cal.user_id(), OrgRole::Member).unwrap();
+    assert_eq!(cloud.space_role(&made.space, "cal@example.com").as_deref(), Some("editor"));
+    assert_eq!(ben.set_org_role(&made.id, &ann.user_id(), OrgRole::Member).unwrap_err(), CloudError::Invalid("role".into()));
+    assert_eq!(ben.remove_member(&made.id, &ann.user_id()).unwrap_err(), CloudError::Forbidden);
+    ben.remove_member(&made.id, &cal.user_id()).unwrap();
+    assert!(cal.orgs().unwrap().is_empty());
+    assert_eq!(ann.leave_org(&made.id).unwrap_err(), CloudError::Invalid("owner".into()));
+    ben.leave_org(&made.id).unwrap();
+    assert_eq!(cloud.org_role(&made.id, "ben@example.com"), None);
+    assert_eq!(ben.create_space(&made.id, "Gone").unwrap_err(), CloudError::NotFound);
+    let feed = ann.changes_since(0).unwrap();
+    assert!(feed.changes.iter().any(|c| c.org_id.as_deref() == Some(made.id.as_str()) && c.workspace_id.is_none() && c.kind == "members"));
+}
+
+#[test]
+fn organizations_have_limits() {
+    let cloud = FakeCloud::new();
+    cloud.set_max_people(2);
+    let ann = cloud.signed_in("ann@example.com", "Ann");
+    let made = ann.create_org("One").unwrap();
+    ann.create_org("Two").unwrap();
+    ann.create_org("Three").unwrap();
+    assert_eq!(ann.create_org("Four").unwrap_err(), CloudError::Limit("orgs".into()));
+    assert_eq!(ann.me().unwrap().usage.owned_orgs, 3);
+    ann.invite_member(&made.id, "x@example.com", OrgRole::Member, &[]).unwrap();
+    assert_eq!(ann.invite_member(&made.id, "y@example.com", OrgRole::Member, &[]).unwrap_err(), CloudError::Limit("members".into()));
+    assert_eq!(ann.invite_member(&made.id, "nope", OrgRole::Member, &[]).unwrap_err(), CloudError::Invalid("email".into()));
+    assert_eq!(ann.create_org("  ").unwrap_err(), CloudError::Invalid("name".into()));
+}
+
+// browser sign-in here---
+
+#[test]
+fn pkce_matches_rfc_7636() {
+    assert_eq!(challenge_of("dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"), "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM");
+    assert_eq!(base64url(b""), "");
+    assert_eq!(base64url(b"f"), "Zg");
+    assert_eq!(base64url(b"foob"), "Zm9vYg");
+    assert_eq!(base64url(&[0xfb, 0xff]), "-_8");
+    let p = Pkce::new();
+    assert_eq!(p.verifier.len(), 43);
+    assert_eq!(p.challenge.len(), 43);
+    assert_eq!(p.challenge, challenge_of(&p.verifier));
+    assert_ne!(Pkce::new().verifier, p.verifier);
+    let cfg = FakeCloud::config();
+    let url = browser::login_url(&cfg, "blackline", "Ann's Mac", &p, 4567, true);
+    assert!(url.starts_with("https://cloud.nativecloud.test/login?app=blackline&device=Ann%27s%20Mac&challenge="));
+    assert!(url.ends_with("&port=4567&mode=signup"));
+    let (path, q) = browser::query_of("/callback?code=AB%2DCD&state=x+y");
+    assert_eq!(path, "/callback");
+    assert_eq!(q, vec![("code".to_string(), "AB-CD".to_string()), ("state".to_string(), "x y".to_string())]);
+}
+
+#[test]
+fn grants_are_single_use_and_bound_to_the_verifier() {
+    let cloud = FakeCloud::new();
+    let ann = cloud.signed_in("ann@example.com", "Ann");
+    let p = Pkce::new();
+    assert_eq!(ann.create_app_grant("blackline", "Mac", "short").unwrap_err(), CloudError::Invalid("challenge".into()));
+    let code = ann.create_app_grant("blackline", "Ann's Mac", &p.challenge).unwrap();
+    assert_eq!(code.len(), 8);
+    let app = cloud.client();
+    let wrong = Pkce::new();
+    assert_eq!(app.redeem_code(&code, &wrong.verifier).unwrap_err(), CloudError::Forbidden);
+    assert!(!app.signed_in());
+    let s = app.redeem_code(&code.to_lowercase(), &p.verifier).unwrap();
+    assert_eq!(s.email, "ann@example.com");
+    assert_eq!(app.me().unwrap().display_name, "Ann");
+    assert_ne!(app.session().unwrap().refresh_token, ann.session().unwrap().refresh_token, "each computer gets its own session");
+    assert_eq!(cloud.client().redeem_code(&code, &p.verifier).unwrap_err(), CloudError::NotFound, "a code works once");
+
+    let burnt = ann.create_app_grant("blackline", "Mac", &p.challenge).unwrap();
+    for _ in 0..5 {
+        assert_eq!(cloud.client().redeem_code(&burnt, &wrong.verifier).unwrap_err(), CloudError::Forbidden);
+    }
+    assert_eq!(cloud.client().redeem_code(&burnt, &p.verifier).unwrap_err(), CloudError::NotFound, "five wrong tries burn it");
+
+    let late = ann.create_app_grant("blackline", "Mac", &p.challenge).unwrap();
+    cloud.advance(121);
+    assert_eq!(cloud.client().redeem_code(&late, &p.verifier).unwrap_err(), CloudError::NotFound, "two minutes and it's gone");
+    assert_eq!(cloud.client().redeem_code("", &p.verifier).unwrap_err(), CloudError::Invalid("code".into()));
+}
+
+#[test]
+fn manage_on_the_web_signs_you_in_there() {
+    let cloud = FakeCloud::new();
+    let ann = cloud.signed_in("ann@example.com", "Ann");
+    let url = ann.web_link("/o/acme/members").unwrap();
+    assert!(url.starts_with("https://cloud.nativecloud.test/auth/handoff#t="));
+    assert!(url.ends_with("&next=%2Fo%2Facme%2Fmembers"));
+    assert!(ann.web_link("https://evil.example").unwrap().ends_with("&next=%2F"));
+    assert!(ann.web_link("//evil.example").unwrap().ends_with("&next=%2F"));
+    let code = url.split("#t=").nth(1).unwrap().split('&').next().unwrap().to_string();
+    assert_eq!(cloud.client().redeem_code(&code, &Pkce::new().verifier).unwrap_err(), CloudError::Forbidden, "a web handoff code never signs in an app");
+    let mut a = fake::account_for(INFO, ann, "Mac");
+    a.open_on_web("/o/acme/settings");
+    settle(&mut a);
+    let urls = a.take_urls();
+    assert_eq!(urls.len(), 1);
+    assert!(urls[0].contains("/auth/handoff#t=") && urls[0].ends_with("settings"));
+    let mut out = fake::account_for(INFO, cloud.client(), "Mac");
+    out.open_on_web("/account");
+    assert_eq!(out.take_urls(), vec!["https://cloud.nativecloud.test/account".to_string()]);
+}
+
+#[test]
+fn signing_in_through_the_browser() {
+    let cloud = FakeCloud::new();
+    cloud.add_user("dee@example.com", "Correct1horse", "Dee");
+    let mut a = fake::account_for(INFO, cloud.client(), "Dee's Mac");
+    assert_eq!(a.stage(), Stage::SignedOut);
+    a.sign_in_with_browser(false);
+    assert_eq!(a.stage(), Stage::Waiting);
+    let urls = a.take_urls();
+    assert_eq!(urls.len(), 1);
+    assert!(urls[0].starts_with("https://cloud.nativecloud.test/login?app=blackline&device=Dee%27s%20Mac&challenge="));
+    let (port, state, challenge) = (a.sign_in_port().unwrap(), a.sign_in_state().unwrap().to_string(), a.sign_in_challenge().unwrap().to_string());
+    assert!(urls[0].contains(&format!("&state={state}&port={port}")));
+
+    assert!(get(port, "/favicon.ico").starts_with("HTTP/1.1 404"));
+    let stray = get(port, "/callback?code=ABCDEFGH&state=nope");
+    assert!(stray.starts_with("HTTP/1.1 400") && stray.contains("out of date"));
+    a.poll();
+    assert_eq!(a.stage(), Stage::Waiting, "a wrong state is ignored");
+
+    let code = cloud.approve("dee@example.com", "blackline", "Dee's Mac", &challenge);
+    let page = get(port, &format!("/callback?code={code}&state={state}"));
+    assert!(page.starts_with("HTTP/1.1 200"));
+    assert!(page.contains("You&#39;re signed in to Cloud Test"));
+    assert!(page.contains("Content-Security-Policy: default-src 'none'"));
+    until(&mut a, |a| a.signed_in() && a.me.is_some());
+    assert_eq!(a.stage(), Stage::SignedIn);
+    assert_eq!(a.take_changed(), Some(true));
+    assert_eq!(a.me.as_ref().unwrap().display_name, "Dee");
+    assert!(a.take_notices().iter().any(|(t, _, _)| t == "Signed in"));
+    assert!(cloud.grant_used(&code));
+    assert!(a.login_url().is_none());
+}
+
+#[test]
+fn the_code_fallback_and_cancelling() {
+    let cloud = FakeCloud::new();
+    cloud.add_user("eve@example.com", "Correct1horse", "Eve");
+    let mut a = fake::account_for(INFO, cloud.client(), "Mac");
+    a.set_code("ABC");
+    a.submit_code();
+    assert!(a.error().unwrap().contains("8-character"));
+    a.set_code("ABCD2345");
+    a.submit_code();
+    assert!(a.error().unwrap().contains("Start signing in first"));
+
+    a.sign_in_with_browser(true);
+    assert!(a.take_urls()[0].ends_with("&mode=signup"));
+    a.set_code("ABCD-2345");
+    a.submit_code();
+    settle(&mut a);
+    assert!(!a.signed_in());
+    assert!(a.error().unwrap().contains("wrong, used or expired"));
+    assert_eq!(a.stage(), Stage::Waiting, "a typo doesn't end the wait");
+    let code = cloud.approve("eve@example.com", "blackline", "Mac", a.sign_in_challenge().unwrap());
+    a.set_code(&format!("{}-{}", &code[..4], &code[4..]));
+    a.submit_code();
+    settle(&mut a);
+    assert!(a.signed_in());
+
+    let mut b = fake::account_for(INFO, cloud.client(), "Mac");
+    b.sign_in_with_browser(false);
+    let (port, state) = (b.sign_in_port().unwrap(), b.sign_in_state().unwrap().to_string());
+    assert!(get(port, &format!("/callback?error=cancelled&state={state}")).contains("Sign-in cancelled"));
+    until(&mut b, |b| b.stage() == Stage::SignedOut);
+    assert!(b.note().unwrap().contains("cancelled"));
+
+    b.sign_in_with_browser(false);
+    let port = b.sign_in_port().unwrap();
+    b.cancel_sign_in();
+    assert_eq!(b.stage(), Stage::SignedOut);
+    let t = Instant::now();
+    while std::net::TcpStream::connect(("127.0.0.1", port)).is_ok() && t.elapsed() < Duration::from_secs(3) {
+        std::thread::sleep(Duration::from_millis(20));
+    }
+    assert!(std::net::TcpStream::connect(("127.0.0.1", port)).is_err(), "cancelling stops listening");
 }
 
 // projects here---
@@ -325,7 +539,7 @@ fn snapshots_trash_moves_and_stars() {
     assert!(cloud.snapshots(&p.id).iter().any(|(k, _, b)| k == "restore" && b == "two"));
     ann.set_star(&p.id, true).unwrap();
     assert_eq!(ann.stars().unwrap(), vec![p.id.clone()]);
-    let ws = ann.create_workspace("Room").unwrap();
+    let ws = ann.create_org("Room").unwrap().space;
     ann.move_project(&p.id, &ws).unwrap();
     assert_eq!(cloud.workspace_of(&p.id), ws);
     let copy = ann.duplicate_project(&p.id, None).unwrap();
@@ -585,129 +799,53 @@ fn settle(a: &mut Account) {
 }
 
 #[test]
-fn signing_up_through_the_form() {
-    let cloud = FakeCloud::new();
-    let mut a = fake::account_for(INFO, cloud.client(), "Mac");
-    assert!(!a.signed_in());
-    a.show(Panel::SignUp);
-    a.fill("dee@example.com", "short", "Dee");
-    a.submit();
-    assert!(a.error().unwrap().contains("10 characters"));
-    a.fill("dee@example.com", "Correct1horse", "Dee");
-    a.submit();
-    settle(&mut a);
-    assert_eq!(a.panel(), Panel::Code(Code::SignUp));
-    a.set_code("12");
-    a.submit();
-    assert!(a.error().is_some());
-    a.set_code(&cloud.code("signup", "dee@example.com").unwrap());
-    a.submit();
-    settle(&mut a);
-    assert!(a.signed_in());
-    assert_eq!(a.take_changed(), Some(true));
-    assert_eq!(a.me.as_ref().unwrap().display_name, "Dee");
-    assert!(a.take_notices().iter().any(|(t, _, _)| t == "Welcome to NativeCloud"));
-    assert_eq!(a.devices.len(), 1);
-    assert_eq!(a.devices[0].name, "Mac");
-}
-
-#[test]
-fn sign_in_mistakes_show_under_the_form() {
-    let cloud = FakeCloud::new();
-    cloud.add_user("eve@example.com", "Correct1horse", "Eve");
-    let mut a = fake::account_for(INFO, cloud.client(), "Mac");
-    a.fill("eve@example.com", "wrong", "");
-    a.submit();
-    settle(&mut a);
-    assert_eq!(a.error(), Some("That email and password don't match."));
-    assert!(!a.signed_in());
-    cloud.set_offline(true);
-    a.fill("eve@example.com", "Correct1horse", "");
-    a.submit();
-    settle(&mut a);
-    assert!(a.error().unwrap().contains("can't be reached"));
-    cloud.set_offline(false);
-    a.submit();
-    settle(&mut a);
-    assert!(a.signed_in());
-}
-
-#[test]
-fn an_unconfirmed_account_is_sent_to_the_code() {
-    let cloud = FakeCloud::new();
-    let c = cloud.client();
-    c.sign_up("fay@example.com", "Correct1horse", "Fay").unwrap();
-    let mut a = fake::account_for(INFO, cloud.client(), "Mac");
-    a.fill("fay@example.com", "Correct1horse", "");
-    a.submit();
-    settle(&mut a);
-    assert_eq!(a.panel(), Panel::Code(Code::SignUp));
-    let code = cloud.code("signup", "fay@example.com").unwrap();
-    a.set_code(&code);
-    a.submit();
-    settle(&mut a);
-    assert!(a.signed_in());
-}
-
-#[test]
-fn forgetting_a_password() {
-    let cloud = FakeCloud::new();
-    cloud.add_user("gus@example.com", "Correct1horse", "Gus");
-    let mut a = fake::account_for(INFO, cloud.client(), "Mac");
-    a.show(Panel::Forgot);
-    a.fill("gus@example.com", "", "");
-    a.submit();
-    settle(&mut a);
-    assert_eq!(a.panel(), Panel::Code(Code::Recovery));
-    a.set_code(&cloud.code("recovery", "gus@example.com").unwrap());
-    a.submit();
-    settle(&mut a);
-    assert_eq!(a.panel(), Panel::NewPassword);
-    assert!(a.signed_in());
-    a.submit();
-    assert!(a.error().is_some());
-}
-
-#[test]
-fn deleting_from_the_account_tab_asks_for_the_password_when_stale() {
-    let cloud = FakeCloud::new();
-    let mut a = fake::account_for(INFO, cloud.signed_in("hal@example.com", "Hal"), "Mac");
-    settle(&mut a);
-    cloud.advance(900);
-    assert!(a.answer("ncf-cloud-delete"));
-    settle(&mut a);
-    assert!(a.signed_in());
-    assert!(a.error().unwrap().contains("password"));
-    let mut h = crate::testing::Harness::new(900.0, 1400.0);
-    h.frames(2, |ctx| {
-        egui::CentralPanel::default().show(ctx, |ui| a.account_ui(ui));
-    });
-    let c = a.client();
-    c.reauthenticate("Password123").unwrap();
-    assert!(a.answer("ncf-cloud-delete"));
-    settle(&mut a);
-    assert!(!a.signed_in());
-    assert_eq!(a.take_changed(), Some(false));
-    assert!(a.me.is_none());
-}
-
-#[test]
-fn team_answers_change_the_team() {
-    let cloud = FakeCloud::new();
+fn signed_in_the_account_is_slim_and_points_to_the_web() {
     let mut d = fake::demo(INFO);
     settle(&mut d.signed_in);
-    let team = d.signed_in.teams.iter().find(|t| t.workspace.id == d.team).unwrap().clone();
-    assert_eq!(team.members.len(), 3);
-    assert_eq!(team.invites.len(), 1);
-    let cal = team.members.iter().find(|(_, p)| p.name == "Cal Diaz").unwrap().0.user_id.clone();
-    assert!(d.signed_in.answer(&format!("ncf-cloud-remove:{}:{cal}", d.team)));
-    settle(&mut d.signed_in);
-    let team = d.signed_in.teams.iter().find(|t| t.workspace.id == d.team).unwrap();
-    assert_eq!(team.members.len(), 2);
-    assert!(!d.signed_in.answer("something-else"));
-    let invite = d.signed_in.invites[0].clone();
-    assert_eq!(invite.workspace, "Pilot season");
-    drop(cloud);
+    let a = &mut d.signed_in;
+    assert_eq!(a.stage(), Stage::SignedIn);
+    assert_eq!(a.me.as_ref().unwrap().orgs.len(), 1);
+    assert_eq!(a.invites.len(), 1);
+    assert_eq!(a.invites[0].org, "Pilot season");
+    assert_eq!(a.selected_org(), Some(d.org.as_str()));
+    let room = a.orgs.iter().find(|o| o.org.id == d.org).unwrap().clone();
+    assert_eq!(room.members.len(), 3);
+    assert_eq!(room.invites.len(), 1);
+    assert_eq!(room.spaces.len(), 2);
+    assert!(room.members.iter().any(|(m, p)| p.name == "Cal Diaz" && m.role == OrgRole::Guest));
+
+    a.set_invite("not-an-email", OrgRole::Member);
+    a.send_invite();
+    assert!(a.take_notices().iter().any(|(t, _, _)| t == "Check that"));
+    a.set_invite("eve@example.com", OrgRole::Admin);
+    a.send_invite();
+    settle(a);
+    assert!(a.take_notices().iter().any(|(t, _, _)| t == "Invite saved"));
+    assert_eq!(a.orgs.iter().find(|o| o.org.id == d.org).unwrap().invites.len(), 2);
+
+    let decline = format!("ncf-cloud-decline:{}", a.invites[0].id);
+    assert!(a.answer(&decline));
+    settle(a);
+    assert!(a.invites.is_empty());
+    assert!(!a.answer("something-else"));
+
+    let pitch = d.cloud.client();
+    pitch.sign_in("ben@example.com", "Password123").unwrap();
+    let other = pitch.create_org("Second").unwrap();
+    pitch.invite_member(&other.id, "ann@example.com", OrgRole::Member, &[]).unwrap();
+    a.reload();
+    settle(a);
+    let id = a.invites[0].id.clone();
+    a.join(&id);
+    settle(a);
+    assert_eq!(a.orgs.len(), 2);
+    assert!(a.spaces.iter().any(|s| s.workspace.id == other.space));
+
+    assert!(a.answer("ncf-cloud-signout"));
+    settle(a);
+    assert!(!a.signed_in());
+    assert!(a.me.is_none());
+    assert_eq!(a.take_changed(), Some(false));
 }
 
 #[test]
@@ -717,17 +855,19 @@ fn every_account_screen_draws_in_both_casts() {
     let mut h = crate::testing::Harness::new(900.0, 1600.0);
     for dark in [true, false] {
         crate::theme::set_palette(dark);
-        for panel in [Panel::SignIn, Panel::SignUp, Panel::Code(Code::SignUp), Panel::Forgot, Panel::NewPassword] {
-            d.signed_out.show(panel);
-            h.frames(2, |ctx| {
-                egui::CentralPanel::default().show(ctx, |ui| d.signed_out.account_ui(ui));
-            });
-        }
+        h.frames(2, |ctx| {
+            egui::CentralPanel::default().show(ctx, |ui| d.signed_out.account_ui(ui));
+        });
+        d.signed_out.sign_in_with_browser(false);
+        h.frames(2, |ctx| {
+            egui::CentralPanel::default().show(ctx, |ui| d.signed_out.account_ui(ui));
+        });
+        d.signed_out.cancel_sign_in();
         h.frames(2, |ctx| {
             egui::CentralPanel::default().show(ctx, |ui| {
                 d.signed_in.account_ui(ui);
-                d.signed_in.teams_ui(ui);
-                d.signed_out.teams_ui(ui);
+                d.signed_in.orgs_ui(ui);
+                d.signed_out.orgs_ui(ui);
                 let now = unix_now();
                 view::readout(ui, &SyncState { signed_in: true, online: false, waiting: 2, ..Default::default() }, now);
             });
@@ -750,8 +890,8 @@ fn settings_sync_only_carries_shared_keys() {
 fn exports_write_one_file_per_project() {
     let dir = temp("export");
     let spaces = vec![
-        Workspace { id: "a".into(), name: "My cloud".into(), kind: "personal".into(), owner_id: "u".into() },
-        Workspace { id: "b".into(), name: "Writers/room".into(), kind: "team".into(), owner_id: "u".into() },
+        Workspace { id: "a".into(), name: "My cloud".into(), kind: "personal".into(), owner_id: Some("u".into()), ..Default::default() },
+        Workspace { id: "b".into(), name: "Writers/room".into(), kind: "space".into(), org_id: Some("o".into()), ..Default::default() },
     ];
     let p = |ws: &str, title: &str, deleted: bool| Project {
         workspace_id: ws.into(),
@@ -807,14 +947,31 @@ fn live_nativecloud_round_trip() {
     assert!(me.plan.max_projects > 0);
     assert_eq!(Client::new(cfg.clone(), Ureq::new("t")).sign_in(&ben_email, "nope").unwrap_err(), CloudError::Auth("invalid_credentials".into()));
 
-    let ws = ann.create_workspace("Live room").unwrap();
-    let invite = ann.invite_member(&ws, &ben_email, Role::Editor).unwrap();
-    assert!(ben.my_invites().unwrap().iter().any(|i| i.id == invite && i.workspace == "Live room"));
-    assert_eq!(ben.accept_invite(&invite).unwrap(), ws);
-    let teams = ann.teams().unwrap();
-    let team = teams.iter().find(|t| t.workspace.id == ws).unwrap();
-    assert_eq!(team.members.len(), 2);
-    assert_eq!(team.my_role, Role::Owner);
+    let made = ann.create_org("Live room").unwrap();
+    let ws = made.space.clone();
+    let invite = ann.invite_member(&made.id, &ben_email, OrgRole::Member, &[]).unwrap();
+    assert!(ben.my_invites().unwrap().iter().any(|i| i.id == invite && i.org == "Live room" && i.role == OrgRole::Member));
+    assert_eq!(ben.accept_invite(&invite).unwrap(), made.id);
+    let orgs = ann.orgs().unwrap();
+    let room = orgs.iter().find(|o| o.org.id == made.id).unwrap();
+    assert_eq!(room.members.len(), 2);
+    assert_eq!(room.org.role, OrgRole::Owner);
+    assert_eq!(room.org.plan, "team");
+    let spaces = ben.spaces().unwrap();
+    assert_eq!(spaces.iter().find(|s| s.workspace.id == ws).unwrap().my_role, Role::Editor);
+
+    let pkce = Pkce::new();
+    let code = ann.create_app_grant("blackline", "Ann's other Mac", &pkce.challenge).unwrap();
+    let other = Client::new(cfg.clone(), Ureq::new("ncf-live-test"));
+    assert_eq!(other.redeem_code(&code, &Pkce::new().verifier).unwrap_err(), CloudError::Forbidden);
+    let s = other.redeem_code(&code, &pkce.verifier).unwrap();
+    assert_eq!(s.user_id, ann.user_id());
+    assert_eq!(other.me().unwrap().display_name, "Ann");
+    assert_eq!(Client::new(cfg.clone(), Ureq::new("t")).redeem_code(&code, &pkce.verifier).unwrap_err(), CloudError::NotFound);
+    other.sign_out(false).unwrap();
+    let link = ann.web_link("/o/live/members").unwrap();
+    assert!(link.contains("/auth/handoff#t=") && link.ends_with("&next=%2Fo%2Flive%2Fmembers"), "{link}");
+    assert!(ann.web_link("https://evil.example").unwrap().ends_with("&next=%2F"));
 
     let p = ann.create_project(&ws, "blackline", "Live pilot", "FADE IN:", &json!({"pages": 1})).unwrap();
     let (da, db) = (device("Ann's Mac"), device("Ben's PC"));
@@ -866,7 +1023,7 @@ fn live_nativecloud_round_trip() {
     assert!(ann.me().is_ok());
     ann.delete_account().unwrap();
     assert!(!ann.signed_in());
-    let after = ben.teams().unwrap();
-    assert_eq!(after.iter().find(|t| t.workspace.id == ws).unwrap().my_role, Role::Owner);
+    let after = ben.orgs().unwrap();
+    assert_eq!(after.iter().find(|o| o.org.id == made.id).unwrap().org.role, OrgRole::Owner);
     ben.sign_out(false).unwrap();
 }
