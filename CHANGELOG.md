@@ -4,6 +4,22 @@ NCF follows [semantic versioning](https://semver.org). Apps pin a tag, so nothin
 
 ## Unreleased
 
+NativeCloud: accounts, sync and teams for every NativeCompute app.
+
+### Desktop (`ncf`)
+- `ncf::cloud`, behind the new `cloud` feature, connects an app to NativeCloud. See [docs/cloud.md](docs/cloud.md).
+  - **Settings tabs:** `Shell::enable_cloud` adds **Account** and **Teams** tabs. People sign up with a 6-digit emailed code, sign in, reset a password, edit their profile, see plan meters, manage computers, change email or password, sign out here or everywhere, export everything and delete the account. Teams can be created, renamed and deleted, with email invites, roles, removals, hand-over and leaving.
+  - **Client:** `Client` makes typed calls that match NativeCloud's API. Sessions are kept in the system keychain (or a private file on Linux) and refresh themselves. Errors come back as `CloudError`, with wording for people.
+  - **Engine:** `Engine` works in the background:
+    - an offline outbox that survives restarts;
+    - edit-lock renewal;
+    - the change feed;
+    - when someone else's version wins, yours is kept as a snapshot.
+  - **Sync my settings** carries appearance, and the keys an app lists in `NcfApp::synced_settings`, between computers.
+  - **Testing:** with `testing`, `cloud::fake::FakeCloud` is an in-memory NativeCloud for tests, and `fake::demo` builds a populated account.
+- `Icon::Cloud`.
+- The gallery has a **Cloud** page. `--cloud signin|signup|code|account|teams|settings|settings-teams` opens one screen on its own.
+
 ## 0.4.0
 
 Launch polish: apps ask about a new version before they open, the splash and updater are shorter, and notices are square readouts.

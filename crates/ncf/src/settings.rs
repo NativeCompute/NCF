@@ -29,11 +29,12 @@ pub struct Look {
     pub check_updates: bool,
     pub debug: bool,
     pub skipped_update: String,
+    pub cloud_sync: bool,
 }
 
 impl Default for Look {
     fn default() -> Self {
-        Look { light_mode: false, animations: true, font_scale: 1.0, splash: true, check_updates: true, debug: false, skipped_update: String::new() }
+        Look { light_mode: false, animations: true, font_scale: 1.0, splash: true, check_updates: true, debug: false, skipped_update: String::new(), cloud_sync: false }
     }
 }
 
@@ -47,6 +48,7 @@ impl Look {
             "check_updates" => self.check_updates = yes(value),
             "debug" => self.debug = yes(value),
             "skipped_update" => self.skipped_update = value.trim().to_string(),
+            "cloud_sync_settings" => self.cloud_sync = yes(value),
             _ => return false,
         }
         true
@@ -55,8 +57,9 @@ impl Look {
     pub fn write(&self) -> String {
         let debug = if self.debug { "debug = yes\n".to_string() } else { String::new() };
         let skipped = if self.skipped_update.trim().is_empty() { String::new() } else { format!("skipped_update = {}\n", self.skipped_update.trim()) };
+        let cloud = if self.cloud_sync { "cloud_sync_settings = yes\n" } else { "" };
         format!(
-            "light_mode = {}\nanimations = {}\nfont_scale = {:.2}\nsplash = {}\ncheck_updates = {}\n{debug}{skipped}",
+            "light_mode = {}\nanimations = {}\nfont_scale = {:.2}\nsplash = {}\ncheck_updates = {}\n{debug}{skipped}{cloud}",
             b(self.light_mode),
             b(self.animations),
             self.font_scale,

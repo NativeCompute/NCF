@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en" class="no-js">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>NCF panel gallery</title>
+  <link rel="icon" href="../brand/app-icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="ncf.css">
+  <link rel="stylesheet" href="ncf-panel.css">
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+  <div class="app" id="app">
+    <button class="side-scrim" type="button" aria-label="Close menu" data-nav-close></button>
+    <aside class="side" aria-label="Sections">
+      <div class="side-head menu-wrap">
+        <button class="switcher" type="button" aria-expanded="false" aria-haspopup="menu" data-menu-toggle="orgs">
+          <span class="avatar" style="--hue: 228">AS</span>
+          <span class="who"><strong>Acme Studio</strong><span class="hud">Studio · 12 people</span></span>
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg>
+        </button>
+        <div class="menu" role="menu" id="orgs" hidden>
+          <button class="menu-item" role="menuitemradio" aria-checked="false" type="button">My cloud</button>
+          <button class="menu-item" role="menuitemradio" aria-checked="true" type="button">Acme Studio</button>
+          <button class="menu-item" role="menuitemradio" aria-checked="false" type="button">Pilot season</button>
+          <div class="menu-sep"></div>
+          <button class="menu-item" role="menuitem" type="button">Create organization</button>
+        </div>
+      </div>
+      <nav class="side-nav">
+        <a class="side-link" href="#overview">Overview</a>
+        <a class="side-link" href="#projects">Projects</a>
+        <a class="side-link" href="#spaces">Spaces</a>
+        <a class="side-link" href="#members" aria-current="page">Members <span class="count">2</span></a>
+        <a class="side-link" href="#plan">Plan and usage</a>
+        <a class="side-link" href="#settings">Settings</a>
+        <div class="side-sep"></div>
+        <p class="side-label">Staff</p>
+        <a class="side-link" href="#staff">Staff console</a>
+      </nav>
+      <div class="side-foot"><div class="person"><span class="avatar" style="--hue: 200">AL</span><span class="who"><strong>Ann Lee</strong><span>ann@example.com</span></span></div></div>
+    </aside>
+    <div>
+      <header class="topbar">
+        <button class="icon-btn nav-btn" type="button" aria-label="Open menu" data-nav-open><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M3 6h14M3 10h14M3 14h14"/></svg></button>
+        <nav class="crumbs" aria-label="Breadcrumb"><a href="#">Acme Studio</a><span class="slash">/</span><span aria-current="page">Members</span></nav>
+        <div class="topbar-actions">
+          <button class="find-btn" type="button">Find anything <kbd>Ctrl</kbd><kbd>K</kbd></button>
+          <button class="btn btn--ghost btn--sm" type="button" data-theme-toggle>Dark / light</button>
+        </div>
+      </header>
+      <main id="main" class="page">
+        <div class="page-head">
+          <div><p class="hud">Acme Studio</p><h1 class="page-title">Members</h1><p class="page-sub">12 of 50 people on Studio.</p></div>
+          <button class="btn btn--primary btn--sm" type="button">Invite people</button>
+        </div>
+
+        <section class="stats" aria-label="Usage">
+          <div class="stat"><span class="hud">People</span><span class="num">12</span><div class="meter" style="--k: 0.24"><div class="meter-bar"></div></div></div>
+          <div class="stat"><span class="hud">Scripts</span><span class="num">4,180</span><div class="meter" data-level="warn" style="--k: 0.84"><div class="meter-bar"></div></div></div>
+          <div class="stat"><span class="hud">Storage</span><span class="num">19.4 GB</span><div class="meter" data-level="full" style="--k: 0.97"><div class="meter-bar"></div></div></div>
+        </section>
+
+        <section class="block">
+          <div class="block-head"><h2>People</h2><span class="state state--signal">2 waiting</span></div>
+          <div class="table-wrap">
+            <table class="table table--stack">
+              <thead><tr><th aria-sort="ascending"><button class="sort" type="button">Name</button></th><th>Role</th><th>Last active</th><th class="act"><span class="sr-only">Actions</span></th></tr></thead>
+              <tbody>
+                <tr><td data-label=""><div class="person"><span class="avatar" style="--hue: 200">AL</span><span class="who"><strong>Ann Lee</strong><span>ann@example.com</span></span></div></td><td data-label="Role"><span class="state">Owner</span></td><td data-label="Last active"><span class="state state--ok">Now</span></td><td class="act" data-label=""></td></tr>
+                <tr aria-selected="true"><td data-label=""><div class="person"><span class="avatar" style="--hue: 300">BI</span><span class="who"><strong>Ben Ito</strong><span>ben@example.com</span></span></div></td><td data-label="Role"><span class="state">Admin</span></td><td data-label="Last active">2 hours ago</td><td class="act" data-label=""><button class="btn btn--quiet btn--sm" type="button">Remove</button></td></tr>
+                <tr><td data-label=""><div class="person"><span class="avatar" style="--hue: 30">CD</span><span class="who"><strong>Cal Diaz</strong><span>cal@example.com</span></span></div></td><td data-label="Role"><span class="state state--warn">Guest</span></td><td data-label="Last active">3 days ago</td><td class="act" data-label=""><button class="btn btn--quiet btn--sm" type="button">Remove</button></td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="pager"><span class="hud">1–3 of 12</span><span class="actions"><button class="btn btn--ghost btn--sm" type="button">Previous</button><button class="btn btn--ghost btn--sm" type="button">Next</button></span></div>
+        </section>
+
+        <div class="grid-2">
+          <section class="block">
+            <div class="block-head"><h2>Loading</h2></div>
+            <div><span class="skeleton skeleton--row"></span><span class="skeleton skeleton--row"></span><span class="skeleton"></span></div>
+          </section>
+          <section class="block">
+            <div class="block-head"><h2>Nothing yet</h2></div>
+            <div class="empty"><h3>No spaces yet</h3><p>A space keeps one show's scripts together. Everyone in the organization can write in it.</p><button class="btn btn--primary btn--sm" type="button">Create a space</button></div>
+          </section>
+        </div>
+
+        <section class="block">
+          <div class="block-head"><h2>Details</h2></div>
+          <dl class="kv"><div><dt>Slug</dt><dd>/o/acme-studio</dd></div><div><dt>Plan</dt><dd>Studio, €79 a month</dd></div><div><dt>Created</dt><dd>7 November 2026</dd></div></dl>
+        </section>
+
+        <section class="danger-zone block">
+          <div class="block-head"><h2>Danger zone</h2></div>
+          <div class="row-action"><div><strong>Delete organization</strong><p class="sec">Its spaces and scripts are deleted for everyone.</p></div><button class="btn btn--danger btn--sm" type="button">Delete</button></div>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <dialog class="palette" id="palette" aria-label="Find anything">
+    <input class="palette-input" placeholder="Jump to an organization, project, person or setting" aria-label="Search">
+    <div class="palette-list" role="listbox">
+      <p class="palette-group">Organizations</p>
+      <button class="palette-item" role="option" aria-selected="true" type="button">Acme Studio <span class="hud">Studio</span></button>
+      <button class="palette-item" role="option" aria-selected="false" type="button">Pilot season <span class="hud">Team</span></button>
+    </div>
+    <div class="palette-foot"><span class="hud"><kbd>↑</kbd> <kbd>↓</kbd> Move</span><span class="hud"><kbd>Enter</kbd> Open</span><span class="hud"><kbd>Esc</kbd> Close</span></div>
+  </dialog>
+
+  <script src="ncf.js"></script>
+  <script>
+    const app = document.getElementById("app");
+    document.querySelectorAll("[data-nav-open]").forEach((b) => b.addEventListener("click", () => app.dataset.nav = "open"));
+    document.querySelectorAll("[data-nav-close]").forEach((b) => b.addEventListener("click", () => delete app.dataset.nav));
+    document.querySelectorAll("[data-menu-toggle]").forEach((b) => b.addEventListener("click", () => {
+      const m = document.getElementById(b.dataset.menuToggle);
+      m.hidden = !m.hidden;
+      b.setAttribute("aria-expanded", String(!m.hidden));
+    }));
+    document.querySelector(".find-btn").addEventListener("click", () => document.getElementById("palette").showModal());
+    document.addEventListener("keydown", (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") { e.preventDefault(); document.getElementById("palette").showModal(); }
+    });
+  </script>
+</body>
+</html>

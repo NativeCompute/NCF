@@ -222,3 +222,33 @@ for cmd in keys::fired(ctx, &keymap, &Cmd::all(), ncf::WEB) { … }
 | `input[type=range]` | Paints the filled part of the track. |
 
 `window.NCF` gives `toast(text, action?)`, `confirm({ title, body, yes, no, danger })` (resolves to true or false), `tray.open(id)` and `tray.close(id)`, `setTheme("dark" | "light")`, `fit()` and `reduceMotion`.
+
+---
+
+## Web panel (`ncf-panel.css`)
+
+Admin panels and dashboards (the NativeCloud panel at cloud.nativecompute.net is the first) load `ncf-panel.css` after `ncf.css`. It adds the B2B panel layout and the data components a site doesn't need. `web/panel.html` shows every one of them in a working shell.
+
+| Class | Is |
+|---|---|
+| `.app` with `.side` and a content column | The shell. The sidebar is fixed at 264 px from 1024 px up; below that it's a drawer opened with `.app[data-nav="open"]`, a `.nav-btn` and a `.side-scrim`. |
+| `.side-head`, `.side-nav`, `.side-link`, `.side-label`, `.side-sep`, `.side-foot` | Sidebar parts. The current link takes `aria-current="page"` and gets a signal rule on its left edge. |
+| `.switcher` with `.menu-wrap` and `.menu` | The organization switcher: a button with an avatar, a name and a HUD line, opening a menu of `.menu-item`s. `aria-checked="true"` marks the current one; `.menu--up` opens upwards (the user menu). |
+| `.topbar`, `.crumbs`, `.topbar-actions`, `.find-btn` | The sticky top bar: breadcrumb in HUD type, and the button that opens the command palette with its keys. |
+| `.page`, `.page-head`, `.page-title`, `.page-sub` | A page: display title (at least 28 px), one line under it, one primary action on the right. |
+| `.block`, `.block-head`, `.grid-2` | A titled group on a page, and two columns of them from 900 px up. |
+| `.stats`, `.stat` | A row of big numbers, each with a HUD label and an optional meter. |
+| `.meter` with `.meter-bar` | A usage bar. Set `--k` from 0 to 1; `data-level="warn"` (80 %) and `"full"` (95 %) change its colour. |
+| `.avatar` (`--sm`, `--lg`), `.avatars`, `.person` | Initials on a circle tinted by `--hue` (0 to 359), the same colours as the app's `view::avatar`. `.avatars` overlaps a few; `.person` is an avatar with a name and a second line. |
+| `.state` (`--ok`, `--signal`, `--warn`, `--danger`) | Status as HUD text after a small square. Never a pill. |
+| `.table-wrap`, `.table`, `.sort`, `.pager` | Data tables: sticky HUD header, `aria-sort` on sortable headers, `aria-selected` rows, `.num-col`, `.act` and `.check-col` cells. Add `.table--stack` and `data-label` on each cell to turn rows into stacked cards below 640 px. |
+| `.list` | A plain bordered list of rows, for short lists that don't need columns. |
+| `.empty` | An empty state: a heading, one sentence and the action that fills it. |
+| `.skeleton`, `.skeleton--row` | Loading placeholders. Still under reduced motion. |
+| `.palette` (a `<dialog>`), `.palette-input`, `.palette-list`, `.palette-group`, `.palette-item`, `.palette-foot` | The command palette (Ctrl or Cmd with K). The highlighted item takes `aria-selected="true"`. |
+| `.auth`, `.auth-top`, `.auth-main`, `.auth-card`, `.auth-foot`, `.or` | Sign-in and sign-up pages: one centred column of 27 rem. |
+| `.code-box`, `.otp` | A code to read or copy, in large mono type, and an input for a 6-digit code. |
+| `.app-ask` | "Sign in to Blackline on Ann's Mac?": the app's mark next to the question. |
+| `.kv` | Label and value rows. |
+| `.danger-zone` with `.row-action` | Destructive actions, each with a sentence saying what goes. |
+| `.script-preview` | A read-only, scrollable view of a script's text. |

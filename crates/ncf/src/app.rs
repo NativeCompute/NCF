@@ -31,6 +31,9 @@ pub trait NcfApp {
     fn on_exit(&mut self, _shell: &mut Shell) {}
     fn about(&mut self, _ui: &mut egui::Ui, _shell: &mut Shell) {}
     fn debug_ui(&mut self, _ui: &mut egui::Ui, _shell: &mut Shell) {}
+    fn synced_settings(&self) -> &'static [&'static str] {
+        &[]
+    }
 }
 
 // shell here---
@@ -50,6 +53,8 @@ pub struct Shell {
     save_due: bool,
     update_rx: Option<Receiver<Status>>,
     extra_settings: Vec<(String, String)>,
+    #[cfg(feature = "cloud")]
+    pub cloud: Option<crate::cloud::Account>,
 }
 
 impl Shell {
@@ -72,7 +77,28 @@ impl Shell {
             save_due: false,
             update_rx: None,
             extra_settings,
+            #[cfg(feature = "cloud")]
+            cloud: None,
         }
+    }
+
+    #[cfg(feature = "cloud")]
+    pub fn enable_cloud(&mut self, ctx: &egui::Context, cfg: crate::cloud::CloudConfig) -> bool {
+        if !cfg.is_set() {
+            return false;
+        }
+        let mut account = crate::cloud::Account::new(self.info, cfg, Some(ctx));
+        account.sync_settings = self.look.cloud_sync;
+        if account.sync_settings && account.signed_in() {
+            account.pull_settings();
+        }
+        self.cloud = Some(account);
+        true
+    }
+
+    #[cfg(feature = "cloud")]
+    pub fn cloud_client(&self) -> Option<crate::cloud::Client> {
+        self.cloud.as_ref().map(|a| a.client())
     }
 
     pub fn folder(&self) -> PathBuf {
@@ -352,6 +378,9 @@ pub fn frame<A: NcfApp>(ctx: &egui::Context, app: &mut A, shell: &mut Shell) {
         }
     }
 
+    #[cfg(feature = "cloud")]
+    cloud_frame(app, shell);
+
     chrome::backdrop(ctx, pal().void);
     chrome::resize_handles(ctx);
 
@@ -388,6 +417,11 @@ pub fn frame<A: NcfApp>(ctx: &egui::Context, app: &mut A, shell: &mut Shell) {
     if let Some(answer) = shell.deck.show(ctx) {
         if answer.action == "ncf-debug-update" {
             shell.update_now(ctx);
+        } else if answer.action.starts_with("ncf-cloud-") {
+            #[cfg(feature = "cloud")]
+            if let Some(a) = shell.cloud.as_mut() {
+                a.answer(&answer.action);
+            }
         } else {
             app.answer(&answer.action, answer.text, shell);
         }
@@ -399,6 +433,55 @@ pub fn frame<A: NcfApp>(ctx: &egui::Context, app: &mut A, shell: &mut Shell) {
         if let Err(e) = platform::write_atomic(&settings_path(&shell.info), text.as_bytes()) {
             shell.warn("Could not save settings", &e.to_string());
         }
+        #[cfg(feature = "cloud")]
+        if let Some(a) = shell.cloud.as_mut() {
+            a.push_settings(&crate::cloud::view::synced_text(&text, app.synced_settings()));
+        }
+    }
+}
+
+#[cfg(feature = "cloud")]
+fn cloud_frame<A: NcfApp>(app: &mut A, shell: &mut Shell) {
+    let Some(a) = shell.cloud.as_mut() else {
+        return;
+    };
+    a.poll();
+    let notices = a.take_notices();
+    let asks = a.take_asks();
+    let urls = a.take_urls();
+    let pulled = a.take_pulled_settings();
+    let sync = a.sync_settings;
+    for (title, body, tone) in notices {
+        shell.deck.say(&title, &body, tone);
+    }
+    for q in asks {
+        shell.ask(&q.title, &q.body, &q.yes, q.danger, &q.action);
+    }
+    for u in urls {
+        match u.strip_prefix("ncf:settings:") {
+            Some(tab) => shell.open_settings(tab),
+            None => platform::open(&u),
+        }
+    }
+    if sync != shell.look.cloud_sync {
+        shell.look.cloud_sync = sync;
+        shell.save_due = true;
+    }
+    if let Some(text) = pulled {
+        let keys = app.synced_settings();
+        let mut look = shell.look.clone();
+        crate::cloud::view::apply_synced(
+            &text,
+            |k, v| {
+                if !look.read(k, v) {
+                    app.read_setting(k, v);
+                }
+            },
+            keys,
+        );
+        shell.look = look;
+        shell.look_dirty = true;
+        shell.save_due = true;
     }
 }
 
@@ -468,6 +551,11 @@ fn settings_window<A: NcfApp>(ctx: &egui::Context, app: &mut A, shell: &mut Shel
     let rect = Rect::from_center_size(screen.center(), size * (0.97 + 0.03 * t));
 
     let mut tabs: Vec<(&str, Icon)> = vec![("Appearance", Icon::Palette)];
+    #[cfg(feature = "cloud")]
+    if shell.cloud.is_some() {
+        tabs.push(("Account", Icon::Cloud));
+        tabs.push(("Organizations", Icon::Users));
+    }
     let extra = app.settings_tabs();
     tabs.extend(extra.iter().copied());
     tabs.push(("About", Icon::Info));
@@ -519,6 +607,18 @@ fn settings_window<A: NcfApp>(ctx: &egui::Context, app: &mut A, shell: &mut Shel
                 match name {
                     "Appearance" => appearance(ui, shell),
                     "About" => about(ui, app, shell),
+                    #[cfg(feature = "cloud")]
+                    "Account" if shell.cloud.is_some() => {
+                        if let Some(a) = shell.cloud.as_mut() {
+                            a.account_ui(ui);
+                        }
+                    }
+                    #[cfg(feature = "cloud")]
+                    "Organizations" if shell.cloud.is_some() => {
+                        if let Some(a) = shell.cloud.as_mut() {
+                            a.orgs_ui(ui);
+                        }
+                    }
                     other => app.settings_ui(other, ui, shell),
                 }
                 ui.add_space(8.0);

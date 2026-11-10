@@ -72,10 +72,11 @@ pub enum Icon {
     SignOut,
     Discord,
     Keyboard,
+    Cloud,
 }
 
 impl Icon {
-    pub const ALL: [Icon; 68] = [
+    pub const ALL: [Icon; 69] = [
         Icon::ChevronRight,
         Icon::ChevronLeft,
         Icon::ChevronDown,
@@ -144,6 +145,7 @@ impl Icon {
         Icon::SignOut,
         Icon::Discord,
         Icon::Keyboard,
+        Icon::Cloud,
     ];
 }
 
@@ -703,6 +705,24 @@ pub fn draw_weighted(
                 seg(p(x - 0.02, 0.51), p(x + 0.02, 0.51));
             }
             seg(p(0.32, 0.62), p(0.68, 0.62));
+        }
+
+        Icon::Cloud => {
+            let mut arc = Vec::new();
+            for i in 0..=8 {
+                let a = std::f32::consts::PI * (0.5 + i as f32 / 8.0);
+                arc.push(p(0.30 + a.cos() * 0.14, 0.64 + a.sin() * 0.14));
+            }
+            for i in 0..=12 {
+                let a = std::f32::consts::PI * (1.05 + 0.95 * i as f32 / 12.0);
+                arc.push(p(0.52 + a.cos() * 0.22, 0.54 + a.sin() * 0.22));
+            }
+            for i in 0..=8 {
+                let a = std::f32::consts::PI * (1.5 + i as f32 / 8.0);
+                arc.push(p(0.72 + a.cos() * 0.14, 0.64 + a.sin() * 0.14));
+            }
+            arc.push(p(0.30, 0.78));
+            line(arc);
         }
 
         Icon::SignOut => {

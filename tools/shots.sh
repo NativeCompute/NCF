@@ -17,7 +17,7 @@ export DISPLAY="$display"
 home="$(mktemp -d)"
 failed=0
 for cast in dark light; do
-  for section in type controls surfaces colour icons marks notices motion; do
+  for section in type controls surfaces colour icons marks notices motion cloud; do
     log="$home/$section-$cast.log"
     XDG_DATA_HOME="$home" HOME="$home" LIBGL_ALWAYS_SOFTWARE=1 "$bin" --"$cast" --no-splash --section "$section" >"$log" 2>&1 &
     pid=$!
