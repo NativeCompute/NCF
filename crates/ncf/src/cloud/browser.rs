@@ -30,16 +30,10 @@ pub fn challenge_of(verifier: &str) -> String {
     base64url(ring::digest::digest(&ring::digest::SHA256, verifier.as_bytes()).as_ref())
 }
 
-fn random(n: usize) -> Vec<u8> {
+fn random(n: usize) -> Option<Vec<u8>> {
     let mut b = vec![0u8; n];
-    if ring::rand::SystemRandom::new().fill(&mut b).is_err() {
-        let seed = super::new_id();
-        let d = ring::digest::digest(&ring::digest::SHA256, format!("{seed}{:?}", Instant::now()).as_bytes());
-        for (i, x) in b.iter_mut().enumerate() {
-            *x = d.as_ref()[i % 32];
-        }
-    }
-    b
+    ring::rand::SystemRandom::new().fill(&mut b).ok()?;
+    Some(b)
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -50,10 +44,14 @@ pub struct Pkce {
 }
 
 impl Pkce {
-    pub fn new() -> Pkce {
-        let verifier = base64url(&random(32));
+    pub fn try_new() -> Option<Pkce> {
+        let verifier = base64url(&random(32)?);
         let challenge = challenge_of(&verifier);
-        Pkce { verifier, challenge, state: base64url(&random(16)) }
+        Some(Pkce { verifier, challenge, state: base64url(&random(16)?) })
+    }
+
+    pub fn new() -> Pkce {
+        Pkce::try_new().expect("the system has no secure random source")
     }
 }
 
@@ -97,7 +95,7 @@ pub fn login_url(cfg: &CloudConfig, app: &str, device: &str, pkce: &Pkce, port: 
 
 impl BrowserSignIn {
     pub fn start(cfg: &CloudConfig, info: &crate::AppInfo, device: &str, signup: bool, wake: impl Fn() + Send + 'static) -> std::io::Result<BrowserSignIn> {
-        let pkce = Pkce::new();
+        let pkce = Pkce::try_new().ok_or_else(|| std::io::Error::other("the system has no secure random source"))?;
         let listener = TcpListener::bind(("127.0.0.1", 0))?;
         listener.set_nonblocking(true)?;
         let port = listener.local_addr()?.port();
@@ -116,7 +114,7 @@ impl BrowserSignIn {
                 }
                 match listener.accept() {
                     Ok((stream, _)) => {
-                        if let Some(cb) = answer(stream, &state, &name) {
+                        if let Some(cb) = answer(stream, &state, &name, &flag) {
                             break cb;
                         }
                     }
@@ -202,13 +200,22 @@ pub fn query_of(target: &str) -> (String, Vec<(String, String)>) {
     (path.to_string(), pairs)
 }
 
-fn read_head(stream: &mut TcpStream) -> Option<String> {
+fn read_head(stream: &mut TcpStream, stop: &AtomicBool) -> Option<String> {
     stream.set_nonblocking(false).ok()?;
-    stream.set_read_timeout(Some(Duration::from_secs(3))).ok()?;
+    let until = Instant::now() + Duration::from_secs(3);
     let mut buf = Vec::new();
     let mut chunk = [0u8; 1024];
     while buf.len() < 8192 {
-        let n = stream.read(&mut chunk).ok()?;
+        let left = until.saturating_duration_since(Instant::now());
+        if left.is_zero() || stop.load(Ordering::Relaxed) {
+            return None;
+        }
+        stream.set_read_timeout(Some(left.min(Duration::from_millis(250)))).ok()?;
+        let n = match stream.read(&mut chunk) {
+            Ok(n) => n,
+            Err(e) if matches!(e.kind(), std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut) => continue,
+            Err(_) => return None,
+        };
         if n == 0 {
             break;
         }
@@ -221,8 +228,8 @@ fn read_head(stream: &mut TcpStream) -> Option<String> {
     text.lines().next().map(str::to_string)
 }
 
-fn answer(mut stream: TcpStream, state: &str, app: &str) -> Option<Callback> {
-    let line = read_head(&mut stream)?;
+fn answer(mut stream: TcpStream, state: &str, app: &str, stop: &AtomicBool) -> Option<Callback> {
+    let line = read_head(&mut stream, stop)?;
     let mut parts = line.split_whitespace();
     let (method, target) = (parts.next().unwrap_or(""), parts.next().unwrap_or(""));
     if method != "GET" {

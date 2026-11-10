@@ -58,9 +58,9 @@ impl CloudConfig {
     }
 
     pub fn with_env(self) -> CloudConfig {
-        let url = std::env::var("NCF_CLOUD_URL").ok().filter(|v| !v.trim().is_empty());
-        let key = std::env::var("NCF_CLOUD_ANON_KEY").ok().filter(|v| !v.trim().is_empty());
-        let web = std::env::var("NCF_CLOUD_WEB_URL").ok().filter(|v| !v.trim().is_empty());
+        let url = std::env::var("NCF_CLOUD_URL").ok().filter(|v| override_ok(v));
+        let key = std::env::var("NCF_CLOUD_ANON_KEY").ok().filter(|v| !v.trim().is_empty() && url.is_some());
+        let web = std::env::var("NCF_CLOUD_WEB_URL").ok().filter(|v| override_ok(v));
         CloudConfig::new(url.as_deref().unwrap_or(&self.url), key.as_deref().unwrap_or(&self.anon_key)).with_web(web.as_deref().unwrap_or(&self.web_url))
     }
 
@@ -76,6 +76,14 @@ impl CloudConfig {
         let path = if path.starts_with('/') { path.to_string() } else { format!("/{path}") };
         format!("{}{}", self.web_url, path)
     }
+}
+
+pub fn override_ok(v: &str) -> bool {
+    let v = v.trim();
+    if v.is_empty() {
+        return false;
+    }
+    cfg!(debug_assertions) || v.starts_with("https://") || v.starts_with("http://127.0.0.1") || v.starts_with("http://localhost")
 }
 
 pub fn time_now_text() -> String {

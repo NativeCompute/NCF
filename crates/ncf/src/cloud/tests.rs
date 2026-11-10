@@ -427,6 +427,41 @@ fn signing_in_through_the_browser() {
 }
 
 #[test]
+fn a_stalled_local_connection_doesnt_block_the_sign_in() {
+    use std::io::Write;
+    let cloud = FakeCloud::new();
+    cloud.add_user("dee@example.com", "Correct1horse", "Dee");
+    let mut a = fake::account_for(INFO, cloud.client(), "Dee's Mac");
+    a.sign_in_with_browser(false);
+    let (port, state, challenge) = (a.sign_in_port().unwrap(), a.sign_in_state().unwrap().to_string(), a.sign_in_challenge().unwrap().to_string());
+    let started = Instant::now();
+    let drip = std::thread::spawn(move || {
+        let mut s = std::net::TcpStream::connect(("127.0.0.1", port)).unwrap();
+        for _ in 0..40 {
+            if s.write_all(b"G").is_err() {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(200));
+        }
+    });
+    std::thread::sleep(Duration::from_millis(100));
+    let code = cloud.approve("dee@example.com", "blackline", "Dee's Mac", &challenge);
+    let page = get(port, &format!("/callback?code={code}&state={state}"));
+    assert!(page.starts_with("HTTP/1.1 200"));
+    assert!(started.elapsed() < Duration::from_secs(6), "the slow connection is dropped after a few seconds");
+    until(&mut a, |a| a.signed_in());
+    let _ = drip.join();
+}
+
+#[test]
+fn environment_overrides_need_https_outside_debug_builds() {
+    assert!(super::override_ok("https://example.supabase.co"));
+    assert!(super::override_ok("http://127.0.0.1:54321"));
+    assert!(!super::override_ok("  "));
+    assert_eq!(super::override_ok("http://evil.example"), cfg!(debug_assertions));
+}
+
+#[test]
 fn the_code_fallback_and_cancelling() {
     let cloud = FakeCloud::new();
     cloud.add_user("eve@example.com", "Correct1horse", "Eve");
