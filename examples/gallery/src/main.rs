@@ -107,7 +107,7 @@ impl NcfApp for Gallery {
         let mut c = ui.new_child(egui::UiBuilder::new().max_rect(pane).layout(Layout::top_down(Align::Min)));
         let (name, _) = SECTIONS[self.section];
         ui::eyebrow(&mut c, &format!("Gallery / {}", if pal().dark { "dark" } else { "light" }));
-        ui::giant_fit(&mut c, &name.to_uppercase(), 46.0, 28.0, pane.width());
+        ui::giant_fit(&mut c, name, 52.0, 28.0, pane.width());
         c.add_space(14.0);
         egui::ScrollArea::vertical().id_salt(("gallery", self.section)).auto_shrink([false, false]).show(&mut c, |ui| {
             ui.set_max_width(ui.available_width() - 18.0);
@@ -273,18 +273,48 @@ impl Gallery {
                 ui::button(ui, "Open the folder", Some(Icon::Folder), false);
             });
         });
-        block(ui, "Cards", "theme::hover_surface(painter, rect, RADIUS, signal, hot, chosen)", |ui| {
+        block(ui, "Cards", "theme::surface(painter, rect, R_LG, Lift::Rest)", |ui| {
             ui.horizontal(|ui| {
+                ui.spacing_mut().item_spacing.x = 14.0;
                 for (i, title) in ["Quarterly plan", "Launch notes", "Field guide"].iter().enumerate() {
-                    let (rect, resp) = ui.allocate_exact_size(Vec2::new(220.0, 108.0), Sense::click());
+                    let (rect, resp) = ui.allocate_exact_size(Vec2::new(220.0, 112.0), Sense::click());
                     let hot = anim::ease(ui.ctx(), resp.id, resp.hovered(), anim::HOVER);
-                    theme::hover_surface(ui.painter(), rect, theme::RADIUS, p.signal, hot, i == 1);
+                    let lift = if hot > 0.5 { theme::Lift::Float } else { theme::Lift::Rest };
+                    theme::surface(ui.painter(), rect, theme::R_LG, lift);
                     let painter = ui.painter();
-                    painter.rect_filled(Rect::from_min_size(rect.min, Vec2::new(rect.width(), 2.0)), egui::Rounding::ZERO, p.group(i));
-                    theme::tracked_text(painter, rect.left_top() + Vec2::new(14.0, 22.0), &format!("ITEM {:02}", i + 1), theme::font_hud(theme::T_MICRO), p.text_3, theme::HUD_TRACKING);
-                    painter.text(rect.left_top() + Vec2::new(14.0, 44.0), egui::Align2::LEFT_CENTER, *title, theme::font_semi(theme::T_BODY), p.text);
-                    painter.text(rect.left_top() + Vec2::new(14.0, 66.0), egui::Align2::LEFT_CENTER, "Edited today", theme::font(theme::T_SM), p.text_2);
+                    painter.circle_filled(rect.left_top() + Vec2::new(24.0, 26.0), 5.0, p.bright(i));
+                    ui::eyebrow_text(painter, rect.left_top() + Vec2::new(36.0, 26.0), &format!("Item {:02}", i + 1), p.text_3);
+                    painter.text(rect.left_top() + Vec2::new(20.0, 56.0), egui::Align2::LEFT_CENTER, *title, theme::font_bold(theme::T_BODY + 1.0), p.text);
+                    painter.text(rect.left_top() + Vec2::new(20.0, 80.0), egui::Align2::LEFT_CENTER, "Edited today", theme::font(theme::T_SM), p.text_2);
                 }
+            });
+        });
+        block(ui, "Tiles", "theme::tile(painter, rect, R_XL, i) · ui::big_number", |ui| {
+            ui.horizontal(|ui| {
+                ui.spacing_mut().item_spacing.x = 14.0;
+                for (i, (label, num, note)) in [("Pages", "112", "across 6 scripts"), ("This session", "1,240", "words written"), ("Goal", "80%", "of 1,500 words"), ("Scenes", "48", "in the library")].iter().enumerate() {
+                    let (rect, _) = ui.allocate_exact_size(Vec2::new(200.0, 150.0), Sense::hover());
+                    theme::tile(ui.painter(), rect, theme::R_XL, i);
+                    let mut c = ui.new_child(egui::UiBuilder::new().max_rect(rect.shrink(22.0)).layout(Layout::top_down(Align::Min)));
+                    let w = ui::eyebrow_width(c.ctx(), label);
+                    let (r, _) = c.allocate_exact_size(Vec2::new(w, 14.0), Sense::hover());
+                    ui::eyebrow_text(c.painter(), r.left_center(), label, theme::wash(p.on_tile, 200));
+                    c.add_space(10.0);
+                    ui::big_number(&mut c, num, 44.0, p.on_tile);
+                    c.label(egui::RichText::new(*note).font(theme::font(theme::T_SM)).color(theme::wash(p.on_tile, 215)));
+                }
+            });
+        });
+        block(ui, "Glass", "ui::pill_bar(ui, |ui| ..) · theme::glass", |ui| {
+            let (rect, _) = ui.allocate_exact_size(Vec2::new(ui.available_width().min(620.0), 96.0), Sense::hover());
+            theme::wallpaper(ui.painter(), rect, theme::R_LG);
+            let mut c = ui.new_child(egui::UiBuilder::new().max_rect(rect.shrink2(Vec2::new(22.0, 26.0))).layout(Layout::left_to_right(Align::Center)));
+            ui::pill_bar(&mut c, |ui| {
+                ui::segmented(ui, &[("Write", Icon::Pencil), ("Cards", Icon::Grid), ("Read", Icon::Book)], 0);
+                ui::rule(ui, 18.0);
+                ui::ribbon_button(ui, Icon::Bold, "", "Bold", false);
+                ui::ribbon_button(ui, Icon::Italic, "", "Italic", false);
+                ui::ribbon_button(ui, Icon::Star, "Starred", "", true);
             });
         });
         block(ui, "Section and separator", "ui::section(ui, label) · ui::separator(ui)", |ui| {
@@ -294,14 +324,14 @@ impl Gallery {
         });
         block(ui, "Focus ring", "theme::focus_ring(painter, rect)", |ui| {
             let (rect, _) = ui.allocate_exact_size(Vec2::new(160.0, 34.0), Sense::hover());
-            ui.painter().rect_filled(rect, egui::Rounding::same(theme::RADIUS), p.panel_2);
+            ui.painter().rect_filled(rect, egui::Rounding::same(rect.height() * 0.5), p.panel_2);
             ui.painter().text(rect.center(), egui::Align2::CENTER_CENTER, "Keyboard focus", theme::font_semi(theme::T_SM), p.text);
-            theme::focus_ring(ui.painter(), rect);
+            theme::focus_ring_r(ui.painter(), rect, rect.height() * 0.5);
         });
         block(ui, "Empty state", "ui::giant + ui::body + ui::button", |ui| {
             theme::panel_box().show(ui, |ui| {
                 ui.set_width(ui.available_width());
-                ui::giant(ui, "NOTHING YET", 26.0);
+                ui::giant(ui, "Nothing yet", 30.0);
                 ui::body(ui, "Make your first item and it shows up here.");
                 ui.add_space(8.0);
                 ui::button(ui, "New item", Some(Icon::Plus), true);
@@ -318,8 +348,8 @@ impl Gallery {
                 for (i, (name, col)) in named.iter().enumerate() {
                     let (rect, _) = ui.allocate_exact_size(Vec2::new(180.0, 54.0), Sense::hover());
                     let chip = Rect::from_min_size(rect.min, Vec2::new(54.0, 54.0));
-                    ui.painter().rect_filled(chip, egui::Rounding::same(theme::RADIUS), *col);
-                    ui.painter().rect_stroke(chip.shrink(0.5), egui::Rounding::same(theme::RADIUS), Stroke::new(1.0_f32, p.line_strong));
+                    ui.painter().rect_filled(chip, egui::Rounding::same(theme::R_SM), *col);
+                    ui.painter().rect_stroke(chip.shrink(0.5), egui::Rounding::same(theme::R_SM), Stroke::new(1.0_f32, p.line));
                     ui.painter().text(Pos2::new(chip.right() + 10.0, rect.top() + 18.0), egui::Align2::LEFT_CENTER, *name, theme::font_semi(theme::T_SM), p.text);
                     let [r, g, b, a] = col.to_srgba_unmultiplied();
                     let hex = if a == 255 { format!("#{r:02x}{g:02x}{b:02x}") } else { format!("#{r:02x}{g:02x}{b:02x}{a:02x}") };
@@ -334,6 +364,16 @@ impl Gallery {
             ui.horizontal(|ui| {
                 for i in 0..6 {
                     ui::swatch(ui, p.group(i), &format!("group {i}"), i == 0, None);
+                }
+            });
+        });
+        block(ui, "Brights", "pal().bright(i) · pal().tile(i) with pal().on_tile", |ui| {
+            ui.horizontal(|ui| {
+                ui.spacing_mut().item_spacing.x = 10.0;
+                for (i, name) in ["Coral", "Lilac", "Sun", "Sky", "Mint", "Rose"].iter().enumerate() {
+                    let (rect, _) = ui.allocate_exact_size(Vec2::new(96.0, 64.0), Sense::hover());
+                    ui.painter().rect_filled(rect, egui::Rounding::same(theme::R_MD), p.bright(i));
+                    ui.painter().text(rect.left_bottom() + Vec2::new(12.0, -14.0), egui::Align2::LEFT_CENTER, *name, theme::font_bold(theme::T_SM), p.on_tile);
                 }
             });
         });
@@ -360,20 +400,21 @@ impl Gallery {
 
     fn marks_page(&mut self, ui: &mut egui::Ui) {
         let p = pal();
-        block(ui, "NativeCompute", "mark::NATIVECOMPUTE.paint(painter, rect)", |ui| {
+        block(ui, "NativeCompute", "mark::NATIVECOMPUTE.paint_glyph(painter, rect)", |ui| {
             let (rect, _) = ui.allocate_exact_size(Vec2::new(ui.available_width(), 120.0), Sense::hover());
-            mark::NATIVECOMPUTE.paint(ui.painter(), Rect::from_min_size(rect.min, Vec2::splat(120.0)));
+            mark::NATIVECOMPUTE.paint_glyph(ui.painter(), Rect::from_min_size(rect.min, Vec2::splat(120.0)));
             ui.painter().text(Pos2::new(rect.left() + 150.0, rect.center().y), egui::Align2::LEFT_CENTER, tokens::BRAND, theme::font_bold(30.0), p.text);
         });
-        block(ui, "App mark", "AppMark { parts: &[slab(..), line(..)] }", |ui| {
+        block(ui, "App icon", "AppMark::drawn(name, &[slab(..), line(..)]).paint(painter, rect)", |ui| {
             let (rect, _) = ui.allocate_exact_size(Vec2::new(ui.available_width(), 128.0), Sense::hover());
             let mut x = rect.left();
             for size in [128.0, 64.0, 32.0, 16.0] {
                 let r = Rect::from_min_size(Pos2::new(x, rect.bottom() - size), Vec2::splat(size));
-                ui.painter().rect_stroke(r, egui::Rounding::ZERO, Stroke::new(1.0_f32, p.line));
                 MARK.paint(ui.painter(), r);
                 x += size + 24.0;
             }
+            let r = Rect::from_min_size(Pos2::new(x + 24.0, rect.bottom() - 128.0), Vec2::splat(128.0));
+            mark::NATIVECOMPUTE.paint(ui.painter(), r);
         });
         block(ui, "Spinner", "mark::spinner(painter, centre, radius, anim::clock(ctx), color)", |ui| {
             let (rect, _) = ui.allocate_exact_size(Vec2::new(60.0, 60.0), Sense::hover());
@@ -470,20 +511,20 @@ impl Gallery {
             }
             ui.add_space(8.0);
             let (track, _) = ui.allocate_exact_size(Vec2::new(ui.available_width().min(520.0), 34.0), Sense::hover());
-            ui.painter().rect_filled(Rect::from_min_size(Pos2::new(track.left(), track.center().y), Vec2::new(track.width(), 1.0)), egui::Rounding::ZERO, p.line_strong);
+            ui.painter().rect_filled(Rect::from_min_size(Pos2::new(track.left(), track.center().y - 1.0), Vec2::new(track.width(), 2.0)), egui::Rounding::same(1.0), p.line_strong);
             for (row, secs) in [(0.0, tokens::MOTION_FAST), (1.0, tokens::MOTION_BASE), (2.0, tokens::MOTION_SLOW)] {
                 let t = anim::ease(ui.ctx(), ("gallery-move", row as i32), self.moved, secs);
                 let x = track.left() + (track.width() - 10.0) * t;
                 let y = track.top() + 6.0 + row * 11.0;
-                ui.painter().rect_filled(Rect::from_min_size(Pos2::new(x, y), Vec2::new(10.0, 6.0)), egui::Rounding::ZERO, p.signal_hi);
+                ui.painter().circle_filled(Pos2::new(x + 5.0, y + 3.0), 4.0, p.signal);
             }
         });
-        block(ui, "Hover wipe", "ui::wipe(painter, rect, t, color)", |ui| {
+        block(ui, "Hover", "theme::mix(rest, hot, anim::ease(..)) over MOTION_QUICK", |ui| {
             let (rect, resp) = ui.allocate_exact_size(Vec2::new(220.0, 40.0), Sense::hover());
-            let t = anim::ease(ui.ctx(), resp.id, resp.hovered(), anim::HOVER);
-            ui.painter().rect_stroke(rect.shrink(0.5), egui::Rounding::same(theme::RADIUS), Stroke::new(1.0_f32, p.line_strong));
-            ui::wipe(ui.painter(), rect, t, p.signal);
-            ui.painter().text(rect.center(), egui::Align2::CENTER_CENTER, "Hover me", theme::font_semi(theme::T_SM), theme::mix(p.text, p.ink, t));
+            let t = anim::ease(ui.ctx(), resp.id, resp.hovered(), tokens::MOTION_QUICK);
+            let r = egui::Rounding::same(rect.height() * 0.5);
+            ui.painter().rect_filled(rect, r, theme::mix(p.signal, p.signal_deep, t));
+            ui.painter().text(rect.center(), egui::Align2::CENTER_CENTER, "Hover me", theme::font_bold(theme::T_SM), p.ink);
         });
         block(ui, "Durations", "tokens::MOTION_*", |ui| {
             for (name, v) in [("fast", tokens::MOTION_FAST), ("quick", tokens::MOTION_QUICK), ("base", tokens::MOTION_BASE), ("slow", tokens::MOTION_SLOW), ("hover", tokens::MOTION_HOVER)] {
