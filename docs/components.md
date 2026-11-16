@@ -24,11 +24,12 @@ brings in `ui`, `theme`, `pal`, `anim`, `Icon`, `AppInfo`, `AppMark`, `slab`, `l
 |---|---|---|---|---|
 | Giant | `ui::giant(ui, "Your items", 46.0)` | `<h1 class="giant"><span class="fit" data-fit>Gallery</span></h1>` | The page or window title. One per screen. | Anything under 26 px, or more than one per screen. |
 | Giant, fitted | `ui::giant_fit(ui, name, 46.0, 28.0, width)` | `data-fit` on a `.fit` span | The title is something a person typed and could be long. | The text is fixed and known to fit. |
-| Eyebrow | `ui::eyebrow(ui, "Ledger / 12 items")` | `<p class="hud">…</p>` above the title | A breadcrumb or count above a giant title. | Sentences. |
+| Eyebrow | `ui::eyebrow(ui, "Continue writing")` | `<p class="eyebrow">…</p>` above the title | The one capitals style: a short label above a tile's title. | Sentences, or anything a person reads twice. |
 | Heading | `ui::heading(ui, "Recent work")` | `<h2 class="h2">`, `<h3 class="h3">` | A section or card title. | The screen title (use giant). |
 | Body | `ui::body(ui, text)` | `<p>`, `<p class="lead">`, `<p class="sec">` | Explanations and descriptions. | Labels on controls. |
 | Caption | `ui::caption(ui, text)` | `<p class="sec">` at `--t-meta` | Metadata under an item: dates, sizes, paths. | Anything a person must read to act. |
-| HUD | `ui::hud(ui, "V0.1.0 / STABLE", None)` | `<span class="hud">` | Versions, counts, keyboard hints, live values. | Running text or anything over one line. |
+| Label | `ui::hud(ui, "Up to date · 0.4.0", None)` | `<span class="hud">` | Versions, counts, live values, in sentence case with figures that line up. | Running text or anything over one line. |
+| Tag | `ui::tag(ui, "Night", Some(1))`, `ui::live_tag(ui, "Live")` | `.tag`, `.tag--night` | A short state on an item: time of day, draft, revision colour, someone in it now. | Actions (use a chip button). |
 | Link | `ui::link(ui, "nativecompute.net")` | `<a class="link">` | Leaving the app or going to another page. | Actions inside the app (use a button). |
 
 Long text inside a fixed width goes through `ui::elide_to_width(ctx, text, font, tracking, width)`. It measures the real glyphs and cuts at a word with an ellipsis. Never cut by character count.
@@ -60,7 +61,7 @@ Long text inside a fixed width goes through `ui::elide_to_width(ctx, text, font,
 | Chip | `ui::chip(ui, "Shared", Some(pal().group(2)))` | `.card-flag` | A tag on an item, in its group colour. |
 | Chip button | `ui::chip_button(ui, "+ Tag")` | n/a | Adding a tag. |
 
-A chip is never decoration on static text. If nothing can be done with it, write it as a HUD readout instead.
+A chip is never decoration on static text. If nothing can be done with it, write it as a label or a tag instead.
 
 ---
 
@@ -125,6 +126,12 @@ if self.open {
 | Card | `theme::surface(painter, rect, theme::R_LG, Lift::Rest)` | `<article class="card">`, `.card--chosen` | An item in a grid a person can open. |
 | Tile | `theme::tile(painter, rect, theme::R_XL, i)` with `ui::big_number` | `.tile--coral`, `--lilac`, `--sun`, `--sky` | The few facts a screen exists to show. Ink text only. |
 | Floating bar | `ui::pill_bar(ui, \|ui\| ..)` | the site header | Tools that float above the content. |
+| Sidebar link | `ui::side_link(ui, Icon::Home, "Home", Some("3"), on)`, `ui::side_section(ui, "Cloud")` | `.side-link` | Places in a glass sidebar. The current one is an inverted pill. |
+| Search trigger | `ui::search_trigger(ui, 380.0, "Search or jump to…", "Ctrl+K")` | `.find-btn` | The title bar's way into the command palette. |
+| Segmented tabs | `ui::seg_tabs(ui, &tabs, current, Some(width))` with `SegTab { label, icon, count, dot }` | `.seg` | Switching views or panels. Given a width, the tabs share it and shrink to fit. |
+| Stat chip | `ui::stat_chip(ui, "117", "words")` | `.stat-chip` | A figure in a status pill. |
+| Select button | `ui::select_button(ui, "Element", "Action")` | `.select` | A dropdown whose current value matters more than its name. |
+| Empty state | `ui::empty_state(ui, Icon::File, title, body, Some("New script"))` | `.empty` | A list or screen with nothing in it yet. Say what will appear and offer the one action. |
 | Section label | `ui::section(ui, "Where things live")` | `<p class="hud">01 / Section</p>` in `.section-head` | Grouping rows in settings or a long page. |
 | Separator | `ui::separator(ui)` | `<hr>` or a hairline border | Between groups of rows. |
 | Spec list | n/a | `<dl class="spec">`, `<dl class="facts">` | Pairs of label and value. |
@@ -136,7 +143,7 @@ if self.open {
 
 ## Notices and confirmation
 
-Notices are pills: a lifted surface with a dot of their tone colour, a HUD label in that colour (DONE, NOTE, WARNING, ERROR) and the message. They stack at the bottom centre and leave on their own. Confirmations are a rounded surface in the centre over a scrim, with a tone dot and eyebrow, the title, the body, and a primary and a ghost button (the primary is the danger pill for anything that deletes); they wait for an answer.
+Notices are pills: a lifted surface with a dot of their tone colour, a label in that colour (Done, Note, Warning, Error) and the message. They stack at the bottom centre and leave on their own. Confirmations are a rounded surface in the centre over a scrim, with a tone dot and eyebrow, the title, the body, and a primary and a ghost button (the primary is the danger pill for anything that deletes); they wait for an answer.
 
 | Component | Rust | Web | Use when |
 |---|---|---|---|

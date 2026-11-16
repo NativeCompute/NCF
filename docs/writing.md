@@ -14,7 +14,7 @@ NativeCompute talks like a capable colleague: direct, plain and calm. It says wh
 ## Case
 
 - Sentence case for buttons, labels, menu items, settings, notices, headings and page titles in running text.
-- Upper case only for display type (giant titles) and HUD readouts. The components set the case for you, so write the text in sentence case and let `ui::giant` and `ui::hud` raise it.
+- Upper case only for eyebrows. Write the text in sentence case and let `ui::eyebrow` raise it; labels, readouts and giant titles stay as written.
 - Product names keep their own case: NativeCompute, Blackline, YouTrack, GitHub.
 
 ## Buttons and menu items
@@ -79,9 +79,9 @@ A giant title that says the state, one line that says how to change it, and the 
 
 The action name, then the shortcut after a middle dot: **Settings · Ctrl+,**, **Close · Esc**, **Hide · Ctrl+I**. No full stops.
 
-## HUD readouts
+## Labels and readouts
 
-Short, factual, separated by a slash with spaces: **V0.1.0 / STABLE**, **LEDGER / 12 ITEMS**, **SETTINGS / DARK**. Use them for versions, counts, breadcrumbs and live values, never for sentences.
+Short and factual, in sentence case, separated by a middle dot: **Up to date · 0.4.0**, **Ledger · 12 items**, **Synced · 2s ago**. Write counts the way you would say them (**3 notes**, **Page 2 of 14**), never padded (**03**). Use them for versions, counts, breadcrumbs and live values, never for sentences.
 
 ## Numbers, time and symbols
 

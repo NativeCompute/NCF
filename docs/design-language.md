@@ -47,9 +47,10 @@ Three families, five roles. All ship with NCF (`crates/ncf/fonts`, `web/fonts`) 
 | Heading | Bricolage Grotesque 800 (text cut), tracking -0.02em | `ui::heading`, `theme::font_heading` | `.h2`, `.h3` | Section and card titles. |
 | UI | Plus Jakarta Sans 600 and 700 | `theme::font_semi`, `theme::font_bold`, buttons, labels | `.btn`, labels | Controls and short labels. |
 | Body | Plus Jakarta Sans 400 | `ui::body`, `theme::font` | `p`, `.lead`, `.sec` | Running text. |
-| HUD | JetBrains Mono 500, upper case, tracking 0.08em | `ui::hud`, `theme::font_hud` | `.hud` | Readouts: versions, counts, paths, keyboard hints. |
+| Label | Plus Jakarta Sans 560 (the label cut), tabular figures, sentence case | `ui::hud`, `theme::font_hud` | `.hud` | Labels and readouts: counts, versions, paths, live values. Figures line up in columns. |
+| Mono | JetBrains Mono 500 | `theme::font_mono`, `keys::keycap` | `code`, `.kbd` | Keycaps and code only. |
 
-Eyebrows (`ui::eyebrow`, `ui::section`) are Plus Jakarta Sans 700 in upper case, tracked wide, in `text-3`.
+Eyebrows (`ui::eyebrow`) are Plus Jakarta Sans 700 in upper case at 0.06em, in `text-3`. They are the only capitals in the interface: *Continue writing*, *Next deadline*, and the group headings `ui::section` draws.
 
 Desktop sizes (`theme::T_*`): title 26, heading 17, body 14.5, small 13, label 12, caption 11, micro 10. Web sizes are a 1.2 ratio scale from `--t-meta` (0.75rem) to `--t-5` (2.488rem), and giant type is fitted to its container with `data-fit`.
 

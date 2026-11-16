@@ -93,7 +93,7 @@ impl NcfApp for Gallery {
         let full = ui.available_rect_before_wrap();
         let nav = Rect::from_min_size(full.min + Vec2::new(0.0, 12.0), Vec2::new(196.0, full.height() - 12.0));
         let mut n = ui.new_child(egui::UiBuilder::new().max_rect(nav).layout(Layout::top_down(Align::Min)));
-        ui::eyebrow(&mut n, &format!("NCF / V{}", ncf::VERSION));
+        ui::eyebrow(&mut n, &format!("NCF {}", ncf::VERSION));
         n.add_space(10.0);
         if let Some(k) = ui::vertical_tabs(&mut n, &SECTIONS, self.section) {
             self.section = k;
@@ -106,7 +106,7 @@ impl NcfApp for Gallery {
         let pane = Rect::from_min_max(Pos2::new(nav.right() + 28.0, full.top() + 12.0), full.max);
         let mut c = ui.new_child(egui::UiBuilder::new().max_rect(pane).layout(Layout::top_down(Align::Min)));
         let (name, _) = SECTIONS[self.section];
-        ui::eyebrow(&mut c, &format!("Gallery / {}", if pal().dark { "dark" } else { "light" }));
+        ui::eyebrow(&mut c, &format!("Gallery · {}", if pal().dark { "dark" } else { "light" }));
         ui::giant_fit(&mut c, name, 52.0, 28.0, pane.width());
         c.add_space(14.0);
         egui::ScrollArea::vertical().id_salt(("gallery", self.section)).auto_shrink([false, false]).show(&mut c, |ui| {
@@ -145,7 +145,7 @@ impl Gallery {
             ui::giant(ui, "NATIVECOMPUTE", 54.0);
         });
         block(ui, "Eyebrow", "ui::eyebrow(ui, text)", |ui| {
-            ui::eyebrow(ui, "Ledger / 12 items");
+            ui::eyebrow(ui, "Continue writing");
         });
         block(ui, "Heading", "ui::heading(ui, text)", |ui| {
             ui::heading(ui, "Recent work");
@@ -156,11 +156,13 @@ impl Gallery {
         block(ui, "Caption", "ui::caption(ui, text)", |ui| {
             ui::caption(ui, "Saved 2 minutes ago · 14 KB");
         });
-        block(ui, "HUD", "ui::hud(ui, text, None)", |ui| {
+        block(ui, "Label", "ui::hud(ui, text, None)", |ui| {
             ui.horizontal(|ui| {
-                ui::hud(ui, "V0.1.0 / STABLE", None);
+                ui::hud(ui, &format!("Up to date · {}", ncf::VERSION), None);
                 ui.add_space(16.0);
-                ui::hud(ui, "SIGNAL", Some(pal().signal_hi));
+                ui::hud(ui, "Synced · 2s ago", Some(pal().signal_hi));
+                ui.add_space(16.0);
+                ui::hud(ui, "1,240 · 0,987 · 2,016", None);
             });
         });
         block(ui, "Scale", "theme::T_TITLE … T_MICRO", |ui| {
@@ -224,6 +226,34 @@ impl Gallery {
             ui.set_max_width(420.0);
             ui::slider(ui, &mut self.level, 0.0..=1.0);
         });
+        block(ui, "Tags", "ui::tag(ui, text, tone) · ui::live_tag", |ui| {
+            ui.horizontal(|ui| {
+                ui::tag(ui, "Night", Some(1));
+                ui::tag(ui, "Day", Some(2));
+                ui::tag(ui, "Dawn", Some(0));
+                ui::tag(ui, "Draft 2", None);
+                ui::live_tag(ui, "Live");
+            });
+        });
+        block(ui, "Select and stat chips", "ui::select_button · ui::stat_chip", |ui| {
+            ui.horizontal(|ui| {
+                ui::select_button(ui, "Element", "Action");
+                ui.add_space(12.0);
+                ui::stat_chip(ui, "1", "page");
+                ui::stat_chip(ui, "117", "words");
+            });
+        });
+        block(ui, "Segmented tabs", "ui::seg_tabs(ui, &tabs, current, Some(width))", |ui| {
+            let tabs = [
+                ui::SegTab { label: "Scenes", icon: None, count: None, dot: false },
+                ui::SegTab { label: "Notes", icon: None, count: Some(3), dot: false },
+                ui::SegTab { label: "Changes", icon: None, count: None, dot: true },
+                ui::SegTab { label: "Cast", icon: None, count: None, dot: false },
+            ];
+            if let Some(k) = ui::seg_tabs(ui, &tabs, self.seg.min(3), Some(320.0)) {
+                self.seg = k;
+            }
+        });
         block(ui, "Segmented and tabs", "ui::segmented · ui::tabs", |ui| {
             if let Some(k) = ui::segmented(ui, &[("Grid", Icon::Grid), ("List", Icon::List), ("Graph", Icon::Graph)], self.seg) {
                 self.seg = k;
@@ -283,7 +313,7 @@ impl Gallery {
                     theme::surface(ui.painter(), rect, theme::R_LG, lift);
                     let painter = ui.painter();
                     painter.circle_filled(rect.left_top() + Vec2::new(24.0, 26.0), 5.0, p.bright(i));
-                    ui::eyebrow_text(painter, rect.left_top() + Vec2::new(36.0, 26.0), &format!("Item {:02}", i + 1), p.text_3);
+                    ui::eyebrow_text(painter, rect.left_top() + Vec2::new(36.0, 26.0), &format!("Item {}", i + 1), p.text_3);
                     painter.text(rect.left_top() + Vec2::new(20.0, 56.0), egui::Align2::LEFT_CENTER, *title, theme::font_bold(theme::T_BODY + 1.0), p.text);
                     painter.text(rect.left_top() + Vec2::new(20.0, 80.0), egui::Align2::LEFT_CENTER, "Edited today", theme::font(theme::T_SM), p.text_2);
                 }
@@ -317,6 +347,23 @@ impl Gallery {
                 ui::ribbon_button(ui, Icon::Star, "Starred", "", true);
             });
         });
+        block(ui, "Glass sidebar", "ui::side_link · ui::side_section · ui::search_trigger", |ui| {
+            let (rect, _) = ui.allocate_exact_size(Vec2::new(ui.available_width().min(620.0), 220.0), Sense::hover());
+            theme::wallpaper(ui.painter(), rect, theme::R_LG);
+            let side = Rect::from_min_size(rect.min + Vec2::new(16.0, 16.0), Vec2::new(220.0, rect.height() - 32.0));
+            ui.painter().rect_filled(side, egui::Rounding::same(theme::R_LG), p.glass);
+            ui.painter().rect_stroke(side.shrink(0.5), egui::Rounding::same(theme::R_LG), egui::Stroke::new(1.0_f32, p.glass_line));
+            theme::glass_highlight(ui.painter(), side, theme::R_LG);
+            let mut c = ui.new_child(egui::UiBuilder::new().max_rect(side.shrink(10.0)).layout(Layout::top_down(Align::Min)));
+            ui::side_link(&mut c, Icon::Home, "Home", None, false);
+            ui::side_link(&mut c, Icon::File, "Crossfire", Some("open"), true);
+            ui::side_link(&mut c, Icon::Star, "Starred", Some("3"), false);
+            ui::side_section(&mut c, "Cloud");
+            ui::side_link(&mut c, Icon::Cloud, "My cloud", None, false);
+            let mut t = ui.new_child(egui::UiBuilder::new().max_rect(Rect::from_min_max(Pos2::new(side.right() + 20.0, side.top()), Pos2::new(rect.right() - 16.0, side.top() + 40.0))).layout(Layout::left_to_right(Align::Center)));
+            let w = t.available_width().min(340.0);
+            ui::search_trigger(&mut t, w, "Search or jump to…", &format!("{}+K", ncf::OS.command_key()));
+        });
         block(ui, "Section and separator", "ui::section(ui, label) · ui::separator(ui)", |ui| {
             ui::section(ui, "Motion");
             ui::caption(ui, "A section label groups the rows under it.");
@@ -328,14 +375,8 @@ impl Gallery {
             ui.painter().text(rect.center(), egui::Align2::CENTER_CENTER, "Keyboard focus", theme::font_semi(theme::T_SM), p.text);
             theme::focus_ring_r(ui.painter(), rect, rect.height() * 0.5);
         });
-        block(ui, "Empty state", "ui::giant + ui::body + ui::button", |ui| {
-            theme::panel_box().show(ui, |ui| {
-                ui.set_width(ui.available_width());
-                ui::giant(ui, "Nothing yet", 30.0);
-                ui::body(ui, "Make your first item and it shows up here.");
-                ui.add_space(8.0);
-                ui::button(ui, "New item", Some(Icon::Plus), true);
-            });
+        block(ui, "Empty state", "ui::empty_state(ui, icon, title, body, action)", |ui| {
+            ui::empty_state(ui, Icon::File, "Nothing here yet", "Make your first item and it shows up here.", Some("New item"));
         });
     }
 

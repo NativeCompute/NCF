@@ -4,7 +4,7 @@ Screens NativeCompute has already solved. Start from these before designing anyt
 
 ## Page header: eyebrow, giant title, primary action
 
-Every main screen opens the same way: a HUD breadcrumb, a giant title that fits its space, and the one primary action on the right.
+Every main screen opens the same way: a label breadcrumb, a giant title that fits its space, and the one primary action on the right.
 
 ```rust
 let w = ui.available_width().min(1100.0);
@@ -70,7 +70,7 @@ for row in shown.chunks(cols) {
                 font,
                 p.text,
             );
-            theme::tracked_text(&clip, Pos2::new(rect.left() + 16.0, rect.bottom() - 22.0), &format!("ITEM {:02}", i + 1), theme::font_hud(theme::T_MICRO + 0.5), p.text_3, theme::HUD_TRACKING);
+            theme::tracked_text(&clip, Pos2::new(rect.left() + 16.0, rect.bottom() - 22.0), &format!("Item {}", i + 1), theme::font_hud(theme::T_MICRO + 0.5), p.text_3, theme::HUD_TRACKING);
         }
     });
     ui.add_space(gap);
@@ -79,7 +79,7 @@ for row in shown.chunks(cols) {
 
 - Columns come from the width, so the grid reflows when the window or the interface size changes.
 - The title is measured with `elide_to_width` and the painter is clipped to the card, so nothing ever spills out. Leave room on the right for the hover actions.
-- Secondary facts go at the foot in HUD type.
+- Secondary facts go at the foot in label type.
 - Actions such as delete appear on hover in the top right, as a 24 px icon button.
 
 ## Confirm before delete

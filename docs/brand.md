@@ -69,7 +69,7 @@ What one mark gives you:
 
 ## Maker line
 
-Every app says who made it, quietly, at the foot of its main screen: **LEDGER BY** in HUD type, then the NativeCompute logo, linking to nativecompute.net. `ui::maker_line(ui, rect, centred, "Ledger")` draws it and returns true when clicked. Web pages use `<a class="maker" href="https://nativecompute.net">Built with NCF by NativeCompute</a>` in the footer.
+Every app says who made it, quietly, at the foot of its main screen: **Ledger by** in label type, then the NativeCompute logo, linking to nativecompute.net. `ui::maker_line(ui, rect, centred, "Ledger")` draws it and returns true when clicked. Web pages use `<a class="maker" href="https://nativecompute.net">Built with NCF by NativeCompute</a>` in the footer.
 
 The splash carries the same line: **BY** + logo. Settings → About shows the logo under *Made by*, and the updater window shows it in its top-right corner. The name never appears as plain type in an app; every logo opens nativecompute.net when clicked.
 

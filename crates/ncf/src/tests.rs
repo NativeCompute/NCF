@@ -884,3 +884,33 @@ fn surfaces_cast_soft_shadows_and_selection_reads() {
     }
     theme::set_palette(true);
 }
+
+#[test]
+fn segmented_tabs_share_the_width_they_are_given() {
+    let _g = lock();
+    let mut h = Harness::new(1000.0, 800.0);
+    theme::set_palette(true);
+    theme::apply(&h.ctx);
+    let tabs = [
+        ui::SegTab { label: "Scenes", icon: None, count: None, dot: false },
+        ui::SegTab { label: "Notes", icon: None, count: Some(12), dot: false },
+        ui::SegTab { label: "Changes", icon: None, count: None, dot: true },
+        ui::SegTab { label: "Cast", icon: None, count: None, dot: false },
+    ];
+    let mut sizes = Vec::new();
+    h.frames(2, |ctx| {
+        sizes.clear();
+        egui::CentralPanel::default().show(ctx, |ui| {
+            for w in [300.0, 520.0] {
+                let got = ui.scope(|ui| {
+                    ui::seg_tabs(ui, &tabs, 1, Some(w));
+                    ui.min_rect().width()
+                });
+                sizes.push((w, got.inner));
+            }
+        });
+    });
+    for (w, got) in sizes {
+        assert!(got <= w + 0.5, "{got} spills past {w}");
+    }
+}

@@ -905,12 +905,14 @@ pub fn seg_tabs(ui: &mut egui::Ui, tabs: &[SegTab], current: usize, width: Optio
     let extra = |t: &SegTab| -> f32 {
         (if t.icon.is_some() { 22.0 } else { 0.0 }) + if t.count.is_some() { 26.0 } else if t.dot { 12.0 } else { 0.0 }
     };
-    let natural: Vec<f32> = tabs.iter().map(|t| theme::tracked_width(ui.ctx(), t.label, font.clone(), 0.0) + extra(t) + 30.0).collect();
+    let content: Vec<f32> = tabs.iter().map(|t| theme::tracked_width(ui.ctx(), t.label, font.clone(), 0.0) + extra(t)).collect();
     let pad = 4.0;
     let h = 38.0;
-    let total_natural: f32 = natural.iter().sum::<f32>() + pad * 2.0;
-    let total = width.unwrap_or(total_natural).max(total_natural);
-    let scale = (total - pad * 2.0) / (total_natural - pad * 2.0).max(1.0);
+    let snug: f32 = content.iter().sum::<f32>() + 14.0 * tabs.len() as f32 + pad * 2.0;
+    let natural_total: f32 = content.iter().sum::<f32>() + 30.0 * tabs.len() as f32 + pad * 2.0;
+    let total = width.unwrap_or(natural_total).max(snug);
+    let spare = (total - pad * 2.0 - content.iter().sum::<f32>()) / tabs.len().max(1) as f32;
+    let widths: Vec<f32> = content.iter().map(|c| c + spare).collect();
     let (rect, _) = ui.allocate_exact_size(Vec2::new(total, h), Sense::hover());
     let r = h * 0.5;
     ui.painter().rect_filled(rect, egui::Rounding::same(r), p.glass);
@@ -920,7 +922,7 @@ pub fn seg_tabs(ui: &mut egui::Ui, tabs: &[SegTab], current: usize, width: Optio
     let mut x = rect.left() + pad;
     let mut picked = None;
     for (i, t) in tabs.iter().enumerate() {
-        let w = natural[i] * scale;
+        let w = widths[i];
         let cell = Rect::from_min_size(Pos2::new(x, rect.top() + pad), Vec2::new(w, h - pad * 2.0));
         x += w;
         let resp = ui.interact(cell, ui.id().with(("ncf-segtab", i)), Sense::click());
@@ -930,8 +932,7 @@ pub fn seg_tabs(ui: &mut egui::Ui, tabs: &[SegTab], current: usize, width: Optio
         }
         let rest = if resp.hovered() { p.text } else { p.text_2 };
         let ink = theme::mix(rest, sel_ink, lit);
-        let content = theme::tracked_width(ui.ctx(), t.label, font.clone(), 0.0) + extra(t);
-        let mut cx = cell.center().x - content * 0.5;
+        let mut cx = cell.center().x - content[i] * 0.5;
         if let Some(icon) = t.icon {
             icons::draw(ui.painter(), Rect::from_center_size(Pos2::new(cx + 7.0, cell.center().y), Vec2::splat(14.0)), icon, ink);
             cx += 22.0;

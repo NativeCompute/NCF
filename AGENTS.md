@@ -39,7 +39,8 @@ New app? Follow [`.claude/skills/ncf-app/SKILL.md`](.claude/skills/ncf-app/SKILL
 - The window background is the wallpaper (`chrome::backdrop`). The dark cast adds a coral glow in the top-left corner, the same glow as the app icon.
 - Display type is Bricolage Grotesque 800, sentence case, tracked -0.045em, for page titles, big numbers and giant words, 26 px and up. Headings below that use the heading cut of the same face.
 - UI and body text are Plus Jakarta Sans (600 for controls, 400 for running text).
-- HUD readouts are JetBrains Mono 500, upper case, tracked 0.08em, in `text-2` or `text-3`. Eyebrows (`ui::eyebrow`, `ui::section`) are Jakarta 700, upper case.
+- Labels and readouts (`ui::hud`, `theme::font_hud`) are the Plus Jakarta Sans label cut: weight 560, tabular figures, sentence case, no tracking, in `text-2` or `text-3`. Eyebrows (`ui::eyebrow`, and `ui::section` for group headings) are Jakarta 700 in upper case at 0.06em, and they are the only capitals in the interface. JetBrains Mono is for keycaps and code only.
+- Glass is for chrome that floats (sidebars, toolbar and status pills, the search trigger, segmented tabs). Anything a person reads or works on is a solid tile.
 - Sentence case for buttons, labels and body copy. Verbs first on buttons.
 - Every interactive element has a focus ring: 2 px `focus` (ink in light, white in dark), offset 2 px, following the element's corners.
 - Hit targets are at least 28 px in the desktop app and 44 px on the web.
