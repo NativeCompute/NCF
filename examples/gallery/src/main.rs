@@ -5,10 +5,7 @@ use ncf::tokens;
 
 use egui::{Align, Layout, Pos2, Rect, Sense, Stroke, Vec2};
 
-pub const MARK: AppMark = AppMark {
-    name: "Gallery",
-    parts: &[slab((0.24, 0.83), (0.46, 0.17)), line((0.56, 0.83), (0.78, 0.17)), line((0.7, 0.83), (0.92, 0.17))],
-};
+pub const MARK: AppMark = AppMark::drawn("Gallery", &[slab((0.24, 0.83), (0.46, 0.17)), line((0.56, 0.83), (0.78, 0.17)), line((0.7, 0.83), (0.92, 0.17))]);
 
 pub const INFO: AppInfo = AppInfo {
     name: "NCF Gallery",

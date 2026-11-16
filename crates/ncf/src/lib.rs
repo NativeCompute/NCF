@@ -5,6 +5,7 @@ pub mod bundle;
 pub mod caret;
 pub mod chrome;
 pub mod debug;
+pub mod icon;
 pub mod icons;
 pub mod keys;
 pub mod mark;

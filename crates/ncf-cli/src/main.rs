@@ -98,10 +98,7 @@ pub fn fill(text: &str, plan: &Plan) -> String {
         .replace("__TAGLINE__", &plan.tagline)
 }
 
-pub const DEFAULT_MARK: AppMark = AppMark {
-    name: "app",
-    parts: &[slab((0.27, 0.83), (0.49, 0.17)), line((0.585, 0.83), (0.805, 0.17))],
-};
+pub const DEFAULT_MARK: AppMark = AppMark::drawn("app", &[slab((0.27, 0.83), (0.49, 0.17)), line((0.585, 0.83), (0.805, 0.17))]);
 
 pub fn write_app(dir: &Path, plan: &Plan) -> Result<(), String> {
     if dir.exists() && dir.read_dir().map(|mut d| d.next().is_some()).unwrap_or(false) {
@@ -114,7 +111,7 @@ pub fn write_app(dir: &Path, plan: &Plan) -> Result<(), String> {
         }
         std::fs::write(&dest, fill(text, plan)).map_err(|e| format!("{}: {e}", dest.display()))?;
     }
-    let mark = AppMark { name: "app", parts: DEFAULT_MARK.parts };
+    let mark = DEFAULT_MARK;
     std::fs::write(dir.join(format!("packaging/{}.svg", plan.slug)), mark.svg().replace("<title>app</title>", &format!("<title>{}</title>", plan.name)))
         .map_err(|e| e.to_string())?;
     std::fs::write(dir.join(format!("packaging/{}.ico", plan.slug)), mark.ico()).map_err(|e| e.to_string())?;

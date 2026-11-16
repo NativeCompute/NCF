@@ -126,33 +126,77 @@ fn text_is_cut_to_its_measured_width() {
     });
 }
 
-const TEST_MARK: AppMark = AppMark {
-    name: "Test",
-    parts: &[
+const TEST_MARK: AppMark = AppMark::drawn(
+    "Test",
+    &[
         mark::Part::Capsule { from: (0.27, 0.83), to: (0.49, 0.17), width: mark::SLAB, ink: mark::Ink::Chrome },
         mark::Part::Capsule { from: (0.585, 0.83), to: (0.805, 0.17), width: mark::LINE, ink: mark::Ink::Signal },
     ],
-};
+);
+
+fn px_at(px: &[u8], n: u32, x: u32, y: u32) -> [u8; 4] {
+    let i = ((y * n + x) * 4) as usize;
+    [px[i], px[i + 1], px[i + 2], px[i + 3]]
+}
 
 #[test]
-fn an_app_mark_becomes_svg_pixels_and_an_ico() {
+fn an_app_mark_sits_on_the_bento_tile() {
     let svg = TEST_MARK.svg();
     assert!(svg.starts_with("<svg"));
     assert_eq!(svg.matches("<polygon").count(), 2);
-    assert!(svg.contains("#FF6A3D"));
-    let n = 64u32;
+    assert!(svg.contains("radialGradient") && svg.contains("#131318"));
+    let n = 128u32;
     let px = TEST_MARK.rgba(n);
-    let at = |x: u32, y: u32| {
-        let i = ((y * n + x) * 4) as usize;
-        [px[i], px[i + 1], px[i + 2], px[i + 3]]
-    };
-    assert_eq!(at(0, 0)[3], 0, "rounded tile corner");
-    assert_eq!(at(4, 32), [0, 0, 0, 255], "black tile");
-    assert_eq!(at(26, 32), [0xF3, 0xF3, 0xF6, 255], "chrome slab");
-    assert_eq!(at(42, 32), [0xFF, 0x6A, 0x3D, 255], "signal line");
+    assert_eq!(px_at(&px, n, 0, 0)[3], 0, "rounded tile corner");
+    let warm = px_at(&px, n, 12, 12);
+    assert!(warm[0] > 150 && warm[0] > warm[1] && warm[1] > warm[2], "coral glow in the top-left: {warm:?}");
+    let ink = px_at(&px, n, 118, 118);
+    assert!(ink.iter().take(3).zip([0x13u8, 0x13, 0x18]).all(|(a, b)| (*a as i32 - b as i32).abs() <= 6), "ink tile: {ink:?}");
     let ico = TEST_MARK.ico();
     assert_eq!(&ico[..4], &[0, 0, 1, 0]);
     assert_eq!(u16::from_le_bytes([ico[4], ico[5]]), 6);
+    let icns = TEST_MARK.icns();
+    assert_eq!(&icns[..4], b"icns");
+    assert_eq!(TEST_MARK.rgba(64), TEST_MARK.rgba(64), "the same pixels every time");
+}
+
+#[test]
+fn a_raster_mark_is_centred_and_padded_for_the_mac() {
+    let mut rgba = Vec::new();
+    for _ in 0..(40 * 20) {
+        rgba.extend_from_slice(&[255, 255, 255, 255]);
+    }
+    let png: &'static [u8] = Box::leak(crate::icon::png_bytes(&rgba, 40, 20).into_boxed_slice());
+    let m = AppMark::raster("Raster", png);
+    let n = 256u32;
+    let px = m.rgba(n);
+    let (mut lo, mut hi) = (n, 0);
+    for x in 0..n {
+        let c = px_at(&px, n, x, n / 2);
+        if c[0] > 200 && c[1] > 200 && c[2] > 200 {
+            lo = lo.min(x);
+            hi = hi.max(x);
+        }
+    }
+    let width = (hi - lo + 1) as f32;
+    assert!((width - n as f32 * crate::icon::BENTO_TILE.mark).abs() <= 2.0, "mark is {width}px wide");
+    assert!((((lo + hi) as f32 * 0.5) - n as f32 * 0.5).abs() <= 1.0, "and centred");
+    let padded = crate::icon::decode_png(&m.png_padded(1024)).unwrap();
+    assert_eq!((padded.width, padded.height), (1024, 1024));
+    assert_eq!(padded.at(50, 50)[3], 0.0, "macOS icons keep a clear margin");
+    assert!(padded.at(512, 1024 - 92)[3] > 0.0, "with a soft shadow under the tile");
+    assert!(m.svg().contains("data:image/png;base64,"));
+    let back = crate::icon::decode_png(&m.png(32)).unwrap();
+    assert_eq!((back.width, back.height), (32, 32));
+}
+
+#[test]
+fn base64_matches_the_standard_alphabet() {
+    assert_eq!(crate::icon::base64(b""), "");
+    assert_eq!(crate::icon::base64(b"f"), "Zg==");
+    assert_eq!(crate::icon::base64(b"fo"), "Zm8=");
+    assert_eq!(crate::icon::base64(b"foo"), "Zm9v");
+    assert_eq!(crate::icon::base64(&[0xfb, 0xff]), "+/8=");
 }
 
 #[test]
@@ -419,7 +463,7 @@ fn the_updater_window_draws_every_step_in_both_casts() {
         headless: false,
         reopen: false,
     };
-    let info = crate::AppInfo { name: "Field Notes", id: "net.nativecompute.fieldnotes", version: "1.3.0", tagline: "", repo: "NativeCompute/field-notes", mark: crate::mark::AppMark { name: "Field Notes", parts: &[] } };
+    let info = crate::AppInfo { name: "Field Notes", id: "net.nativecompute.fieldnotes", version: "1.3.0", tagline: "", repo: "NativeCompute/field-notes", mark: crate::mark::AppMark::drawn("Field Notes", &[]) };
     for dark in [true, false] {
         theme::set_palette(dark);
         let mut h = Harness::new(540.0, 340.0);

@@ -3,6 +3,7 @@ use std::sync::Mutex;
 
 use eframe::egui::{self, Color32, Mesh, Pos2, Rect, Stroke, Vec2};
 
+use crate::icon::{self, Frame, Image, Tile};
 use crate::theme::{self, pal};
 use crate::tokens;
 
@@ -22,20 +23,29 @@ pub enum Part {
 }
 
 #[derive(Clone, Copy, Debug)]
-pub struct AppMark {
-    pub name: &'static str,
-    pub parts: &'static [Part],
+pub enum Glyph {
+    Parts(&'static [Part]),
+    Png(&'static [u8]),
 }
 
-pub const NATIVECOMPUTE: AppMark = AppMark {
-    name: "NativeCompute",
-    parts: &[
+#[derive(Clone, Copy, Debug)]
+pub struct AppMark {
+    pub name: &'static str,
+    pub glyph: Glyph,
+    pub tile: Tile,
+}
+
+pub const DRAWN_TILE: Tile = Tile { mark: 400.0 / 512.0, ..crate::icon::BENTO_TILE };
+
+pub const NATIVECOMPUTE: AppMark = AppMark::drawn(
+    "NativeCompute",
+    &[
         Part::Polygon { points: crate::brand::SLABS[0], ink: Ink::Text },
         Part::Polygon { points: crate::brand::SLABS[1], ink: Ink::Text },
         Part::Polygon { points: crate::brand::SLABS[2], ink: Ink::Text },
         Part::Polygon { points: crate::brand::SLABS[3], ink: Ink::Text },
     ],
-};
+);
 
 pub const SLAB: f32 = 0.21;
 pub const LINE: f32 = 0.075;
@@ -67,11 +77,26 @@ fn capsule(a: Pos2, b: Pos2, w: f32) -> Vec<Pos2> {
 }
 
 impl AppMark {
+    pub const fn drawn(name: &'static str, parts: &'static [Part]) -> AppMark {
+        AppMark { name, glyph: Glyph::Parts(parts), tile: DRAWN_TILE }
+    }
+
+    pub const fn raster(name: &'static str, png: &'static [u8]) -> AppMark {
+        AppMark { name, glyph: Glyph::Png(png), tile: crate::icon::BENTO_TILE }
+    }
+
+    pub fn parts(&self) -> &'static [Part] {
+        match self.glyph {
+            Glyph::Parts(p) => p,
+            Glyph::Png(_) => &[],
+        }
+    }
+
     pub fn outlines(&self, rect: Rect) -> Vec<(Vec<Pos2>, Ink, bool)> {
         let side = rect.width().min(rect.height());
         let origin = rect.center() - Vec2::splat(side * 0.5);
         let at = |(x, y): (f32, f32)| origin + Vec2::new(x * side, y * side);
-        self.parts
+        self.parts()
             .iter()
             .map(|part| match *part {
                 Part::Capsule { from, to, width, ink } => (capsule(at(from), at(to), width * side), ink, true),
@@ -81,6 +106,25 @@ impl AppMark {
     }
 
     pub fn paint(&self, painter: &egui::Painter, rect: Rect) {
+        let side = rect.width().min(rect.height());
+        if side < 4.0 {
+            return;
+        }
+        let ctx = painter.ctx();
+        let px = (side * ctx.pixels_per_point()).round().clamp(8.0, 1024.0) as u32;
+        let id = egui::Id::new(("ncf-mark", self.name, px));
+        let tex: Option<egui::TextureHandle> = ctx.data(|d| d.get_temp(id));
+        let tex = tex.unwrap_or_else(|| {
+            let img = egui::ColorImage::from_rgba_unmultiplied([px as usize, px as usize], &self.rgba(px));
+            let t = ctx.load_texture(format!("ncf-mark-{}-{px}", self.name), img, egui::TextureOptions::LINEAR);
+            ctx.data_mut(|d| d.insert_temp(id, t.clone()));
+            t
+        });
+        let at = Rect::from_center_size(rect.center(), Vec2::splat(side));
+        painter.image(tex.id(), at, Rect::from_min_max(Pos2::ZERO, Pos2::new(1.0, 1.0)), Color32::WHITE);
+    }
+
+    pub fn paint_glyph(&self, painter: &egui::Painter, rect: Rect) {
         let p = pal();
         if rect.width().min(rect.height()) < 4.0 {
             return;
@@ -108,82 +152,103 @@ impl AppMark {
     }
 
     fn key(&self, part: usize) -> (usize, usize) {
-        (self.parts.as_ptr() as usize, part)
+        (self.parts().as_ptr() as usize, part)
+    }
+
+    pub fn glyph_image(&self, px: u32) -> Option<std::sync::Arc<Image>> {
+        match self.glyph {
+            Glyph::Png(bytes) => icon::decode(bytes),
+            Glyph::Parts(_) => Some(std::sync::Arc::new(self.drawn_image(px))),
+        }
+    }
+
+    fn drawn_image(&self, px: u32) -> Image {
+        let n = px.max(1) as usize;
+        let parts: Vec<(Vec<Pos2>, [f32; 3], Rect)> = self
+            .outlines(Rect::from_min_size(Pos2::ZERO, Vec2::splat(n as f32)))
+            .into_iter()
+            .map(|(pts, ink, _)| {
+                let c = ink_rgb(ink);
+                let bounds = Rect::from_points(&pts);
+                (pts, [c.r() as f32 / 255.0, c.g() as f32 / 255.0, c.b() as f32 / 255.0], bounds)
+            })
+            .collect();
+        const SS: usize = 4;
+        let mut img = Image::new(n, n);
+        for py in 0..n {
+            for px in 0..n {
+                let mut acc = [0.0f32; 4];
+                for sy in 0..SS {
+                    for sx in 0..SS {
+                        let x = px as f32 + (sx as f32 + 0.5) / SS as f32;
+                        let y = py as f32 + (sy as f32 + 0.5) / SS as f32;
+                        let mut hit = None;
+                        for (pts, col, b) in &parts {
+                            if x >= b.min.x && x <= b.max.x && y >= b.min.y && y <= b.max.y && inside(pts, x, y) {
+                                hit = Some(*col);
+                            }
+                        }
+                        if let Some(c) = hit {
+                            acc[0] += c[0];
+                            acc[1] += c[1];
+                            acc[2] += c[2];
+                            acc[3] += 1.0;
+                        }
+                    }
+                }
+                let k = 1.0 / (SS * SS) as f32;
+                img.px[py * n + px] = [acc[0] * k, acc[1] * k, acc[2] * k, acc[3] * k];
+            }
+        }
+        img
+    }
+
+    pub fn compose(&self, px: u32, frame: Frame) -> Vec<u8> {
+        let mark_px = ((self.tile.mark * px as f32).round().max(1.0)) as u32;
+        let empty = Image::new(1, 1);
+        let glyph = self.glyph_image(mark_px);
+        icon::compose(&self.tile, glyph.as_deref().unwrap_or(&empty), px, frame).to_rgba()
     }
 
     pub fn svg(&self) -> String {
-        let poly = |pts: &[Pos2]| -> String { pts.iter().map(|q| format!("{:.2},{:.2}", q.x, q.y)).collect::<Vec<_>>().join(" ") };
         let mut s = String::new();
         s.push_str("<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 512 512\" width=\"512\" height=\"512\">\n");
         s.push_str(&format!("  <title>{}</title>\n", self.name));
-        s.push_str("  <rect width=\"512\" height=\"512\" rx=\"116\" fill=\"#000000\"/>\n");
-        for (pts, ink, _) in self.outlines(Rect::from_min_size(Pos2::new(56.0, 56.0), Vec2::splat(400.0))) {
-            let fill = match ink {
-                Ink::Signal => hex(tokens::DARK.signal),
-                Ink::Chrome | Ink::Text => hex(tokens::DARK.chrome_hi),
-            };
-            s.push_str(&format!("  <polygon points=\"{}\" fill=\"{}\"/>\n", poly(&pts), fill));
+        if let Glyph::Png(_) = self.glyph {
+            let png = icon::png_bytes(&self.compose(512, Frame::Full), 512, 512);
+            s.push_str(&format!("  <image width=\"512\" height=\"512\" href=\"data:image/png;base64,{}\"/>\n", icon::base64(&png)));
+            s.push_str("</svg>\n");
+            return s;
+        }
+        let t = &self.tile;
+        let rgb = |c: [u8; 3]| format!("#{:02X}{:02X}{:02X}", c[0], c[1], c[2]);
+        s.push_str(&format!("  <rect width=\"512\" height=\"512\" rx=\"{:.1}\" fill=\"{}\"/>\n", t.radius * 512.0, rgb(t.fill)));
+        if let Some(g) = &t.glow {
+            s.push_str("  <defs>\n    <radialGradient id=\"glow\" gradientUnits=\"userSpaceOnUse\"");
+            s.push_str(&format!(" cx=\"{:.1}\" cy=\"{:.1}\" r=\"{:.1}\">\n", g.at.0 * 512.0, g.at.1 * 512.0, g.reach.0 * 512.0));
+            for (at, c) in g.stops {
+                s.push_str(&format!(
+                    "      <stop offset=\"{:.2}\" stop-color=\"{}\" stop-opacity=\"{:.3}\"/>\n",
+                    at,
+                    rgb([c[0], c[1], c[2]]),
+                    c[3] as f32 / 255.0
+                ));
+            }
+            s.push_str("    </radialGradient>\n  </defs>\n");
+            s.push_str(&format!("  <rect width=\"512\" height=\"512\" rx=\"{:.1}\" fill=\"url(#glow)\"/>\n", t.radius * 512.0));
+        }
+        let poly = |pts: &[Pos2]| -> String { pts.iter().map(|q| format!("{:.2},{:.2}", q.x, q.y)).collect::<Vec<_>>().join(" ") };
+        let box_side = t.mark * 512.0;
+        let at = (512.0 - box_side) * 0.5;
+        for (pts, ink, _) in self.outlines(Rect::from_min_size(Pos2::new(at, at), Vec2::splat(box_side))) {
+            s.push_str(&format!("  <polygon points=\"{}\" fill=\"{}\"/>\n", poly(&pts), hex(ink_rgb(ink))));
         }
         s.push_str("</svg>\n");
         s
     }
 
     pub fn rgba(&self, size: u32) -> Vec<u8> {
-        let n = size as f32;
-        let scale = n / 512.0;
-        let parts: Vec<(Vec<Pos2>, [u8; 3], Rect)> = self
-            .outlines(Rect::from_min_size(Pos2::new(56.0 * scale, 56.0 * scale), Vec2::splat(400.0 * scale)))
-            .into_iter()
-            .map(|(pts, ink, _)| {
-                let c = match ink {
-                    Ink::Signal => tokens::DARK.signal,
-                    Ink::Chrome | Ink::Text => tokens::DARK.chrome_hi,
-                };
-                let bounds = Rect::from_points(&pts);
-                (pts, [c.r(), c.g(), c.b()], bounds)
-            })
-            .collect();
-        let radius = 116.0 * scale;
-        let inside_tile = |x: f32, y: f32| {
-            let cx = x.clamp(radius, n - radius);
-            let cy = y.clamp(radius, n - radius);
-            (x - cx).powi(2) + (y - cy).powi(2) <= radius * radius
-        };
-        const SS: usize = 4;
-        let mut out = vec![0u8; (size * size * 4) as usize];
-        for py in 0..size {
-            for px in 0..size {
-                let mut acc = [0.0f32; 4];
-                for sy in 0..SS {
-                    for sx in 0..SS {
-                        let x = px as f32 + (sx as f32 + 0.5) / SS as f32;
-                        let y = py as f32 + (sy as f32 + 0.5) / SS as f32;
-                        if !inside_tile(x, y) {
-                            continue;
-                        }
-                        let mut c = [0u8, 0, 0];
-                        for (pts, col, bounds) in &parts {
-                            if x >= bounds.min.x && x <= bounds.max.x && y >= bounds.min.y && y <= bounds.max.y && inside(pts, x, y) {
-                                c = *col;
-                            }
-                        }
-                        acc[0] += c[0] as f32;
-                        acc[1] += c[1] as f32;
-                        acc[2] += c[2] as f32;
-                        acc[3] += 255.0;
-                    }
-                }
-                let at = ((py * size + px) * 4) as usize;
-                if acc[3] > 0.0 {
-                    let cover = acc[3] / 255.0;
-                    out[at] = (acc[0] / cover).round() as u8;
-                    out[at + 1] = (acc[1] / cover).round() as u8;
-                    out[at + 2] = (acc[2] / cover).round() as u8;
-                    out[at + 3] = (acc[3] / (SS * SS) as f32).round() as u8;
-                }
-            }
-        }
-        out
+        self.compose(size, Frame::Full)
     }
 
     pub fn icon_data(&self, size: u32) -> egui::IconData {
@@ -191,17 +256,11 @@ impl AppMark {
     }
 
     pub fn png(&self, size: u32) -> Vec<u8> {
-        let mut out = Vec::new();
-        {
-            let mut encoder = png::Encoder::new(&mut out, size, size);
-            encoder.set_color(png::ColorType::Rgba);
-            encoder.set_depth(png::BitDepth::Eight);
-            encoder.set_compression(png::Compression::High);
-            if let Ok(mut writer) = encoder.write_header() {
-                let _ = writer.write_image_data(&self.rgba(size));
-            }
-        }
-        out
+        icon::png_bytes(&self.rgba(size), size, size)
+    }
+
+    pub fn png_padded(&self, size: u32) -> Vec<u8> {
+        icon::png_bytes(&self.compose(size, Frame::Padded), size, size)
     }
 
     pub fn icns(&self) -> Vec<u8> {
@@ -221,7 +280,7 @@ impl AppMark {
         let mut made: Vec<(u32, Vec<u8>)> = Vec::new();
         for (kind, size) in SLOTS {
             if !made.iter().any(|(s, _)| *s == size) {
-                made.push((size, self.png(size)));
+                made.push((size, self.png_padded(size)));
             }
             let png = &made.iter().find(|(s, _)| *s == size).map(|(_, p)| p.clone()).unwrap_or_default();
             body.extend_from_slice(kind);
@@ -277,6 +336,13 @@ impl AppMark {
         }
         out.extend(std::iter::repeat(0u8).take((mask_row * size) as usize));
         out
+    }
+}
+
+fn ink_rgb(ink: Ink) -> Color32 {
+    match ink {
+        Ink::Signal => tokens::DARK.signal,
+        Ink::Chrome | Ink::Text => tokens::DARK.chrome_hi,
     }
 }
 

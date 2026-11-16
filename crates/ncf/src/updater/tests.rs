@@ -253,7 +253,7 @@ fn the_updater_demo_walks_the_same_steps_and_installs_nothing() {
     assert_eq!(demo_from_args(&["app".into(), DEMO_FLAG.into(), "fail".into()]), Some(Demo::Fails));
     assert_eq!(demo_from_args(&["app".into(), DEMO_FLAG.into(), "nonsense".into()]), None);
     assert_eq!(demo_from_args(&["app".into()]), None);
-    let info = crate::AppInfo { name: "Field Notes", id: "x", version: "1.3.0", tagline: "", repo: "NativeCompute/field-notes", mark: crate::mark::AppMark { name: "Field Notes", parts: &[] } };
+    let info = crate::AppInfo { name: "Field Notes", id: "x", version: "1.3.0", tagline: "", repo: "NativeCompute/field-notes", mark: crate::mark::AppMark::drawn("Field Notes", &[]) };
     let plan = demo_plan(&info);
     assert_eq!((plan.version.as_str(), plan.reopen, plan.slug.as_str()), ("1.3.1", false, "field-notes-demo"));
 

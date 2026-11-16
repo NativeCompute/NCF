@@ -831,7 +831,7 @@ const INFO: crate::AppInfo = crate::AppInfo {
     version: "1.0.0",
     tagline: "",
     repo: "",
-    mark: crate::mark::AppMark { name: "Cloud Test", parts: &[] },
+    mark: crate::mark::AppMark::drawn("Cloud Test", &[]),
 };
 
 fn settle(a: &mut Account) {

@@ -41,5 +41,6 @@ fn the_app_draws_in_both_casts_and_keeps_its_items() {
 #[test]
 fn the_mark_exports_an_icon() {
     assert!(crate::MARK.svg().contains("<polygon"));
+    assert!(crate::MARK.svg().contains("radialGradient"), "the app tile carries the coral glow");
     assert_eq!(&crate::MARK.ico()[..4], &[0, 0, 1, 0]);
 }
