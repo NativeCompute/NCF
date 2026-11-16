@@ -230,3 +230,100 @@ pub fn pick_file(filter: &FileFilter) -> Result<Option<PathBuf>, String> {
     }
     Err("Neither kdialog nor zenity is installed — drop the file onto the window instead.".into())
 }
+
+// desktop appearance here---
+
+static DESKTOP: std::sync::atomic::AtomicU8 = std::sync::atomic::AtomicU8::new(0);
+static WATCH: std::sync::Once = std::sync::Once::new();
+
+pub fn desktop_dark() -> Option<bool> {
+    if !cfg!(target_os = "linux") {
+        return None;
+    }
+    WATCH.call_once(|| {
+        DESKTOP.store(encode(read_desktop()), std::sync::atomic::Ordering::Relaxed);
+        let _ = std::thread::Builder::new().name("ncf-appearance".into()).spawn(|| loop {
+            std::thread::sleep(std::time::Duration::from_secs(30));
+            DESKTOP.store(encode(read_desktop()), std::sync::atomic::Ordering::Relaxed);
+        });
+    });
+    match DESKTOP.load(std::sync::atomic::Ordering::Relaxed) {
+        2 => Some(false),
+        3 => Some(true),
+        _ => None,
+    }
+}
+
+fn encode(v: Option<bool>) -> u8 {
+    match v {
+        None => 1,
+        Some(false) => 2,
+        Some(true) => 3,
+    }
+}
+
+pub fn scheme_says_dark(name: &str) -> Option<bool> {
+    let n = name.trim().trim_matches('\'').to_ascii_lowercase();
+    if n.is_empty() {
+        None
+    } else {
+        Some(n.contains("dark"))
+    }
+}
+
+fn read_desktop() -> Option<bool> {
+    let kde = std::env::var("XDG_CURRENT_DESKTOP").unwrap_or_default().to_ascii_uppercase().contains("KDE");
+    if kde {
+        if let Some(v) = kde_scheme() {
+            return Some(v);
+        }
+    }
+    if let Some(v) = gsettings("color-scheme") {
+        let v = v.to_ascii_lowercase();
+        if v.contains("prefer-dark") {
+            return Some(true);
+        }
+        if v.contains("prefer-light") {
+            return Some(false);
+        }
+        if let Some(theme) = gsettings("gtk-theme") {
+            return scheme_says_dark(&theme);
+        }
+        return Some(false);
+    }
+    if let Some(v) = kde_scheme() {
+        return Some(v);
+    }
+    std::env::var("GTK_THEME").ok().and_then(|t| scheme_says_dark(&t))
+}
+
+fn gsettings(key: &str) -> Option<String> {
+    let out = std::process::Command::new("gsettings")
+        .args(["get", "org.gnome.desktop.interface", key])
+        .stdin(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .output()
+        .ok()?;
+    if !out.status.success() {
+        return None;
+    }
+    let s = String::from_utf8_lossy(&out.stdout).trim().to_string();
+    (!s.is_empty()).then_some(s)
+}
+
+fn kde_scheme() -> Option<bool> {
+    let base = std::env::var_os("XDG_CONFIG_HOME").map(PathBuf::from).or_else(|| dirs::home_dir().map(|h| h.join(".config")))?;
+    let text = std::fs::read_to_string(base.join("kdeglobals")).ok()?;
+    let mut general = false;
+    for line in text.lines() {
+        let l = line.trim();
+        if l.starts_with('[') {
+            general = l == "[General]";
+        } else if general {
+            if let Some(v) = l.strip_prefix("ColorScheme=") {
+                return scheme_says_dark(v);
+            }
+        }
+    }
+    None
+}

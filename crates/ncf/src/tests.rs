@@ -233,8 +233,8 @@ fn a_keymap_works_for_any_apps_commands() {
 #[test]
 fn look_settings_round_trip_and_unknown_keys_are_left_alone() {
     let mut l = Look::default();
-    assert!(!l.light_mode && l.animations && l.check_updates);
-    l.light_mode = true;
+    assert!(l.appearance == crate::settings::Appearance::System && l.animations && l.check_updates);
+    l.set_appearance(crate::settings::Appearance::Light);
     l.font_scale = 1.2;
     assert_eq!(Look::parse(&l.write()), l);
     assert!(!Look::default().read("youtrack_url", "x"));
@@ -468,7 +468,7 @@ fn debug_mode_opens_only_on_five_held_knocks_within_three_seconds() {
 #[test]
 fn the_settings_file_only_mentions_debug_mode_while_it_is_on() {
     let off = Look::default();
-    assert_eq!(off.write(), "light_mode = no\nanimations = yes\nfont_scale = 1.00\nsplash = yes\ncheck_updates = yes\n", "byte-identical to before debug mode existed");
+    assert_eq!(off.write(), "appearance = system\nlight_mode = no\nanimations = yes\nfont_scale = 1.00\nsplash = yes\ncheck_updates = yes\n", "light_mode stays for older builds");
     assert!(!off.write().contains("debug"));
     let on = Look { debug: true, ..Look::default() };
     assert!(on.write().ends_with("debug = yes\n"));
@@ -698,5 +698,62 @@ fn every_bento_font_covers_latin_and_kerns() {
         assert!(fonts.has_glyphs(&id, "Aa Zz 0123456789 —–…·“”‘’ éñŁčß€→"), "{name} misses a glyph");
         let w = |s: &str| fonts.layout_no_wrap(s.into(), id.clone(), egui::Color32::WHITE).rect.width();
         assert!(w("AV") < w("A") + w("V") - 0.5, "{name} lost its kerning");
+    }
+}
+
+#[test]
+fn appearance_reads_old_and_new_settings_files() {
+    use crate::settings::Appearance::{self, *};
+    let a = |text: &str| Look::parse(text).appearance;
+    assert_eq!(a(""), System, "a fresh install follows the computer");
+    assert_eq!(a("light_mode = no\n"), Dark, "someone who kept dark keeps dark");
+    assert_eq!(a("light_mode = yes\n"), Light);
+    assert_eq!(a("appearance = system\nlight_mode = yes\n"), System);
+    assert_eq!(a("light_mode = yes\nappearance = system\n"), System, "the new key wins in either order");
+    assert_eq!(a("appearance = dark\nlight_mode = yes\n"), Dark);
+    assert_eq!(a("appearance = sepia\nlight_mode = yes\n"), Light, "an unknown value falls back to the old key");
+    for x in Appearance::ALL {
+        let mut l = Look::default();
+        l.set_appearance(x);
+        assert_eq!(Look::parse(&l.write()).appearance, x);
+        assert_eq!(Appearance::from_slug(x.slug()), Some(x));
+    }
+    assert!(Look { appearance: Light, ..Look::default() }.write().contains("light_mode = yes"));
+    assert!(Look::default().write().contains("light_mode = no"), "older builds open dark when the choice is the computer's");
+}
+
+#[test]
+fn the_cast_follows_the_choice_then_the_computer_then_dark() {
+    use crate::settings::Appearance::*;
+    assert!(!theme::dark_for(Light, Some(true), Some(true)));
+    assert!(theme::dark_for(Dark, Some(false), Some(false)));
+    assert!(!theme::dark_for(System, Some(false), Some(true)), "the computer's own answer comes first");
+    assert!(theme::dark_for(System, Some(true), None));
+    assert!(!theme::dark_for(System, None, Some(false)), "then the desktop settings");
+    assert!(theme::dark_for(System, None, None), "and dark when nothing answers");
+}
+
+#[test]
+fn a_desktop_scheme_name_says_dark_or_light() {
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        use crate::platform::scheme_says_dark;
+        assert_eq!(scheme_says_dark("'Adwaita-dark'"), Some(true));
+        assert_eq!(scheme_says_dark("BreezeDark"), Some(true));
+        assert_eq!(scheme_says_dark("'Adwaita'"), Some(false));
+        assert_eq!(scheme_says_dark("  "), None);
+    }
+}
+
+#[test]
+fn debug_mode_can_pick_each_appearance() {
+    use crate::settings::Appearance;
+    let _g = lock();
+    let info = crate::AppInfo { name: "Field Notes", id: "x", version: "1.3.0", tagline: "", repo: "NativeCompute/field-notes", mark: crate::mark::NATIVECOMPUTE };
+    let mut shell = crate::app::Shell::new(info);
+    let h = Harness::new(400.0, 300.0);
+    for a in Appearance::ALL {
+        crate::app::apply_debug(&h.ctx, &mut shell, &crate::debug::Request::Appearance(a));
+        assert_eq!(shell.look.appearance, a);
     }
 }

@@ -136,7 +136,11 @@ impl Shell {
     }
 
     pub fn set_light(&mut self, light: bool) {
-        self.look.light_mode = light;
+        self.set_appearance(crate::settings::Appearance::from_light_mode(light));
+    }
+
+    pub fn set_appearance(&mut self, a: crate::settings::Appearance) {
+        self.look.set_appearance(a);
         self.look_dirty = true;
         self.save_due = true;
     }
@@ -280,7 +284,7 @@ pub fn run_with<A: NcfApp + 'static>(shell: Shell, make: impl FnOnce(&egui::Cont
 
 pub fn start<A: NcfApp>(ctx: &egui::Context, shell: &mut Shell, make: impl FnOnce(&egui::Context, &mut Shell) -> A) -> A {
     theme::install_fonts(ctx);
-    theme::set_palette(!shell.look.light_mode);
+    theme::set_palette(theme::wants_dark(ctx, shell.look.appearance));
     theme::apply(ctx);
     anim::set_enabled(shell.look.animations);
     ctx.set_zoom_factor(shell.look.font_scale);
@@ -363,8 +367,9 @@ impl<A: NcfApp> eframe::App for Runner<A> {
 
 pub fn frame<A: NcfApp>(ctx: &egui::Context, app: &mut A, shell: &mut Shell) {
     shell.frame_no = shell.frame_no.wrapping_add(1);
+    theme::follow(ctx, shell.look.appearance);
     if shell.look_dirty {
-        theme::set_palette(!shell.look.light_mode);
+        theme::set_palette(theme::wants_dark(ctx, shell.look.appearance));
         theme::apply(ctx);
         anim::set_enabled(shell.look.animations);
         ctx.set_zoom_factor(shell.look.font_scale);
@@ -528,6 +533,7 @@ pub fn apply_debug(ctx: &egui::Context, shell: &mut Shell, request: &crate::debu
             shell.save_due = true;
         }
         Request::Light(light) => shell.set_light(*light),
+        Request::Appearance(a) => shell.set_appearance(*a),
         Request::Animations(on) => {
             shell.look.animations = *on;
             shell.look_dirty = true;
@@ -626,15 +632,19 @@ fn settings_window<A: NcfApp>(ctx: &egui::Context, app: &mut A, shell: &mut Shel
         });
 }
 
+pub const APPEARANCE_NOTE: &str = "System follows your computer. Light is soft pastel and white tiles; Dark is ink with a coral glow.";
+
 fn appearance(ui: &mut egui::Ui, shell: &mut Shell) {
     let before = shell.look.clone();
-    ui::section(ui, "Mode");
-    let dark = !shell.look.light_mode;
-    if let Some(k) = ui::tabs(ui, &["Dark", "Light"], if dark { 0 } else { 1 }) {
-        shell.look.light_mode = k == 1;
+    ui::section(ui, "Appearance");
+    let all = crate::settings::Appearance::ALL;
+    let labels: Vec<&str> = all.iter().map(|a| a.label()).collect();
+    let now = all.iter().position(|a| *a == shell.look.appearance).unwrap_or(0);
+    if let Some(k) = ui::tabs(ui, &labels, now) {
+        shell.look.set_appearance(all[k]);
     }
     ui.add_space(4.0);
-    ui::caption(ui, "Dark is the house look: void black and one signal blue. Light is the same language on paper white.");
+    ui::caption(ui, APPEARANCE_NOTE);
     ui::separator(ui);
     ui::section(ui, "Motion");
     let mut v = shell.look.animations;

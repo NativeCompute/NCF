@@ -50,6 +50,7 @@ pub enum Request {
     WindowSize(Vec2),
     TextScale(f32),
     Light(bool),
+    Appearance(crate::settings::Appearance),
     Animations(bool),
     Inspector(bool),
     Off,

@@ -317,10 +317,12 @@ fn save_png(path: &std::path::Path, image: &egui::ColorImage) -> Result<(), Stri
 
 struct Host {
     updater: Updater,
+    appearance: crate::settings::Appearance,
 }
 
 impl eframe::App for Host {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        theme::follow(ctx, self.appearance);
         self.updater.ui(ctx);
     }
 
@@ -354,7 +356,7 @@ pub fn run_with(info: AppInfo, plan: Plan, rx: Receiver<Event>, worker: work::Wo
         let viewport = chrome::viewport(builder, crate::OS).with_resizable(false).with_maximize_button(false);
         let options = eframe::NativeOptions { viewport, renderer, centered: true, ..Default::default() };
         let (flag, plan2, rx2, cancel2, reopened2) = (started.clone(), plan.clone(), rx.clone(), cancel.clone(), reopened.clone());
-        let light = look.light_mode;
+        let appearance = look.appearance;
         let animations = look.animations;
         let outcome = eframe::run_native(
             &format!("{} updater", info.name),
@@ -362,13 +364,13 @@ pub fn run_with(info: AppInfo, plan: Plan, rx: Receiver<Event>, worker: work::Wo
             Box::new(move |cc| {
                 flag.store(true, Ordering::SeqCst);
                 theme::install_fonts(&cc.egui_ctx);
-                theme::set_palette(!light);
+                theme::set_palette(theme::wants_dark(&cc.egui_ctx, appearance));
                 theme::apply(&cc.egui_ctx);
                 anim::set_enabled(animations);
                 let rx = rx2.lock().ok().and_then(|mut r| r.take());
                 let mut updater = Updater::new(info, plan2, rx, cancel2);
                 updater.reopened = reopened2;
-                Ok(Box::new(Host { updater }))
+                Ok(Box::new(Host { updater, appearance }))
             }),
         );
         if outcome.is_ok() || started.load(Ordering::SeqCst) {

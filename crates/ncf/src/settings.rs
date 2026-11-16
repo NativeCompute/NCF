@@ -20,9 +20,54 @@ pub fn pairs(text: &str) -> Vec<(String, String)> {
         .collect()
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+pub enum Appearance {
+    #[default]
+    System,
+    Light,
+    Dark,
+}
+
+impl Appearance {
+    pub const ALL: [Appearance; 3] = [Appearance::System, Appearance::Light, Appearance::Dark];
+
+    pub fn slug(self) -> &'static str {
+        match self {
+            Appearance::System => "system",
+            Appearance::Light => "light",
+            Appearance::Dark => "dark",
+        }
+    }
+
+    pub fn label(self) -> &'static str {
+        match self {
+            Appearance::System => "System",
+            Appearance::Light => "Light",
+            Appearance::Dark => "Dark",
+        }
+    }
+
+    pub fn from_slug(s: &str) -> Option<Appearance> {
+        Appearance::ALL.into_iter().find(|a| a.slug() == s.trim().to_ascii_lowercase())
+    }
+
+    pub fn from_light_mode(light: bool) -> Appearance {
+        if light {
+            Appearance::Light
+        } else {
+            Appearance::Dark
+        }
+    }
+
+    pub fn light_mode(self) -> bool {
+        self == Appearance::Light
+    }
+}
+
+#[derive(Clone, Debug)]
 pub struct Look {
-    pub light_mode: bool,
+    pub appearance: Appearance,
+    pub appearance_said: bool,
     pub animations: bool,
     pub font_scale: f32,
     pub splash: bool,
@@ -34,14 +79,41 @@ pub struct Look {
 
 impl Default for Look {
     fn default() -> Self {
-        Look { light_mode: false, animations: true, font_scale: 1.0, splash: true, check_updates: true, debug: false, skipped_update: String::new(), cloud_sync: false }
+        Look { appearance: Appearance::System, appearance_said: false, animations: true, font_scale: 1.0, splash: true, check_updates: true, debug: false, skipped_update: String::new(), cloud_sync: false }
+    }
+}
+
+impl PartialEq for Look {
+    fn eq(&self, o: &Look) -> bool {
+        self.appearance == o.appearance
+            && self.animations == o.animations
+            && self.font_scale == o.font_scale
+            && self.splash == o.splash
+            && self.check_updates == o.check_updates
+            && self.debug == o.debug
+            && self.skipped_update == o.skipped_update
+            && self.cloud_sync == o.cloud_sync
     }
 }
 
 impl Look {
+    pub fn set_appearance(&mut self, a: Appearance) {
+        self.appearance = a;
+        self.appearance_said = true;
+    }
+
     pub fn read(&mut self, key: &str, value: &str) -> bool {
         match key {
-            "light_mode" => self.light_mode = yes(value),
+            "appearance" => {
+                if let Some(a) = Appearance::from_slug(value) {
+                    self.set_appearance(a);
+                }
+            }
+            "light_mode" => {
+                if !self.appearance_said {
+                    self.appearance = Appearance::from_light_mode(yes(value));
+                }
+            }
             "animations" => self.animations = yes(value),
             "font_scale" => self.font_scale = value.parse::<f32>().unwrap_or(1.0).clamp(0.8, 1.4),
             "splash" => self.splash = yes(value),
@@ -59,8 +131,9 @@ impl Look {
         let skipped = if self.skipped_update.trim().is_empty() { String::new() } else { format!("skipped_update = {}\n", self.skipped_update.trim()) };
         let cloud = if self.cloud_sync { "cloud_sync_settings = yes\n" } else { "" };
         format!(
-            "light_mode = {}\nanimations = {}\nfont_scale = {:.2}\nsplash = {}\ncheck_updates = {}\n{debug}{skipped}{cloud}",
-            b(self.light_mode),
+            "appearance = {}\nlight_mode = {}\nanimations = {}\nfont_scale = {:.2}\nsplash = {}\ncheck_updates = {}\n{debug}{skipped}{cloud}",
+            self.appearance.slug(),
+            b(self.appearance.light_mode()),
             b(self.animations),
             self.font_scale,
             b(self.splash),

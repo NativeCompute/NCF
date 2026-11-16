@@ -59,6 +59,53 @@ pub fn set_look(ctx: &egui::Context, dark: bool) {
     apply(ctx);
 }
 
+pub fn dark_for(a: crate::settings::Appearance, system: Option<bool>, probe: Option<bool>) -> bool {
+    use crate::settings::Appearance;
+    match a {
+        Appearance::Light => false,
+        Appearance::Dark => true,
+        Appearance::System => system.or(probe).unwrap_or(true),
+    }
+}
+
+pub fn forced() -> Option<bool> {
+    match std::env::var("NCF_APPEARANCE").ok()?.trim() {
+        "dark" => Some(true),
+        "light" => Some(false),
+        _ => None,
+    }
+}
+
+pub fn system_dark(ctx: &egui::Context) -> Option<bool> {
+    forced().or_else(|| ctx.system_theme().map(|t| t == egui::Theme::Dark))
+}
+
+pub fn desktop_dark() -> Option<bool> {
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        crate::platform::desktop_dark()
+    }
+    #[cfg(target_arch = "wasm32")]
+    {
+        None
+    }
+}
+
+pub fn wants_dark(ctx: &egui::Context, a: crate::settings::Appearance) -> bool {
+    let probe = if a == crate::settings::Appearance::System { desktop_dark() } else { None };
+    dark_for(a, system_dark(ctx), probe)
+}
+
+pub fn follow(ctx: &egui::Context, a: crate::settings::Appearance) -> bool {
+    let dark = wants_dark(ctx, a);
+    let now = CURRENT.read().ok().and_then(|g| *g).map(|p| p.dark);
+    if now == Some(dark) {
+        return false;
+    }
+    set_look(ctx, dark);
+    true
+}
+
 // metrics here---
 
 pub const RADIUS: f32 = tokens::RADIUS;

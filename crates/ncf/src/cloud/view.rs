@@ -9,7 +9,7 @@ use crate::icons::{self, Icon};
 use crate::theme::{self, pal};
 use crate::{ui, AppInfo};
 
-pub const SYNCED_LOOK_KEYS: [&str; 5] = ["light_mode", "animations", "font_scale", "splash", "check_updates"];
+pub const SYNCED_LOOK_KEYS: [&str; 6] = ["appearance", "light_mode", "animations", "font_scale", "splash", "check_updates"];
 
 pub struct Ask {
     pub title: String,

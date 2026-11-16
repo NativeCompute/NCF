@@ -86,7 +86,7 @@ fn block(ui: &mut egui::Ui, title: &str, call: &str, body: impl FnOnce(&mut egui
 
 impl NcfApp for Gallery {
     fn title_extras(&mut self, ui: &mut egui::Ui, shell: &mut Shell) {
-        let light = shell.look.light_mode;
+        let light = !pal().dark;
         if ui::icon_button(ui, if light { Icon::Moon } else { Icon::Sun }, if light { "Dark" } else { "Light" }, 28.0) {
             shell.set_light(!light);
         }
@@ -500,10 +500,13 @@ fn main() -> ncf::eframe::Result<()> {
     let args: Vec<String> = std::env::args().collect();
     let mut shell = Shell::new(INFO);
     if args.iter().any(|a| a == "--light") {
-        shell.look.light_mode = true;
+        shell.look.set_appearance(ncf::settings::Appearance::Light);
     }
     if args.iter().any(|a| a == "--dark") {
-        shell.look.light_mode = false;
+        shell.look.set_appearance(ncf::settings::Appearance::Dark);
+    }
+    if args.iter().any(|a| a == "--system") {
+        shell.look.set_appearance(ncf::settings::Appearance::System);
     }
     if args.iter().any(|a| a == "--no-splash") {
         shell.look.splash = false;
