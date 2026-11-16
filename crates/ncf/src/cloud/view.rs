@@ -816,13 +816,19 @@ impl Account {
             let selected = self.org.as_deref() == Some(o.org.id.as_str());
             let (rect, resp) = ui.allocate_exact_size(Vec2::new(w, 36.0), Sense::click());
             let hot = crate::anim::ease(ui.ctx(), resp.id, resp.hovered() || selected, crate::anim::HOVER);
-            theme::hover_surface(ui.painter(), rect, theme::R_SM, p.signal, hot, selected);
-            icons::draw(ui.painter(), Rect::from_center_size(Pos2::new(rect.left() + 16.0, rect.center().y), Vec2::splat(14.0)), Icon::Users, p.text_2);
-            ui.painter().text(Pos2::new(rect.left() + 34.0, rect.center().y), egui::Align2::LEFT_CENTER, &o.org.name, theme::font_med(theme::T_SM), p.text);
+            let (sel_fill, sel_ink) = p.selected();
+            if selected {
+                ui.painter().rect_filled(rect, egui::Rounding::same(rect.height() * 0.5), sel_fill);
+            } else {
+                theme::hover_surface(ui.painter(), rect, rect.height() * 0.5, p.signal, hot, false);
+            }
+            let (ink, soft) = if selected { (sel_ink, theme::wash(sel_ink, 170)) } else { (p.text, p.text_3) };
+            icons::draw(ui.painter(), Rect::from_center_size(Pos2::new(rect.left() + 18.0, rect.center().y), Vec2::splat(14.0)), Icon::Users, if selected { sel_ink } else { p.text_2 });
+            ui.painter().text(Pos2::new(rect.left() + 36.0, rect.center().y), egui::Align2::LEFT_CENTER, &o.org.name, theme::font_med(theme::T_SM), ink);
             let n = o.members.len();
             let tag = format!("{} · {} · {n} {}", o.org.role.label(), plan_name(&o.org.plan), if n == 1 { "person" } else { "people" }).to_uppercase();
             let tw = theme::tracked_width(ui.ctx(), &tag, theme::font_hud(theme::T_MICRO), 0.8);
-            theme::tracked_text(ui.painter(), Pos2::new(rect.right() - 12.0 - tw, rect.center().y), &tag, theme::font_hud(theme::T_MICRO), p.text_3, 0.8);
+            theme::tracked_text(ui.painter(), Pos2::new(rect.right() - 14.0 - tw, rect.center().y), &tag, theme::font_hud(theme::T_MICRO), soft, 0.8);
             if resp.clicked() {
                 self.org = Some(o.org.id.clone());
             }
@@ -838,7 +844,7 @@ impl Account {
         let me = self.engine.client().user_id();
         let manage = o.org.role.can_manage();
         ui::separator(ui);
-        ui.label(egui::RichText::new(o.org.name.to_uppercase()).font(theme::font_display(theme::T_H + 6.0)).color(p.text));
+        ui.label(ui::display_text(&o.org.name, theme::T_H + 6.0, p.text));
         ui.add_space(2.0);
         let mut line = format!("/o/{} · {} plan", o.org.slug, plan_name(&o.org.plan));
         if let Some(t) = o.org.trial_ends_at.as_deref().filter(|t| t.len() >= 10) {
