@@ -49,7 +49,7 @@ Long text inside a fixed width goes through `ui::elide_to_width(ctx, text, font,
 | Icon button | `ui::icon_button(ui, Icon::Search, "Search · Ctrl+F", 28.0)` | `<button class="icon-btn" aria-label="…">` with a `.tip` | A frequent action with a well-known icon. Always give the tooltip, with the shortcut after a middle dot. |
 | Ribbon button | `ui::ribbon_button(ui, Icon::Bold, "Bold", "Bold · Ctrl+B", on)` | n/a | A toggle in an editing toolbar. |
 
-`ui::button_response` returns the `egui::Response` when you need hover or position. Buttons wipe a fill in from the left on hover and invert their label as it passes. Do not add a second hover effect.
+`ui::button_response` returns the `egui::Response` when you need hover or position. Buttons are pills; on hover the primary darkens to `signal-deep` and the ghost takes a `panel-2` fill. Do not add a second hover effect.
 
 ---
 
@@ -122,7 +122,9 @@ if self.open {
 |---|---|---|---|
 | Panel | `theme::panel_box().show(ui, \|ui\| …)` or `theme::panel(painter, rect)` | `<div class="panel panel-pad">` | Grouping related content. |
 | Bracketed panel | n/a | `.panel.bracket` | A featured panel on a marketing page. |
-| Card | `theme::hover_surface(painter, rect, theme::RADIUS, p.signal, hot, chosen)` | `<article class="card">`, `.card--chosen` | An item in a grid a person can open. |
+| Card | `theme::surface(painter, rect, theme::R_LG, Lift::Rest)` | `<article class="card">`, `.card--chosen` | An item in a grid a person can open. |
+| Tile | `theme::tile(painter, rect, theme::R_XL, i)` with `ui::big_number` | `.tile--coral`, `--lilac`, `--sun`, `--sky` | The few facts a screen exists to show. Ink text only. |
+| Floating bar | `ui::pill_bar(ui, \|ui\| ..)` | the site header | Tools that float above the content. |
 | Section label | `ui::section(ui, "Where things live")` | `<p class="hud">01 / Section</p>` in `.section-head` | Grouping rows in settings or a long page. |
 | Separator | `ui::separator(ui)` | `<hr>` or a hairline border | Between groups of rows. |
 | Spec list | n/a | `<dl class="spec">`, `<dl class="facts">` | Pairs of label and value. |
@@ -134,7 +136,7 @@ if self.open {
 
 ## Notices and confirmation
 
-Notices are readouts: a `panel` with a hairline and a 2 px bar of their tone colour on the left, then a HUD label in that colour (DONE, NOTE, WARNING, ERROR) and the message. They stack at the bottom centre and leave on their own. Confirmations are the same panel in the centre over a scrim, with a HUD eyebrow, the title, the body, and a primary and a ghost button (the primary is red for anything that deletes); they wait for an answer.
+Notices are pills: a lifted surface with a dot of their tone colour, a HUD label in that colour (DONE, NOTE, WARNING, ERROR) and the message. They stack at the bottom centre and leave on their own. Confirmations are a rounded surface in the centre over a scrim, with a tone dot and eyebrow, the title, the body, and a primary and a ghost button (the primary is the danger pill for anything that deletes); they wait for an answer.
 
 | Component | Rust | Web | Use when |
 |---|---|---|---|
@@ -155,7 +157,7 @@ Supplied by `ncf::app::run`. You do not call these unless you build your own she
 
 | Part | Rust |
 |---|---|
-| Backdrop and column guides | `chrome::backdrop(ctx, pal().void)`, `chrome::column_guides(painter, rect)` |
+| Backdrop and wallpaper | `chrome::backdrop(ctx, pal().void)`, `theme::wallpaper(painter, rect, radius)` |
 | Title bar with the app mark, name, extras and window buttons | `chrome::title_bar(ui, ctx, &info, \|ui\| …)` |
 | Resize grips for the undecorated window | `chrome::resize_handles(ctx)` |
 | Splash card | `splash::Splash::new(info).show(ctx)`; `set_status(update_status)` adds the update line; `set_offer(offer)` turns it into the update prompt, and `take_choice()` returns *Update now*, *Download*, *Not now* or *Skip this version* |

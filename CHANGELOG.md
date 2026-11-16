@@ -4,6 +4,16 @@ NCF follows [semantic versioning](https://semver.org). Apps pin a tag, so nothin
 
 ## Unreleased
 
+### Bento 2.0
+
+- **A new look.** Rounded tiles on a soft wallpaper, one coral accent (`signal` is now #FF6A3D), colour tiles in coral, lilac, sun and sky with ink text, soft token shadows, and frosted floating bars (`ui::pill_bar`, `theme::glass`). The dark cast is graphite with a coral glow in the top-left corner.
+- **New type.** Bricolage Grotesque for display and headings, Plus Jakarta Sans for the interface, JetBrains Mono for HUD readouts. Display type is sentence case. The desktop fonts carry their kerning in a `kern` table so egui sets them properly.
+- **Tokens.** New colours (`focus`, `on_danger`, `on_tile`, `glass`, `glass_line`, `shadow`, `shadow_soft`, `wall_a/b/c`, `glow`), six `brights`, a radius scale (`RADIUS_SM` to `RADIUS_PILL`; `RADIUS` is now 12), shadows and the wallpaper. The CSS gains `--wallpaper`, `--shadow*`, `--r-*` and website aliases (`--bg`, `--accent`, `--link`, `--on-accent`).
+- **System appearance.** `Look.appearance` is `System`, `Light` or `Dark`, saved as `appearance`; `light_mode` is still read and written for older builds. System follows the computer, falling back to dark when it says nothing. On the web the theme toggle cycles auto, light and dark.
+- **App icons on the Bento tile.** Breaking: `AppMark` is now built with `AppMark::drawn(name, parts)` or `AppMark::raster(name, png)`. Every app icon sits on the ink tile with the coral glow, and the app binary composes every size (`png`, `ico`, padded `icns`, `svg`). `paint` draws the whole icon; `paint_glyph` draws a drawn mark alone.
+- **Components.** Pill buttons with ink text on coral, inverted selection, round toggles and sliders, rounded menus and popovers, pill notices, rounded splash, updater and settings windows, and avatars on the tile colours.
+- The browser sign-in page and the web layer use the same tokens.
+
 NativeCloud: accounts, sync and teams for every NativeCompute app.
 
 ### Desktop (`ncf`)

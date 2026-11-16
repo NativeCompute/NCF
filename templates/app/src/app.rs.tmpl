@@ -185,8 +185,7 @@ impl NcfApp for App {
                         for (i, title) in row {
                             let (rect, resp) = ui.allocate_exact_size(Vec2::new(card_w, card_h), Sense::click());
                             let hot = anim::ease(ui.ctx(), resp.id, resp.hovered(), anim::HOVER);
-                            ui.painter().rect_filled(rect, egui::Rounding::same(theme::RADIUS), theme::mix(p.deep, p.panel, hot));
-                            ui.painter().rect_stroke(rect.shrink(0.5), egui::Rounding::same(theme::RADIUS), egui::Stroke::new(1.0_f32, theme::mix(p.line, p.text_3, hot)));
+                            theme::surface(ui.painter(), rect, theme::R_LG, if hot > 0.5 { theme::Lift::Float } else { theme::Lift::Rest });
                             theme::top_edge(ui.painter(), rect);
                             let clip = ui.painter().with_clip_rect(rect.shrink(1.0));
                             let font = theme::font_bold(theme::T_BODY);

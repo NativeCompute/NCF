@@ -19,40 +19,46 @@ New app? Follow [`.claude/skills/ncf-app/SKILL.md`](.claude/skills/ncf-app/SKILL
 
 ### Tokens only
 - Every colour comes from `pal()` in Rust or a `var(--…)` in CSS. Never write a hex value, `Color32::from_rgb` or `rgb()` in app code.
-- Every size comes from `theme::T_*`, `tokens::SPACE_*`, `tokens::RADIUS` or the CSS `--s-*`, `--t-*` and `--r-sm` variables.
+- Every size comes from `theme::T_*`, `tokens::SPACE_*`, the radius scale (`theme::R_SM`, `R_MD`, `R_LG`, `R_XL`, `R_PILL`) or the CSS `--s-*`, `--t-*` and `--r-*` variables.
+- Every shadow comes from `theme::Lift` (`Rest`, `Float`, `Lift`) or the CSS `--shadow*` variables.
 - Every duration comes from `tokens::MOTION_*` or `anim::HOVER` in Rust, `--m-*` in CSS.
 - A value that is missing from the tokens goes into `tokens/ncf.toml`, then `cargo run -p ncf-tokens`, in an NCF change. It never goes into the app.
 
 ### Components before custom drawing
 - Use `ncf::ui` and `ncf::theme` first. Look in [`docs/components.md`](docs/components.md) and the gallery (`cargo run -p ncf-gallery`) before drawing anything by hand.
-- When you have to draw by hand, build from `theme::panel`, `theme::hover_surface`, `theme::tracked_text`, `ui::wipe` and the tokens, so the result reads as ours.
+- When you have to draw by hand, build from `theme::surface`, `theme::tile`, `theme::glass`, `theme::hover_surface`, `theme::tracked_text` and the tokens, so the result reads as ours.
 - On the web, use the class names in `web/ncf.css` as they are. Do not restyle `.btn`, `.panel` or `.tabs` per page.
 
 ### Do
-- One accent: signal blue (`signal`, `signal-hi`). Everything else is neutral.
-- Corners at 2 px (`RADIUS`). Hairline borders (`line`, `line-strong`), 1 px. The two built-in exceptions are notices, which have fully rounded ends, and keycaps, at 6 px; both are drawn by NCF, so never copy them onto other things.
-- Solid fills: `void` behind everything, then `deep`, `panel`, `panel-2`.
-- Display type is Anybody 800 at width 150, upper case, for giant words and page titles only.
-- HUD readouts are JetBrains Mono 500, upper case, tracked 0.08em, in `text-2` or `text-3`.
-- UI text is Anybody 600 at width 112; body text is Anybody 400.
+- Bento: content sits on rounded tiles over a soft wallpaper. White surfaces (dark grey in the dark cast) for content, colour tiles (`pal().tile(i)`: coral, lilac, sun, sky) for the few things that should stand out, always with `on_tile` ink text.
+- One accent: coral (`signal`). It fills primary buttons, toggles, progress and the caret. Text in the accent colour uses `signal-hi`, never `signal`: coral on light paper is not readable.
+- Text on a coral fill is `ink` (near-black), never white.
+- Selection inverts: the chosen tab, segment or nav item becomes a `text`-coloured pill with `deep` text (`pal().selected()`).
+- Corners from the scale: 12 for controls and small cards, 20 for panels and menus, 28 for large cards and windows, 32 for hero tiles, pills (`R_PILL`) for buttons, chips, toggles and floating bars.
+- Soft shadows from `theme::Lift` only. Floating chrome (`ui::pill_bar`, popovers, the header on the web) is drawn frost: the `glass` fill, a `glass_line` hairline and a float shadow. The desktop cannot blur; the web may use `backdrop-filter`.
+- The window background is the wallpaper (`chrome::backdrop`). The dark cast adds a coral glow in the top-left corner, the same glow as the app icon.
+- Display type is Bricolage Grotesque 800, sentence case, tracked -0.045em, for page titles, big numbers and giant words, 26 px and up. Headings below that use the heading cut of the same face.
+- UI and body text are Plus Jakarta Sans (600 for controls, 400 for running text).
+- HUD readouts are JetBrains Mono 500, upper case, tracked 0.08em, in `text-2` or `text-3`. Eyebrows (`ui::eyebrow`, `ui::section`) are Jakarta 700, upper case.
 - Sentence case for buttons, labels and body copy. Verbs first on buttons.
-- Show the six column guides behind content (`chrome::column_guides`, or the CSS `body::before`).
-- Every interactive element has a focus ring: 2 px `signal-hi`, offset 2 px.
+- Every interactive element has a focus ring: 2 px `focus` (ink in light, white in dark), offset 2 px, following the element's corners.
 - Hit targets are at least 28 px in the desktop app and 44 px on the web.
-- Every text and background pair meets WCAG AA. `cargo test -p ncf-tokens` checks the palette; you check your own pairs.
+- Every text and background pair meets WCAG AA. `cargo test -p ncf-tokens` checks the palette, including text on tiles, glass and the wallpaper; you check your own pairs.
 - Respect the Animations switch (desktop) and `prefers-reduced-motion` (web).
+- The appearance follows the computer by default (`Appearance::System`), with Light and Dark as choices. Never special-case one cast in an app.
 - Long text is measured and shortened with `ui::elide_to_width`, never cut by character count.
 
 ### Never
-- Glass, blur, glows or drop shadows.
-- Multi-hue gradients, new gradients on buttons or surfaces, or more than one accent hue. The single-hue shading on confirmation buttons and the faint accent wash on notices are built in; do not add more.
+- Real blur on the desktop, or shadows, glows and gradients other than the token ones. The wallpaper and the dark-cast corner glow are the only multi-hue gradients, and NCF draws both.
+- Coral as text on a light surface, or white text on coral or on a tile.
+- Corners off the radius scale.
+- More than one accent. Tile colours are fills for whole tiles, avatars and tags, not a second accent for controls.
 - Pills or badges on static text. A chip is for a tag a person can act on.
-- Rounded corners above 2 px, other than the notices and keycaps NCF already draws.
 - Emoji in the interface.
 - Motion longer than 300 ms, except what NCF already does: the splash, notices arriving (420 ms) and a web page-load reveal (600 ms).
 - Bouncy or elastic motion on anything a person waits on. The overshoot on notices and confirmations is built in; do not add more.
 - Custom cursors, fake metrics, fake testimonials, cartoon illustration.
-- Text set in the display face below 26 px.
+- Text set in the display face below 26 px (use the heading cut instead).
 
 ### Code
 - No comments in source code. If a marker helps you find your place later, use a lazy one: `// thing part here` or `// function_name here---`. Explanations go in `docs/`.

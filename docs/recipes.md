@@ -27,7 +27,7 @@ ui.horizontal(|ui| {
 });
 ```
 
-- Content is capped at 1100 px wide and sits on the left, so the column guides show to the right on wide windows.
+- Content is capped at 1100 px wide and sits on the left, so the wallpaper shows to the right on wide windows.
 - `giant_fit` shrinks a long title down to its minimum, then ellipsises. A title a person typed always goes through it.
 
 ## Empty state
@@ -59,8 +59,7 @@ for row in shown.chunks(cols) {
         for (i, title) in row {
             let (rect, resp) = ui.allocate_exact_size(Vec2::new(card_w, 104.0), Sense::click());
             let hot = anim::ease(ui.ctx(), resp.id, resp.hovered(), anim::HOVER);
-            ui.painter().rect_filled(rect, egui::Rounding::same(theme::RADIUS), theme::mix(p.deep, p.panel, hot));
-            ui.painter().rect_stroke(rect.shrink(0.5), egui::Rounding::same(theme::RADIUS), egui::Stroke::new(1.0_f32, theme::mix(p.line, p.text_3, hot)));
+            theme::surface(ui.painter(), rect, theme::R_LG, if hot > 0.5 { theme::Lift::Float } else { theme::Lift::Rest });
             theme::top_edge(ui.painter(), rect);
             let clip = ui.painter().with_clip_rect(rect.shrink(1.0));
             let font = theme::font_bold(theme::T_BODY);
@@ -210,7 +209,7 @@ egui::ScrollArea::vertical().id_salt("rail").show(&mut r, |ui| {
     for (i, item) in self.items.iter().enumerate() {
         let (rect, resp) = ui.allocate_exact_size(Vec2::new(rail.width(), 34.0), Sense::click());
         let hot = anim::ease(ui.ctx(), resp.id, resp.hovered(), anim::HOVER);
-        theme::hover_surface(ui.painter(), rect, theme::RADIUS, p.signal, hot, i == self.open);
+        theme::hover_surface(ui.painter(), rect, theme::R_SM, p.signal, hot, i == self.open);
         let font = theme::font_semi(theme::T_SM);
         ui.painter().text(rect.left_center() + Vec2::new(12.0, 0.0), egui::Align2::LEFT_CENTER,
             ui::elide_to_width(ui.ctx(), &item.title, font.clone(), 0.0, rect.width() - 24.0), font, p.text);

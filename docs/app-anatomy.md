@@ -70,7 +70,7 @@ In order, it:
 6. shows the splash, then grows the window to 1320 × 900 (minimum 880 × 580).
 
 Every frame it then:
-1. draws the backdrop, the column guides and the resize grips;
+1. follows the computer's light or dark setting when the appearance is System, then draws the wallpaper and the resize grips;
 2. draws the title bar: app mark, name, a Settings button, your `title_extras`, the window buttons;
 3. gives your `ui` the rest of the window;
 4. opens Settings on Ctrl+, ;

@@ -11,7 +11,7 @@ Motion in NativeCompute apps confirms that something happened. It is quick, it s
 | fast, 100 ms | `tokens::MOTION_FAST` | `--m-100` | Colour changes on small controls, press states. |
 | quick, 150 ms | `tokens::MOTION_QUICK` | `--m-150` | Tabs and segments changing, toasts leaving, borders on hover. |
 | base, 200 ms | `tokens::MOTION_BASE` | `--m-200` | Tooltips, menus opening, toasts arriving. |
-| slow, 300 ms | `tokens::MOTION_SLOW` | `--m-300` | Windows and trays opening, the button wipe, page transitions. |
+| slow, 300 ms | `tokens::MOTION_SLOW` | `--m-300` | Windows and trays opening, page transitions. |
 | hover, 240 ms | `tokens::MOTION_HOVER`, `anim::HOVER` | n/a | Hover fills on cards, menu items, dropdowns and icon buttons. |
 
 Nothing runs longer than 300 ms, except:
@@ -24,7 +24,7 @@ Nothing runs longer than 300 ms, except:
 
 - **Ease-out** for everything that arrives: `cubic-bezier(0.16, 1, 0.3, 1)` (`--ease-out`, `tokens::EASE_OUT`). Fast start, long settle.
 - **Ease-in** for things that leave: `cubic-bezier(0.7, 0, 0.84, 0)` (`--ease-in`, `tokens::EASE_IN`).
-- In egui, `anim::ease` gives a smootherstep curve for on/off states, and `anim::glide` gives an exponential ease-out for moving to a new value. `ui::wipe` applies the exponential ease-out itself.
+- In egui, `anim::ease` gives a smootherstep curve for on/off states, and `anim::glide` gives an exponential ease-out for moving to a new value. `ui::wipe` is still there for custom fills and applies the exponential ease-out itself.
 
 ## The drivers
 
@@ -50,14 +50,14 @@ let v = anim::to(ctx, "level", self.level, tokens::MOTION_QUICK);
 
 | Event | Motion |
 |---|---|
-| Hover on a button | A fill wipes in from the left (300 ms, ease-out) and the label inverts as the edge passes. |
-| Hover on a card or menu item | Fill and hairline fade in (240 ms). Menu items also show a 2 px signal bar on the left. |
+| Hover on a button | The fill cross-fades to its hover colour (150 ms). |
+| Hover on a card or menu item | A `panel-2` fill fades in (240 ms); lifted cards move from the rest to the float shadow. |
 | Tab or segment change | The selected fill fades across (150 ms). |
 | Settings window | The scrim fades in and the window grows from 97% to 100% while it fades in (300 ms). |
 | Notice | Rises from the bottom edge with a small overshoot (`anim::pop`, 420 ms), stacks upward, leaves on its own after a few seconds and sinks away in 220 ms. |
 | Confirmation | Grows from 90% to 100% at the centre with a slight overshoot (`anim::ease_out_back`, 420 ms) over a scrim. |
 | Splash | The name drifts 10 px into place over 550 ms, the progress line fills, then the card fades. |
-| Web header | Clear at the top of the page; takes the `void` fill and a hairline once the page scrolls (150 ms). |
+| Web header | A frosted pill that floats over the page from the start. |
 | Web tooltip | Fades and rises 4 px (200 ms). |
 | Web page change | A 300 ms cross-fade view transition. |
 

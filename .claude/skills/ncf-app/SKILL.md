@@ -66,7 +66,7 @@ Before writing code, write down each screen and map every part of it to a compon
 | Result of an action | `shell.ok` / `shell.say` / `shell.warn` |
 | Loading | `mark::spinner` |
 
-If a part has no match, compose it from `theme::panel`, `theme::hover_surface`, `theme::tracked_text`, `ui::hud` and the tokens. Do not invent a new visual idea: no new colours, radii, shadows, gradients or motion curves.
+If a part has no match, compose it from `theme::surface`, `theme::tile`, `theme::glass`, `theme::hover_surface`, `theme::tracked_text`, `ui::big_number`, `ui::pill_bar` and the tokens. Do not invent a new visual idea: no colours, radii, shadows, gradients or motion curves outside the tokens.
 
 ## 5. Build it
 

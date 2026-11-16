@@ -59,7 +59,7 @@ fn main() -> ncf::eframe::Result<()> {
 }
 ```
 
-`ncf::app::run` opens the window with the app's icon, shows the splash, draws the title bar and column guides, and gives you Settings with Appearance and About, notices, confirmations, saved settings and the update check.
+`ncf::app::run` opens the window with the app's icon, shows the splash, draws the title bar and the Bento wallpaper, follows the computer's light or dark setting, and gives you Settings with Appearance and About, notices, confirmations, saved settings and the update check.
 
 ## A website
 
