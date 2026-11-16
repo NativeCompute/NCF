@@ -1,8 +1,10 @@
 /* ncf web here--- */
 @import url("ncf-tokens.css");
 
-@font-face { font-family: "Anybody"; font-style: normal; font-display: swap; font-weight: 100 900; font-stretch: 50% 150%; src: url("fonts/anybody-latin-ext-wdth-normal.woff2") format("woff2-variations"), url("fonts/anybody-latin-ext-wdth-normal.woff2") format("woff2"); unicode-range: U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF; }
-@font-face { font-family: "Anybody"; font-style: normal; font-display: swap; font-weight: 100 900; font-stretch: 50% 150%; src: url("fonts/anybody-latin-wdth-normal.woff2") format("woff2-variations"), url("fonts/anybody-latin-wdth-normal.woff2") format("woff2"); unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD; }
+@font-face { font-family: "Bricolage Grotesque"; font-style: normal; font-display: swap; font-weight: 500 800; src: url("fonts/bricolage-grotesque-latin-ext.woff2") format("woff2"); unicode-range: U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF; }
+@font-face { font-family: "Bricolage Grotesque"; font-style: normal; font-display: swap; font-weight: 500 800; src: url("fonts/bricolage-grotesque-latin.woff2") format("woff2"); unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD; }
+@font-face { font-family: "Plus Jakarta Sans"; font-style: normal; font-display: swap; font-weight: 400 800; src: url("fonts/plus-jakarta-sans-latin-ext.woff2") format("woff2"); unicode-range: U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF; }
+@font-face { font-family: "Plus Jakarta Sans"; font-style: normal; font-display: swap; font-weight: 400 800; src: url("fonts/plus-jakarta-sans-latin.woff2") format("woff2"); unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD; }
 @font-face { font-family: "JetBrains Mono"; font-style: normal; font-display: swap; font-weight: 100 800; src: url("fonts/jetbrains-mono-latin-ext-wght-normal.woff2") format("woff2-variations"), url("fonts/jetbrains-mono-latin-ext-wght-normal.woff2") format("woff2"); unicode-range: U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF; }
 @font-face { font-family: "JetBrains Mono"; font-style: normal; font-display: swap; font-weight: 100 800; src: url("fonts/jetbrains-mono-latin-wght-normal.woff2") format("woff2-variations"), url("fonts/jetbrains-mono-latin-wght-normal.woff2") format("woff2"); unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD; }
 
@@ -289,3 +291,95 @@ input[type="range"]::-moz-range-thumb { width: 20px; height: 20px; background: v
   .faq summary svg, .switch span, .switch span::after { transition: none; }
   .confirm[open] { animation: none; }
 }
+
+/* bento base here--- */
+html, body { background: var(--wallpaper), var(--bg); background-attachment: fixed; }
+body:not(.no-guides)::before { display: none; }
+::selection { background: var(--signal-soft-hi); color: var(--text); }
+:focus-visible { outline-color: var(--focus); border-radius: var(--r-sm); }
+.giant, .giant .fit, .footer-giant .fit { text-transform: none; font-stretch: normal; line-height: 0.92; letter-spacing: var(--display-tracking); }
+.h2, .h3, .num { font-family: var(--display); font-weight: 800; font-stretch: normal; letter-spacing: -0.02em; }
+.spec dt, .card-head h3, .tray-head h2, .faq summary { font-family: var(--display); font-weight: 800; font-stretch: normal; text-transform: none; letter-spacing: -0.02em; }
+.mobile-nav a:not(.btn) { font-stretch: normal; text-transform: none; letter-spacing: -0.02em; }
+.footer-giant .fit { font-stretch: normal; text-transform: none; letter-spacing: -0.045em; }
+.nav a, .tab, .field > label, .footer-inner h2, .maker, .facts dt { font-family: var(--font); font-weight: 700; letter-spacing: 0.08em; }
+.live::before { background: var(--signal); box-shadow: 0 0 0 0 var(--signal-soft-hi); }
+@keyframes ncf-live { 70%, 100% { box-shadow: 0 0 0 8px rgba(255, 106, 61, 0); } }
+.marker { border-radius: 50%; background: var(--signal); }
+
+/* bento buttons here--- */
+.btn { border-radius: var(--r-pill); font-weight: 700; font-stretch: normal; transition: background-color var(--m-150) ease, border-color var(--m-150) ease, color var(--m-150) ease; }
+.btn::before { display: none; }
+.btn--primary { background: var(--accent); color: var(--on-accent); }
+.btn--primary:hover { background: var(--accent-hover); color: var(--on-accent); }
+.btn--ghost { background: var(--surface); color: var(--text); border-color: var(--line-strong); }
+.btn--ghost:hover { background: var(--surface-2); color: var(--text); border-color: var(--text-3); }
+.btn--quiet:hover { background: var(--surface-2); }
+.btn--danger, [data-theme="light"] .btn--danger { background: var(--danger); color: var(--on-danger); }
+.btn--danger:hover { color: var(--on-danger); filter: brightness(1.06); }
+.icon-btn { border-radius: 50%; background: var(--surface); border-color: var(--line); }
+.icon-btn:hover { border-color: var(--text-3); }
+.tip { border-radius: var(--r-sm); box-shadow: var(--shadow-float); }
+.count { background: var(--accent); color: var(--on-accent); font-family: var(--font); font-weight: 800; }
+kbd { border-radius: 6px; background: var(--surface-2); }
+
+/* bento header here--- */
+.site-header { top: 12px; width: calc(100% - 32px); max-width: calc(var(--vp-wide) - 32px); margin: 12px auto 0; border: 1px solid var(--glass-line); border-radius: var(--r-pill); background: var(--glass); box-shadow: var(--shadow-float); -webkit-backdrop-filter: blur(20px) saturate(180%); backdrop-filter: blur(20px) saturate(180%); }
+.site-header.is-scrolled, .site-header[data-open="true"] { background: var(--glass); border-bottom-color: var(--glass-line); }
+.site-header[data-open="true"] { border-radius: var(--r-lg); }
+.header-inner { height: 60px; padding-inline: 20px 8px; }
+.nav a { border-radius: var(--r-pill); min-height: 40px; font-size: var(--t-sec); text-transform: none; letter-spacing: 0; font-weight: 600; }
+.nav a:hover { background: var(--surface-2); }
+.nav a[aria-current="page"] { background: var(--text); color: var(--bg); }
+.nav a[aria-current="page"]::before { display: none; }
+.mobile-nav { background: transparent; border-top-color: var(--line); inset: auto; position: static; }
+
+/* bento surfaces here--- */
+.panel { background: var(--surface); border: 0; border-radius: var(--r-lg); box-shadow: none; }
+[data-theme="dark"] .panel { border: 1px solid var(--line); }
+.panel--chosen { outline: 2px solid var(--focus); outline-offset: 0; }
+.bracket::before, .bracket::after { display: none; }
+.cards { gap: 16px; border: 0; }
+.card { border: 0; border-radius: var(--r-lg); background: var(--surface); }
+.card--chosen { background: var(--lilac); color: var(--on-tile); outline: 0; }
+.card--chosen .card-flag, .card--chosen li, .card--chosen .sec { color: var(--on-tile); }
+.card-flag { color: var(--link); font-family: var(--font); font-weight: 800; }
+.card ul, .card li { border-color: transparent; }
+.tile { border-radius: var(--r-xl); padding: var(--s-6); color: var(--on-tile); }
+.tile--coral { background: var(--coral); }
+.tile--lilac { background: var(--lilac); }
+.tile--sun { background: var(--sun); }
+.tile--sky { background: var(--sky); }
+.spec, .facts { border-top-color: var(--line); }
+
+/* bento controls here--- */
+.tabs { border: 0; padding: 4px; gap: 4px; border-radius: var(--r-pill); background: var(--surface-2); }
+.tab { border: 0; border-radius: var(--r-pill); min-height: 40px; text-transform: none; letter-spacing: 0; font-size: var(--t-sec); font-weight: 600; }
+.tab[aria-selected="true"] { background: var(--text); color: var(--bg); }
+.input, .select, .textarea { border-radius: var(--r-sm); background: var(--surface); }
+.field > label { text-transform: none; letter-spacing: 0; font-size: var(--t-sec); }
+input[type="range"]::-webkit-slider-runnable-track { height: 4px; border-radius: 2px; background: linear-gradient(90deg, var(--accent) var(--fill, 33%), var(--line-strong) var(--fill, 33%)); }
+input[type="range"]::-moz-range-track { height: 4px; border-radius: 2px; }
+input[type="range"]::-moz-range-progress { height: 4px; border-radius: 2px; background: var(--accent); }
+input[type="range"]::-webkit-slider-thumb { width: 20px; height: 20px; margin-top: -8px; border-radius: 50%; background: #fff; box-shadow: var(--shadow-rest), 0 0 0 1px var(--line-strong); }
+input[type="range"]::-moz-range-thumb { border-radius: 50%; background: #fff; box-shadow: var(--shadow-rest), 0 0 0 1px var(--line-strong); }
+.check { border-radius: var(--r-sm); background: var(--surface); }
+.check:has(input:checked) { border-color: var(--text); background: var(--surface); }
+.switch { width: 38px; height: 22px; }
+.switch span { border-radius: var(--r-pill); background: var(--line-strong); border-color: transparent; }
+.switch span::after { top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: var(--shadow-rest); }
+.switch input:checked + span::after { transform: translateX(16px); }
+.banner { border-radius: var(--r-pill); border-color: var(--line); background: var(--surface); }
+.faq, .faq details { border-color: var(--line); }
+
+/* bento overlays here--- */
+.tray-scrim, .confirm::backdrop { background: rgba(19, 19, 24, 0.45); }
+.tray { background: var(--surface); border-left: 0; border-radius: var(--r-lg) 0 0 var(--r-lg); box-shadow: var(--shadow); }
+.tray-head { background: var(--coral); color: var(--on-tile); border-bottom: 0; border-top-left-radius: var(--r-lg); }
+.toast { border-radius: var(--r-pill); box-shadow: var(--shadow); }
+.toast .btn { border-radius: var(--r-pill); }
+.confirm { border: 0; border-radius: var(--r-lg); background: var(--surface); box-shadow: var(--shadow); }
+
+/* bento footer here--- */
+.site-footer { background: transparent; border-top: 0; }
+.footer-giant { color: var(--text); -webkit-text-stroke: 0; opacity: 0.07; }

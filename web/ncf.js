@@ -187,16 +187,25 @@
   });
 
   // theme here---
+  const darkQuery = window.matchMedia ? window.matchMedia("(prefers-color-scheme: dark)") : null;
+  let themeMode = "auto";
+  const paintTheme = () => {
+    const resolved = themeMode === "auto" ? (darkQuery && darkQuery.matches ? "dark" : "light") : themeMode;
+    document.documentElement.dataset.theme = resolved;
+    document.documentElement.dataset.themeMode = themeMode;
+    $$("[data-theme-toggle]").forEach((b) => b.setAttribute("aria-label", "Appearance: " + (themeMode === "auto" ? "follows your computer" : themeMode)));
+  };
   const setTheme = (mode) => {
-    if (mode === "light") document.documentElement.dataset.theme = "light";
-    else delete document.documentElement.dataset.theme;
-    try { localStorage.setItem("ncf:theme", mode); } catch { }
+    themeMode = mode === "light" || mode === "dark" ? mode : "auto";
+    paintTheme();
+    try { localStorage.setItem("ncf:theme", themeMode); } catch { }
   };
   const themeToggles = () => {
-    try { const saved = localStorage.getItem("ncf:theme"); if (saved) setTheme(saved); } catch { }
-    $$("[data-theme-toggle]").forEach((b) => b.addEventListener("click", () => {
-      setTheme(document.documentElement.dataset.theme === "light" ? "dark" : "light");
-    }));
+    try { const saved = localStorage.getItem("ncf:theme"); if (saved) themeMode = saved === "light" || saved === "dark" ? saved : "auto"; } catch { }
+    paintTheme();
+    if (darkQuery && darkQuery.addEventListener) darkQuery.addEventListener("change", () => { if (themeMode === "auto") paintTheme(); });
+    const next = { auto: "light", light: "dark", dark: "auto" };
+    $$("[data-theme-toggle]").forEach((b) => b.addEventListener("click", () => setTheme(next[themeMode])));
   };
 
   const start = () => {
