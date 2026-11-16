@@ -15,7 +15,7 @@ NativeCompute talks like a capable colleague: direct, plain and calm. It says wh
 
 - Sentence case for buttons, labels, menu items, settings, notices, headings and page titles in running text.
 - Upper case only for eyebrows. Write the text in sentence case and let `ui::eyebrow` raise it; labels, readouts and giant titles stay as written.
-- Product names keep their own case: NativeCompute, Blackline, YouTrack, GitHub.
+- Product names keep their own case: NativeCompute, NativeDraft, YouTrack, GitHub.
 
 ## Buttons and menu items
 

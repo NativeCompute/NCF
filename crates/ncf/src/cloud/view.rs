@@ -213,7 +213,7 @@ fn countdown(left: std::time::Duration) -> String {
 
 impl Account {
     pub fn new(info: AppInfo, cfg: CloudConfig, ctx: Option<&egui::Context>) -> Account {
-        let folder = crate::platform::app_folder(info.name);
+        let folder = info.folder();
         let client = Client::for_app(cfg, &info);
         let device = Device::load_or_create(&folder);
         let engine = Engine::spawn(Worker::new(client, device, Outbox::memory(), Heartbeat::off()), ctx.cloned());

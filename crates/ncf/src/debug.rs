@@ -282,7 +282,7 @@ pub fn next_version(version: &str) -> String {
 
 #[cfg(not(target_arch = "wasm32"))]
 pub fn crash_report(info: &crate::AppInfo, text: &str) -> std::path::PathBuf {
-    let folder = crate::platform::app_folder(info.name);
+    let folder = info.folder();
     let log = folder.join("error.log");
     let _ = std::fs::create_dir_all(&folder);
     if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(&log) {

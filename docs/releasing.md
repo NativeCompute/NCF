@@ -2,7 +2,7 @@
 
 ## An app
 
-Apps made with `ncf new` ship the same way Blackline does.
+Apps made with `ncf new` ship the same way NativeDraft does.
 
 1. Bump `version` in `Cargo.toml`. The splash, Settings → About, `--version` and the Windows file properties all read it.
 2. Run the checks:

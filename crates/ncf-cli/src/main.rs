@@ -192,7 +192,7 @@ mod tests {
 
     #[test]
     fn names_become_slugs() {
-        assert_eq!(slug("Blackline"), "blackline");
+        assert_eq!(slug("NativeDraft"), "nativedraft");
         assert_eq!(slug("My Great App!"), "my-great-app");
         assert_eq!(slug("  ...  "), "");
     }

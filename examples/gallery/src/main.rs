@@ -14,6 +14,7 @@ pub const INFO: AppInfo = AppInfo {
     tagline: "Every NCF component",
     repo: "",
     mark: MARK,
+    formerly: &[],
 };
 
 const SECTIONS: [(&str, Icon); 9] = [

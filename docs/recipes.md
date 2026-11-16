@@ -1,6 +1,6 @@
 # Recipes
 
-Screens NativeCompute has already solved. Start from these before designing anything new. The code is from the `ncf new` template (`templates/app/src/app.rs.tmpl`) and Blackline, trimmed to the part that matters.
+Screens NativeCompute has already solved. Start from these before designing anything new. The code is from the `ncf new` template (`templates/app/src/app.rs.tmpl`) and NativeDraft, trimmed to the part that matters.
 
 ## Page header: eyebrow, giant title, primary action
 
@@ -197,7 +197,7 @@ if self.focus_search {
 
 ## List and detail
 
-Blackline's library uses a rail on the left and the open item on the right. Build it from two child UIs:
+NativeDraft's library uses a rail on the left and the open item on the right. Build it from two child UIs:
 
 ```rust
 let full = ui.available_rect_before_wrap();
@@ -226,7 +226,7 @@ The chosen row keeps the hover fill with a signal edge, so it reads as selected 
 
 ## Home picker
 
-When an app has several kinds of work (Blackline: Write, Cards, Read), the home screen greets the person with a giant title and offers each as a large ghost button with an icon, in a row, with the most common one as the primary.
+When an app has several kinds of work (NativeDraft: Write, Cards, Read), the home screen greets the person with a giant title and offers each as a large ghost button with an icon, in a row, with the most common one as the primary.
 
 ```rust
 ui::eyebrow(ui, &format!("{} / V{}", shell.info.name, shell.info.version));

@@ -102,7 +102,7 @@ impl Shell {
     }
 
     pub fn folder(&self) -> PathBuf {
-        platform::app_folder(self.info.name)
+        self.info.folder()
     }
 
     pub fn say(&mut self, title: &str, body: &str) {
@@ -205,7 +205,7 @@ impl Shell {
 }
 
 pub fn settings_path(info: &AppInfo) -> PathBuf {
-    platform::app_folder(info.name).join("settings.conf")
+    info.folder().join("settings.conf")
 }
 
 // runner here---

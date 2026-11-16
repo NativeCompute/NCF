@@ -95,9 +95,9 @@ impl Client {
     }
 
     pub fn for_app(cfg: CloudConfig, info: &crate::AppInfo) -> Client {
-        let folder = crate::platform::app_folder(info.name);
+        let folder = info.folder();
         let ua = format!("{}/{} NativeCloud", info.name, info.version);
-        Client::with_vault(cfg, Ureq::new(&ua), Vault::system(&folder, info.id))
+        Client::with_vault(cfg, Ureq::new(&ua), Vault::system(&folder, info.id).formerly(info.former_slugs()))
     }
 
     fn build(cfg: CloudConfig, http: Box<dyn Transport>, vault: Option<Vault>) -> Client {

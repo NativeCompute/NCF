@@ -257,7 +257,7 @@ Admin panels and dashboards (the NativeCloud panel at cloud.nativecompute.net is
 | `.palette` (a `<dialog>`), `.palette-input`, `.palette-list`, `.palette-group`, `.palette-item`, `.palette-foot` | The command palette (Ctrl or Cmd with K). The highlighted item takes `aria-selected="true"`. |
 | `.auth`, `.auth-top`, `.auth-main`, `.auth-card`, `.auth-foot`, `.or` | Sign-in and sign-up pages: one centred column of 27 rem. |
 | `.code-box`, `.otp` | A code to read or copy, in large mono type, and an input for a 6-digit code. |
-| `.app-ask` | "Sign in to Blackline on Ann's Mac?": the app's mark next to the question. |
+| `.app-ask` | "Sign in to NativeDraft on Ann's Mac?": the app's mark next to the question. |
 | `.kv` | Label and value rows. |
 | `.danger-zone` with `.row-action` | Destructive actions, each with a sentence saying what goes. |
 | `.script-preview` | A read-only, scrollable view of a script's text. |

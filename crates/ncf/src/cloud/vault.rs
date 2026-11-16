@@ -14,15 +14,28 @@ pub struct Vault {
     file: PathBuf,
     account: String,
     system: bool,
+    formerly: Vec<String>,
+}
+
+pub fn first_found(mine: Option<String>, formerly: &[String], read: impl Fn(&str) -> Option<String>) -> Option<(String, bool)> {
+    if let Some(text) = mine {
+        return Some((text, false));
+    }
+    formerly.iter().find_map(|old| read(old)).map(|text| (text, true))
 }
 
 impl Vault {
     pub fn system(folder: &Path, app_id: &str) -> Vault {
-        Vault { file: folder.join("cloud-session"), account: app_id.to_string(), system: cfg!(any(windows, target_os = "macos")) }
+        Vault { file: folder.join("cloud-session"), account: app_id.to_string(), system: cfg!(any(windows, target_os = "macos")), formerly: Vec::new() }
     }
 
     pub fn file_only(file: PathBuf) -> Vault {
-        Vault { file, account: String::new(), system: false }
+        Vault { file, account: String::new(), system: false, formerly: Vec::new() }
+    }
+
+    pub fn formerly(mut self, accounts: Vec<String>) -> Vault {
+        self.formerly = accounts.into_iter().filter(|a| *a != self.account).collect();
+        self
     }
 
     pub fn account(&self) -> &str {
@@ -34,7 +47,14 @@ impl Vault {
     }
 
     pub fn load(&self) -> Option<Stored> {
-        let text = self.read_system().or_else(|| std::fs::read_to_string(&self.file).ok())?;
+        let mine = self.read_system();
+        let (text, moved) = match first_found(mine, &self.formerly, |old| self.read_system_as(old)) {
+            Some(found) => found,
+            None => (std::fs::read_to_string(&self.file).ok()?, false),
+        };
+        if moved {
+            self.write_system(&text);
+        }
         serde_json::from_str::<Stored>(&text).ok().filter(|s| !s.refresh_token.is_empty())
     }
 
@@ -54,15 +74,25 @@ impl Vault {
 
     #[cfg(all(feature = "cloud", any(windows, target_os = "macos")))]
     fn entry(&self) -> Option<keyring::Entry> {
+        self.entry_as(&self.account)
+    }
+
+    #[cfg(all(feature = "cloud", any(windows, target_os = "macos")))]
+    fn entry_as(&self, account: &str) -> Option<keyring::Entry> {
         if !self.system {
             return None;
         }
-        keyring::Entry::new("NativeCloud", &self.account).ok()
+        keyring::Entry::new("NativeCloud", account).ok()
     }
 
     #[cfg(all(feature = "cloud", any(windows, target_os = "macos")))]
     fn read_system(&self) -> Option<String> {
         self.entry()?.get_password().ok()
+    }
+
+    #[cfg(all(feature = "cloud", any(windows, target_os = "macos")))]
+    fn read_system_as(&self, account: &str) -> Option<String> {
+        self.entry_as(account)?.get_password().ok()
     }
 
     #[cfg(all(feature = "cloud", any(windows, target_os = "macos")))]
@@ -79,6 +109,11 @@ impl Vault {
 
     #[cfg(not(all(feature = "cloud", any(windows, target_os = "macos"))))]
     fn read_system(&self) -> Option<String> {
+        None
+    }
+
+    #[cfg(not(all(feature = "cloud", any(windows, target_os = "macos"))))]
+    fn read_system_as(&self, _account: &str) -> Option<String> {
         None
     }
 

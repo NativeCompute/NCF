@@ -26,7 +26,7 @@ Call `shell.enable_cloud(ctx, CloudConfig::nativecloud())` in your `make` closur
 Sign-in, sign-up, email codes, passwords, profile changes, computers, export and account deletion all happen on the web. The app follows [RFC 8252](https://www.rfc-editor.org/rfc/rfc8252): an authorization code with PKCE over a loopback redirect.
 1. `Account::sign_in_with_browser(signup)` makes a `Pkce` (a random verifier, its SHA-256 challenge and a random state) and listens on `127.0.0.1` on a free port for five minutes.
 2. It opens `{web}/login?app=…&device=…&challenge=…&state=…&port=…` (with `&mode=signup` for a new account).
-3. After signing in, the person confirms "Sign in to Blackline on Ann's Mac?". The web asks the server for a one-time grant code tied to the challenge, then sends the browser to `http://127.0.0.1:{port}/callback?code=…&state=…`.
+3. After signing in, the person confirms "Sign in to NativeDraft on Ann's Mac?". The web asks the server for a one-time grant code tied to the challenge, then sends the browser to `http://127.0.0.1:{port}/callback?code=…&state=…`.
 4. The app checks `state`, answers with a small NCF-styled page, and calls `Client::redeem_code(code, verifier)`. The `app-token` function checks the verifier against the challenge and returns a new session for this computer.
 - A wrong `state` is ignored and the app keeps waiting. A code works once, for two minutes, and five wrong verifiers burn it.
 - If the browser can't reach the app, the web shows the code instead. `Account::set_code` and `submit_code` redeem it with the same verifier.

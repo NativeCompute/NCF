@@ -39,10 +39,10 @@ There are two kinds of mark.
 pub const MARK: AppMark = AppMark::drawn("Ledger", &[slab((0.27, 0.83), (0.49, 0.17)), line((0.585, 0.83), (0.805, 0.17))]);
 ```
 
-**Picture marks** are a PNG with a transparent background, scaled to 79% of the tile's width with a soft drop shadow. Blackline's ribbon is one.
+**Picture marks** are a PNG with a transparent background, scaled to 79% of the tile's width with a soft drop shadow. NativeDraft's ribbon is one.
 
 ```rust
-pub const MARK: AppMark = AppMark::raster("Blackline", include_bytes!("../assets/icon/mark.png"));
+pub const MARK: AppMark = AppMark::raster("NativeDraft", include_bytes!("../assets/icon/mark.png"));
 ```
 
 Drawn marks:

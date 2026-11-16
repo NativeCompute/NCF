@@ -46,6 +46,39 @@ pub struct AppInfo {
     pub tagline: &'static str,
     pub repo: &'static str,
     pub mark: mark::AppMark,
+    pub formerly: &'static [&'static str],
+}
+
+impl AppInfo {
+    pub fn former_slugs(&self) -> Vec<String> {
+        self.formerly.iter().map(|n| slug_of(n)).collect()
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn folder(&self) -> std::path::PathBuf {
+        self.folder_in(&platform::data_home(), OS)
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn folder_in(&self, home: &std::path::Path, os: Os) -> std::path::PathBuf {
+        let fresh = home.join(platform::folder_name(self.name, os));
+        if fresh.exists() {
+            return fresh;
+        }
+        self.formerly.iter().map(|n| home.join(platform::folder_name(n, os))).find(|d| d.is_dir()).unwrap_or(fresh)
+    }
+}
+
+pub fn slug_of(name: &str) -> String {
+    let mut s = String::new();
+    for c in name.trim().chars() {
+        if c.is_ascii_alphanumeric() {
+            s.push(c.to_ascii_lowercase());
+        } else if !s.ends_with('-') && !s.is_empty() {
+            s.push('-');
+        }
+    }
+    s.trim_end_matches('-').to_string()
 }
 
 pub mod prelude {

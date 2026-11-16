@@ -427,6 +427,7 @@ fn the_mac_info_plist_has_what_finder_and_retina_need() {
         tagline: "",
         repo: "",
         mark: crate::mark::NATIVECOMPUTE,
+        formerly: &[],
     };
     let plist = crate::bundle::info_plist(&info, "field-notes", "Field Notes");
     for (k, v) in [
@@ -463,7 +464,7 @@ fn the_updater_window_draws_every_step_in_both_casts() {
         headless: false,
         reopen: false,
     };
-    let info = crate::AppInfo { name: "Field Notes", id: "net.nativecompute.fieldnotes", version: "1.3.0", tagline: "", repo: "NativeCompute/field-notes", mark: crate::mark::AppMark::drawn("Field Notes", &[]) };
+    let info = crate::AppInfo { name: "Field Notes", id: "net.nativecompute.fieldnotes", version: "1.3.0", tagline: "", repo: "NativeCompute/field-notes", mark: crate::mark::AppMark::drawn("Field Notes", &[]), formerly: &[] };
     for dark in [true, false] {
         theme::set_palette(dark);
         let mut h = Harness::new(540.0, 340.0);
@@ -637,7 +638,7 @@ fn the_splash_waits_for_the_update_check() {
     use crate::splash::Splash;
     let _guard = lock();
     let mut h = Harness::new(900.0, 600.0);
-    let info = crate::AppInfo { name: "Field Notes", id: "x", version: "1.3.0", tagline: "", repo: "NativeCompute/field-notes", mark: crate::mark::NATIVECOMPUTE };
+    let info = crate::AppInfo { name: "Field Notes", id: "x", version: "1.3.0", tagline: "", repo: "NativeCompute/field-notes", mark: crate::mark::NATIVECOMPUTE, formerly: &[] };
     let mut s = Splash::inline(info);
     s.set_status(update::Status::Checking);
     splash_frames(&mut h, &mut s, 3);
@@ -655,7 +656,7 @@ fn the_splash_turns_into_the_update_prompt_and_waits_for_a_choice() {
     use crate::splash::{Choice, Offer, Splash};
     let _guard = lock();
     let mut h = Harness::new(900.0, 600.0);
-    let info = crate::AppInfo { name: "Field Notes", id: "x", version: "1.3.0", tagline: "", repo: "NativeCompute/field-notes", mark: crate::mark::NATIVECOMPUTE };
+    let info = crate::AppInfo { name: "Field Notes", id: "x", version: "1.3.0", tagline: "", repo: "NativeCompute/field-notes", mark: crate::mark::NATIVECOMPUTE, formerly: &[] };
     let mut s = Splash::inline(info);
     s.set_status(update::Status::Newer(update::Release { version: "1.4.0".into(), url: String::new() }));
     crate::anim::set_enabled(true);
@@ -688,7 +689,7 @@ fn the_splash_turns_into_the_update_prompt_and_waits_for_a_choice() {
 fn the_update_prompt_blocks_until_answered_in_both_casts() {
     use crate::splash::{prompt, Choice, Offer};
     let _guard = lock();
-    let info = crate::AppInfo { name: "Field Notes", id: "x", version: "1.3.0", tagline: "", repo: "NativeCompute/field-notes", mark: crate::mark::NATIVECOMPUTE };
+    let info = crate::AppInfo { name: "Field Notes", id: "x", version: "1.3.0", tagline: "", repo: "NativeCompute/field-notes", mark: crate::mark::NATIVECOMPUTE, formerly: &[] };
     for dark in [true, false] {
         let mut h = Harness::new(1000.0, 700.0);
         theme::set_palette(dark);
@@ -811,7 +812,7 @@ fn a_desktop_scheme_name_says_dark_or_light() {
 fn debug_mode_can_pick_each_appearance() {
     use crate::settings::Appearance;
     let _g = lock();
-    let info = crate::AppInfo { name: "Field Notes", id: "x", version: "1.3.0", tagline: "", repo: "NativeCompute/field-notes", mark: crate::mark::NATIVECOMPUTE };
+    let info = crate::AppInfo { name: "Field Notes", id: "x", version: "1.3.0", tagline: "", repo: "NativeCompute/field-notes", mark: crate::mark::NATIVECOMPUTE, formerly: &[] };
     let mut shell = crate::app::Shell::new(info);
     let h = Harness::new(400.0, 300.0);
     for a in Appearance::ALL {
@@ -913,4 +914,23 @@ fn segmented_tabs_share_the_width_they_are_given() {
     for (w, got) in sizes {
         assert!(got <= w + 0.5, "{got} spills past {w}");
     }
+}
+
+#[test]
+fn a_renamed_app_keeps_its_old_folder_until_it_has_a_new_one() {
+    let home = std::env::temp_dir().join(format!("ncf-formerly-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&home);
+    std::fs::create_dir_all(&home).unwrap();
+    let info = crate::AppInfo { name: "Tally", id: "tally", version: "1.0.0", tagline: "", repo: "", mark: crate::mark::NATIVECOMPUTE, formerly: &["Ledger"] };
+    assert_eq!(info.folder_in(&home, crate::Os::Linux), home.join("tally"), "nothing yet: the new name");
+    std::fs::create_dir_all(home.join("ledger")).unwrap();
+    std::fs::write(home.join("ledger/settings.conf"), "kept").unwrap();
+    assert_eq!(info.folder_in(&home, crate::Os::Linux), home.join("ledger"), "the old folder, where it is");
+    assert_eq!(std::fs::read_to_string(home.join("ledger/settings.conf")).unwrap(), "kept");
+    assert!(!home.join("tally").exists(), "no new folder is made just by looking");
+    assert_eq!(info.folder_in(&home, crate::Os::Mac), home.join("Tally"), "on a Mac the folder keeps its capitals");
+    std::fs::create_dir_all(home.join("tally")).unwrap();
+    assert_eq!(info.folder_in(&home, crate::Os::Linux), home.join("tally"), "once there is a new folder, it wins");
+    assert_eq!(info.former_slugs(), vec!["ledger".to_string()]);
+    let _ = std::fs::remove_dir_all(&home);
 }

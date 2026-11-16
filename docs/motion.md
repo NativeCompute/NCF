@@ -44,7 +44,7 @@ let v = anim::to(ctx, "level", self.level, tokens::MOTION_QUICK);
 | `anim::breathe(ctx, period)` | 0 to 1 and back | A live dot or a waiting state. Sparingly. |
 | `anim::keep_going(ctx)` | Asks for the next frame | Call while something continuous is on screen. |
 
-`anim::pop` and `anim::ease_out_back` give notices and confirmations their small overshoot, and that is where they belong. `anim::spring_to`, `anim::bounce_in` and `anim::ease_out_elastic` exist for Blackline's existing flourishes. Do not use any of them for new screens, lists or anything a person waits on.
+`anim::pop` and `anim::ease_out_back` give notices and confirmations their small overshoot, and that is where they belong. `anim::spring_to`, `anim::bounce_in` and `anim::ease_out_elastic` exist for NativeDraft's existing flourishes. Do not use any of them for new screens, lists or anything a person waits on.
 
 ## What moves
 

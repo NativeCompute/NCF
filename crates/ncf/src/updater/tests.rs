@@ -13,42 +13,42 @@ fn temp(name: &str) -> PathBuf {
 #[test]
 fn only_a_standard_install_can_update_itself() {
     let home = Path::new("/Users/sam");
-    let mac = |p: &str| Install::detect(Path::new(p), home, Os::Mac, "blackline");
+    let mac = |p: &str| Install::detect(Path::new(p), home, Os::Mac, "ledger", &[]);
     assert_eq!(
-        mac("/Applications/Blackline.app/Contents/MacOS/blackline"),
-        Some(Install::MacBundle { app: PathBuf::from("/Applications/Blackline.app") })
+        mac("/Applications/Ledger.app/Contents/MacOS/ledger"),
+        Some(Install::MacBundle { app: PathBuf::from("/Applications/Ledger.app") })
     );
     assert_eq!(
-        mac("/Users/sam/Applications/Blackline.app/Contents/MacOS/blackline"),
-        Some(Install::MacBundle { app: PathBuf::from("/Users/sam/Applications/Blackline.app") })
+        mac("/Users/sam/Applications/Ledger.app/Contents/MacOS/ledger"),
+        Some(Install::MacBundle { app: PathBuf::from("/Users/sam/Applications/Ledger.app") })
     );
-    assert_eq!(mac("/Users/sam/Desktop/Blackline.app/Contents/MacOS/blackline"), None, "an app outside Applications");
-    assert_eq!(mac("/Users/sam/blackline/target/release/blackline"), None, "a build from source");
-    assert_eq!(mac("/Applications/Blackline/Contents/MacOS/blackline"), None, "not a .app");
+    assert_eq!(mac("/Users/sam/Desktop/Ledger.app/Contents/MacOS/ledger"), None, "an app outside Applications");
+    assert_eq!(mac("/Users/sam/ledger/target/release/ledger"), None, "a build from source");
+    assert_eq!(mac("/Applications/Ledger/Contents/MacOS/ledger"), None, "not a .app");
 
     let home = Path::new("/home/sam");
-    let linux = |p: &str| Install::detect(Path::new(p), home, Os::Linux, "blackline");
-    assert_eq!(linux("/home/sam/.local/bin/blackline"), Some(Install::LinuxLocal { bin: PathBuf::from("/home/sam/.local/bin/blackline") }));
-    assert_eq!(linux("/home/sam/code/blackline/target/release/blackline"), None);
-    assert_eq!(linux("/usr/bin/blackline"), None);
+    let linux = |p: &str| Install::detect(Path::new(p), home, Os::Linux, "ledger", &[]);
+    assert_eq!(linux("/home/sam/.local/bin/ledger"), Some(Install::LinuxLocal { bin: PathBuf::from("/home/sam/.local/bin/ledger") }));
+    assert_eq!(linux("/home/sam/code/ledger/target/release/ledger"), None);
+    assert_eq!(linux("/usr/bin/ledger"), None);
 
-    let win = |p: &str| Install::detect(Path::new(p), Path::new("C:/Users/sam"), Os::Windows, "blackline");
-    assert!(matches!(win("D:/Apps/Blackline/blackline.exe"), Some(Install::WindowsExe { .. })));
-    assert!(matches!(win("D:/Apps/Blackline/BLACKLINE.EXE"), Some(Install::WindowsExe { .. })));
-    assert_eq!(win("D:/Apps/Blackline/blackline-updater.exe"), None);
-    assert_eq!(Install::detect(Path::new("/x"), home, Os::Web, "blackline"), None);
+    let win = |p: &str| Install::detect(Path::new(p), Path::new("C:/Users/sam"), Os::Windows, "ledger", &[]);
+    assert!(matches!(win("D:/Apps/Ledger/ledger.exe"), Some(Install::WindowsExe { .. })));
+    assert!(matches!(win("D:/Apps/Ledger/LEDGER.EXE"), Some(Install::WindowsExe { .. })));
+    assert_eq!(win("D:/Apps/Ledger/ledger-updater.exe"), None);
+    assert_eq!(Install::detect(Path::new("/x"), home, Os::Web, "ledger", &[]), None);
 }
 
 #[test]
 fn each_platform_downloads_its_own_release_files() {
-    assert_eq!(assets("blackline", "2.2.1", Os::Mac), ["blackline-macos.zip", "blackline-macos.zip.sha256", "install-macos.sh"]);
-    assert_eq!(assets("blackline", "2.2.1", Os::Linux), ["blackline-v2.2.1-linux-x86_64.tar.gz", "blackline-v2.2.1-linux-x86_64.tar.gz.sha256"]);
-    assert_eq!(assets("blackline", "2.2.1", Os::Windows), ["blackline-v2.2.1-windows-x86_64.zip", "blackline-v2.2.1-windows-x86_64.zip.sha256"]);
-    assert!(assets("blackline", "2.2.1", Os::Web).is_empty());
+    assert_eq!(assets("ledger", "2.2.1", Os::Mac), ["ledger-macos.zip", "ledger-macos.zip.sha256", "install-macos.sh"]);
+    assert_eq!(assets("ledger", "2.2.1", Os::Linux), ["ledger-v2.2.1-linux-x86_64.tar.gz", "ledger-v2.2.1-linux-x86_64.tar.gz.sha256"]);
+    assert_eq!(assets("ledger", "2.2.1", Os::Windows), ["ledger-v2.2.1-windows-x86_64.zip", "ledger-v2.2.1-windows-x86_64.zip.sha256"]);
+    assert!(assets("ledger", "2.2.1", Os::Web).is_empty());
     assert_eq!(slug("Field Notes"), "field-notes");
-    assert_eq!(slug("Blackline"), "blackline");
-    assert_eq!(updater_name("blackline", Os::Windows), "blackline-updater.exe");
-    assert_eq!(updater_name("blackline", Os::Mac), "blackline-updater", "a different process name from the app's");
+    assert_eq!(slug("Ledger"), "ledger");
+    assert_eq!(updater_name("ledger", Os::Windows), "ledger-updater.exe");
+    assert_eq!(updater_name("ledger", Os::Mac), "ledger-updater", "a different process name from the app's");
 }
 
 #[test]
@@ -81,7 +81,7 @@ fn the_updater_gets_the_whole_plan_through_its_arguments() {
 #[test]
 fn a_release_names_the_exact_version_it_installs() {
     std::env::remove_var("NCF_UPDATE_SOURCE");
-    assert_eq!(source_for("NativeCompute/blackline", "2.2.1"), "https://github.com/NativeCompute/blackline/releases/download/v2.2.1");
+    assert_eq!(source_for("NativeCompute/ledger", "2.2.1"), "https://github.com/NativeCompute/ledger/releases/download/v2.2.1");
 }
 
 #[test]
@@ -90,7 +90,7 @@ fn checksums_and_installer_lines_read_the_way_the_tools_write_them() {
     std::fs::write(dir.join("abc"), b"abc").unwrap();
     assert_eq!(work::sha256_hex(&dir.join("abc")).unwrap(), "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
     assert_eq!(
-        work::expected_sum("BA7816BF8F01CFEA414140DE5DAE2223B00361A396177A9CB410FF61F20015AD  blackline-macos.zip\n").as_deref(),
+        work::expected_sum("BA7816BF8F01CFEA414140DE5DAE2223B00361A396177A9CB410FF61F20015AD  ledger-macos.zip\n").as_deref(),
         Some("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad")
     );
     assert_eq!(work::expected_sum("not a checksum"), None);
@@ -116,8 +116,8 @@ fn the_window_follows_the_work_step_by_step() {
     s.apply(Event::Step(Step::Install));
     assert_eq!(s.progress, 0.0, "a new step starts its own progress");
     assert!(s.installing(), "closing the window is refused while installing");
-    s.apply(Event::Line("Installed to /Applications/Blackline.app".into()));
-    assert_eq!(s.detail, "Installed to /Applications/Blackline.app");
+    s.apply(Event::Line("Installed to /Applications/Ledger.app".into()));
+    assert_eq!(s.detail, "Installed to /Applications/Ledger.app");
     s.apply(Event::Done);
     assert!(s.finished() && !s.installing());
     let mut f = State::default();
@@ -130,26 +130,26 @@ fn the_window_follows_the_work_step_by_step() {
 #[test]
 fn swapping_the_program_keeps_the_old_one_until_the_new_one_is_in() {
     let dir = temp("swap");
-    let exe = dir.join("blackline.exe");
+    let exe = dir.join("ledger.exe");
     let new = dir.join("new.exe");
     std::fs::write(&exe, b"old").unwrap();
     std::fs::write(&new, b"new").unwrap();
-    work::swap(&exe, &new, "blackline", std::time::Duration::from_secs(1)).unwrap();
+    work::swap(&exe, &new, "ledger", std::time::Duration::from_secs(1)).unwrap();
     assert_eq!(std::fs::read(&exe).unwrap(), b"new");
-    assert_eq!(std::fs::read(old_exe(&exe, "blackline")).unwrap(), b"old", "kept until the next start tidies it");
+    assert_eq!(std::fs::read(old_exe(&exe, "ledger")).unwrap(), b"old", "kept until the next start tidies it");
 
     std::fs::write(&exe, b"current").unwrap();
     let missing = dir.join("missing.exe");
-    let err = work::swap(&exe, &missing, "blackline", std::time::Duration::from_secs(1)).unwrap_err();
+    let err = work::swap(&exe, &missing, "ledger", std::time::Duration::from_secs(1)).unwrap_err();
     assert!(err.contains("old one is back"), "{err}");
     assert_eq!(std::fs::read(&exe).unwrap(), b"current", "a failed swap puts the old program back");
 
-    let data = dir.join("Blackline");
+    let data = dir.join("Ledger");
     std::fs::create_dir_all(data.join("scripts")).unwrap();
     std::fs::write(data.join("scripts/a.md"), b"INT. HOUSE - DAY").unwrap();
     let backup = work::back_up(&data).unwrap().unwrap();
     assert_eq!(std::fs::read(backup.join("scripts/a.md")).unwrap(), b"INT. HOUSE - DAY");
-    assert!(backup.file_name().unwrap().to_string_lossy().starts_with("Blackline-backup-"));
+    assert!(backup.file_name().unwrap().to_string_lossy().starts_with("Ledger-backup-"));
     assert_eq!(work::back_up(&dir.join("none")).unwrap(), None);
     let _ = std::fs::remove_dir_all(dir);
 }
@@ -253,7 +253,7 @@ fn the_updater_demo_walks_the_same_steps_and_installs_nothing() {
     assert_eq!(demo_from_args(&["app".into(), DEMO_FLAG.into(), "fail".into()]), Some(Demo::Fails));
     assert_eq!(demo_from_args(&["app".into(), DEMO_FLAG.into(), "nonsense".into()]), None);
     assert_eq!(demo_from_args(&["app".into()]), None);
-    let info = crate::AppInfo { name: "Field Notes", id: "x", version: "1.3.0", tagline: "", repo: "NativeCompute/field-notes", mark: crate::mark::AppMark::drawn("Field Notes", &[]) };
+    let info = crate::AppInfo { name: "Field Notes", id: "x", version: "1.3.0", tagline: "", repo: "NativeCompute/field-notes", mark: crate::mark::AppMark::drawn("Field Notes", &[]), formerly: &[] };
     let plan = demo_plan(&info);
     assert_eq!((plan.version.as_str(), plan.reopen, plan.slug.as_str()), ("1.3.1", false, "field-notes-demo"));
 
@@ -279,3 +279,20 @@ fn the_updater_demo_walks_the_same_steps_and_installs_nothing() {
     assert!(worker.join().unwrap().unwrap_err().contains("Cancelled"), "Cancel stops the slow demo");
 }
 
+
+#[test]
+fn an_app_that_was_renamed_still_updates_from_its_old_name() {
+    let was = vec!["ledger".to_string()];
+    let home = Path::new("/home/sam");
+    assert_eq!(
+        Install::detect(Path::new("/home/sam/.local/bin/ledger"), home, Os::Linux, "tally", &was),
+        Some(Install::LinuxLocal { bin: PathBuf::from("/home/sam/.local/bin/ledger") })
+    );
+    assert_eq!(Install::detect(Path::new("/home/sam/.local/bin/ledger"), home, Os::Linux, "tally", &[]), None, "only when the app says it was called that");
+    assert!(matches!(Install::detect(Path::new("D:/Apps/Ledger/ledger.exe"), Path::new("C:/Users/sam"), Os::Windows, "tally", &was), Some(Install::WindowsExe { .. })));
+    assert!(matches!(Install::detect(Path::new("D:/Apps/Tally/tally.exe"), Path::new("C:/Users/sam"), Os::Windows, "tally", &was), Some(Install::WindowsExe { .. })));
+    assert_eq!(
+        Install::detect(Path::new("/Applications/Ledger.app/Contents/MacOS/ledger"), Path::new("/Users/sam"), Os::Mac, "tally", &was),
+        Some(Install::MacBundle { app: PathBuf::from("/Applications/Ledger.app") })
+    );
+}

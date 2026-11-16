@@ -40,6 +40,7 @@ const INFO: AppInfo = AppInfo {
     tagline: "Money, plainly.",
     repo: "NativeCompute/ledger",
     mark: MARK,
+    formerly: &[],
 };
 
 struct Ledger;

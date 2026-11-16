@@ -832,6 +832,7 @@ const INFO: crate::AppInfo = crate::AppInfo {
     tagline: "",
     repo: "",
     mark: crate::mark::AppMark::drawn("Cloud Test", &[]),
+    formerly: &[],
 };
 
 fn settle(a: &mut Account) {
@@ -1078,4 +1079,14 @@ fn the_sign_in_page_wears_the_bento_tokens() {
     assert!(!html.to_ascii_lowercase().contains("#3b4cff"), "no old signal blue");
     assert!(html.contains("&lt;now&gt;"), "text is escaped");
     assert!(html.contains("border-radius: 28px"));
+}
+
+#[test]
+fn a_session_saved_under_an_old_app_id_is_found_and_moved_over() {
+    use crate::cloud::vault::first_found;
+    let was = vec!["ledger".to_string()];
+    let read = |acc: &str| (acc == "ledger").then(|| "old".to_string());
+    assert_eq!(first_found(Some("mine".into()), &was, read), Some(("mine".to_string(), false)), "the new entry wins");
+    assert_eq!(first_found(None, &was, read), Some(("old".to_string(), true)), "the old one is used and copied over");
+    assert_eq!(first_found(None, &[], read), None);
 }

@@ -45,6 +45,7 @@ pub const INFO: AppInfo = AppInfo {
     tagline: "Money, plainly.",
     repo: "NativeCompute/ledger",
     mark: MARK,
+    formerly: &[],
 };
 ```
 
@@ -52,6 +53,7 @@ pub const INFO: AppInfo = AppInfo {
 - `id` is the Wayland app id and the `.desktop` file name.
 - `repo` is where the update check looks for releases. Leave it empty to turn the check off.
 - `mark` is the app's icon, as data. See [brand.md](brand.md#app-marks).
+- `formerly` lists names the app had before, oldest last. After a rename the app keeps using the old data folder when there is no new one, keeps people signed in, and still updates an install that carries the old program name. Nothing is copied or moved.
 
 ### `ncf::app::run`
 

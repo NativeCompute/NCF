@@ -8,6 +8,11 @@ NCF follows [semantic versioning](https://semver.org). Apps pin a tag, so nothin
 
 - **A new look.** Rounded tiles on a soft wallpaper, one coral accent (`signal` is now #FF6A3D), colour tiles in coral, lilac, sun and sky with ink text, soft token shadows, and frosted floating bars (`ui::pill_bar`, `theme::glass`). The dark cast is graphite with a coral glow in the top-left corner.
 - **New type.** Bricolage Grotesque for display and headings, Plus Jakarta Sans for the interface. Display type is sentence case. The desktop fonts carry their kerning in a `kern` table so egui sets them properly.
+- **Renaming an app.** Breaking: `AppInfo` has a new field, `formerly`, listing the names an app had before. Apps that were never renamed pass `&[]`. A renamed app:
+  - keeps using its old data folder until a folder under the new name exists (`AppInfo::folder`), so settings, the device id and NativeCloud sign-in stay put;
+  - reads a keychain sign-in saved under the old app id and copies it to the new one;
+  - still updates an install that carries the old program name (`updater::Install::detect`, `updater::tidy_app`).
+  Nothing is copied or moved on disk.
 - **Labels you can read.** `ui::hud` and `theme::font_hud` are now a Plus Jakarta Sans label cut (weight 560, tabular figures baked in) in sentence case with no tracking, instead of upper-case JetBrains Mono. Eyebrows (`ui::eyebrow`) are the only capitals left. Mono is for keycaps and code. Every built-in string (notices, the updater, splash, cloud screens) is sentence case.
 - **Glass chrome.** `chrome::title_bar_with` takes a crumb and a centre slot (`TITLE_H` is 44). New widgets for a glass shell: `side_link`, `side_section`, `search_trigger`, `seg_tabs` (shares the width it is given), `stat_chip`, `select_button`, `tag`/`live_tag`, `empty_state`. `theme::glass_highlight` draws the inset edge, `Pal::pill` and `Pal::tag` give their fills, and `Icon::Note` joins the set.
 - **The wallpaper** gains a 135° base gradient (`wall_from`, `wall_to`) under its three washes. Translucent tokens are premultiplied the way CSS composites them, and `theme::css_rgba` does the same at runtime, so dark glass stays dark.
@@ -75,7 +80,7 @@ macOS. Every check runs on GitHub's Macs, Apple Silicon and Intel, as well as on
 
 ## 0.1.0
 
-The first release: the NativeCompute look and app plumbing, lifted out of Blackline and nativecompute.net into one framework.
+The first release: the NativeCompute look and app plumbing, lifted out of Blackline (now NativeDraft) and nativecompute.net into one framework.
 
 ### Tokens
 - `tokens/ncf.toml` holds every colour (dark and light), type role and size, spacing step, shape value and motion duration.

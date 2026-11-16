@@ -18,7 +18,8 @@ pub enum Install {
 }
 
 impl Install {
-    pub fn detect(exe: &Path, home: &Path, os: Os, slug: &str) -> Option<Install> {
+    pub fn detect(exe: &Path, home: &Path, os: Os, slug: &str, formerly: &[String]) -> Option<Install> {
+        let names: Vec<&str> = std::iter::once(slug).chain(formerly.iter().map(String::as_str)).collect();
         match os {
             Os::Mac => {
                 let macos = exe.parent()?;
@@ -30,9 +31,10 @@ impl Install {
                 let dir = app.parent()?;
                 (dir == Path::new("/Applications") || dir == home.join("Applications")).then(|| Install::MacBundle { app: app.to_path_buf() })
             }
-            Os::Linux => (exe == home.join(".local/bin").join(slug)).then(|| Install::LinuxLocal { bin: exe.to_path_buf() }),
+            Os::Linux => names.iter().any(|n| exe == home.join(".local/bin").join(n)).then(|| Install::LinuxLocal { bin: exe.to_path_buf() }),
             Os::Windows => {
-                let named = exe.file_name()?.to_string_lossy().eq_ignore_ascii_case(&format!("{slug}.exe"));
+                let file = exe.file_name()?.to_string_lossy().to_string();
+                let named = names.iter().any(|n| file.eq_ignore_ascii_case(&format!("{n}.exe")));
                 named.then(|| Install::WindowsExe { exe: exe.to_path_buf() })
             }
             Os::Web => None,
@@ -80,15 +82,7 @@ pub struct Plan {
 }
 
 pub fn slug(name: &str) -> String {
-    let mut s = String::new();
-    for c in name.trim().chars() {
-        if c.is_ascii_alphanumeric() {
-            s.push(c.to_ascii_lowercase());
-        } else if !s.ends_with('-') && !s.is_empty() {
-            s.push('-');
-        }
-    }
-    s.trim_end_matches('-').to_string()
+    crate::slug_of(name)
 }
 
 pub fn source_for(repo: &str, version: &str) -> String {
@@ -136,7 +130,7 @@ impl Plan {
         let exe = exe.canonicalize().unwrap_or(exe);
         let home = dirs::home_dir()?;
         let home = home.canonicalize().unwrap_or(home);
-        let install = Install::detect(&exe, &home, crate::OS, &slug)?;
+        let install = Install::detect(&exe, &home, crate::OS, &slug, &info.former_slugs())?;
         if let Install::WindowsExe { exe } = &install {
             if !writable(exe.parent()?) {
                 return None;
@@ -248,6 +242,13 @@ pub fn start(plan: &Plan) -> Result<(), String> {
     cmd.spawn().map(|_| ()).map_err(|e| format!("could not start the updater: {e}"))
 }
 
+pub fn tidy_app(info: &AppInfo) {
+    tidy(&slug(info.name));
+    for old in info.former_slugs() {
+        tidy(&old);
+    }
+}
+
 pub fn tidy(slug: &str) {
     let dir = work_dir(slug);
     let mine = std::env::current_exe().ok().map(|e| e.starts_with(&dir)).unwrap_or(false);
@@ -279,7 +280,7 @@ pub fn demo_plan(info: &AppInfo) -> Plan {
         version: crate::debug::next_version(info.version),
         source: "demo".to_string(),
         install,
-        data: crate::platform::app_folder(info.name),
+        data: info.folder(),
         parent: 0,
         headless: false,
         reopen: false,
