@@ -1,4 +1,3 @@
-use eframe::egui::Color32;
 use std::fmt::Write;
 
 pub const COLOR_NAMES: [&str; 39] = [
@@ -100,7 +99,8 @@ impl Tokens {
 }
 
 fn premultiplied(c: Rgba) -> [u8; 4] {
-    Color32::from_rgba_unmultiplied(c.0, c.1, c.2, c.3).to_array()
+    let m = |v: u8| ((v as u32 * c.3 as u32 + 127) / 255) as u8;
+    [m(c.0), m(c.1), m(c.2), c.3]
 }
 
 fn rust_color(c: Rgba) -> String {

@@ -42,21 +42,21 @@ impl Pal {
 
     pub fn pill(&self) -> Color32 {
         if self.dark {
-            Color32::from_rgba_unmultiplied(255, 255, 255, 20)
+            css_rgba(255, 255, 255, 20)
         } else {
-            Color32::from_rgba_unmultiplied(255, 255, 255, 128)
+            css_rgba(255, 255, 255, 128)
         }
     }
 
     pub fn tag(&self, tone: Option<usize>) -> (Color32, Color32) {
         match tone {
-            None => (self.text_2, if self.dark { Color32::from_rgba_unmultiplied(255, 255, 255, 18) } else { self.panel_2 }),
+            None => (self.text_2, if self.dark { css_rgba(255, 255, 255, 18) } else { self.panel_2 }),
             Some(i) => {
                 let b = self.bright(i);
                 if self.dark {
-                    (lighten(b, 0.45), Color32::from_rgba_unmultiplied(b.r(), b.g(), b.b(), 46))
+                    (lighten(b, 0.45), css_rgba(b.r(), b.g(), b.b(), 46))
                 } else {
-                    (self.colors.groups[i % self.colors.groups.len()], Color32::from_rgba_unmultiplied(b.r(), b.g(), b.b(), 64))
+                    (self.colors.groups[i % self.colors.groups.len()], css_rgba(b.r(), b.g(), b.b(), 64))
                 }
             }
         }
@@ -65,6 +65,11 @@ impl Pal {
     pub fn scrim(&self) -> Color32 {
         Color32::from_rgba_unmultiplied(0x13, 0x13, 0x18, if self.dark { 150 } else { 96 })
     }
+}
+
+pub fn css_rgba(r: u8, g: u8, b: u8, a: u8) -> Color32 {
+    let m = |v: u8| ((v as u32 * a as u32 + 127) / 255) as u8;
+    Color32::from_rgba_premultiplied(m(r), m(g), m(b), a)
 }
 
 pub fn palette(dark: bool) -> Pal {
@@ -336,7 +341,7 @@ pub fn glass_highlight(painter: &egui::Painter, rect: Rect, radius: f32) {
     let a = if p.dark { 60 } else { 230 };
     painter.line_segment(
         [Pos2::new(rect.left() + r * 0.8, y), Pos2::new(rect.right() - r * 0.8, y)],
-        Stroke::new(1.0_f32, Color32::from_rgba_unmultiplied(255, 255, 255, a)),
+        Stroke::new(1.0_f32, css_rgba(255, 255, 255, a)),
     );
 }
 
