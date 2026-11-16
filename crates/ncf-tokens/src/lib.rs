@@ -1,11 +1,18 @@
 use eframe::egui::Color32;
 use std::fmt::Write;
 
-pub const COLOR_NAMES: [&str; 26] = [
+pub const COLOR_NAMES: [&str; 37] = [
     "void", "deep", "panel", "panel_2", "sunken", "line", "line_strong", "text", "text_2", "text_3", "ink",
     "signal", "signal_hi", "signal_deep", "signal_soft", "signal_soft_hi", "chrome", "chrome_hi", "chrome_lo", "chrome_shade",
-    "danger", "danger_hi", "warn", "ok", "edge", "guide",
+    "danger", "danger_hi", "warn", "ok", "edge", "guide", "focus", "on_danger", "on_tile", "glass", "glass_line", "shadow",
+    "shadow_soft", "wall_a", "wall_b", "wall_c", "glow",
 ];
+
+pub const BRIGHT_NAMES: [&str; 6] = ["coral", "lilac", "sun", "sky", "mint", "rose"];
+
+pub const RADII: [&str; 5] = ["sm", "md", "lg", "xl", "pill"];
+pub const SHADOWS: [&str; 3] = ["lift", "float", "rest"];
+pub const WALLS: [&str; 4] = ["a", "b", "c", "glow"];
 
 pub const FONT_ROLES: [&str; 5] = ["display", "heading", "ui", "body", "hud"];
 
@@ -58,13 +65,37 @@ impl Tokens {
     }
 
     pub fn groups(&self, cast: &str) -> Result<Vec<Rgba>, String> {
+        self.list(cast, "groups")
+    }
+
+    pub fn brights(&self, cast: &str) -> Result<Vec<Rgba>, String> {
+        self.list(cast, "brights")
+    }
+
+    fn list(&self, cast: &str, name: &str) -> Result<Vec<Rgba>, String> {
         let list = self
-            .get(&format!("color.{cast}.groups"))?
+            .get(&format!("color.{cast}.{name}"))?
             .as_array()
-            .ok_or_else(|| format!("tokens: color.{cast}.groups is not a list"))?;
-        list.iter()
-            .map(|v| v.as_str().ok_or("tokens: a group colour is not text".to_string()).and_then(hex))
+            .ok_or_else(|| format!("tokens: color.{cast}.{name} is not a list"))?;
+        let out: Vec<Rgba> = list
+            .iter()
+            .map(|v| v.as_str().ok_or(format!("tokens: a {name} colour is not text")).and_then(hex))
+            .collect::<Result<_, _>>()?;
+        if out.len() != 6 {
+            return Err(format!("tokens: color.{cast}.{name} needs six colours"));
+        }
+        Ok(out)
+    }
+
+    pub fn numbers(&self, path: &str) -> Result<Vec<f64>, String> {
+        let arr = self.get(path)?.as_array().ok_or_else(|| format!("tokens: {path} is not a list"))?;
+        arr.iter()
+            .map(|x| x.as_float().or_else(|| x.as_integer().map(|i| i as f64)).ok_or_else(|| format!("tokens: {path} is not numbers")))
             .collect()
+    }
+
+    pub fn radius(&self, name: &str) -> Result<f64, String> {
+        self.num(&format!("radius.{name}"))
     }
 }
 
@@ -102,7 +133,7 @@ pub fn rust(t: &Tokens) -> Result<String, String> {
     for n in COLOR_NAMES {
         writeln!(o, "    pub {n}: Color32,").unwrap();
     }
-    o.push_str("    pub groups: [Color32; 6],\n}\n\n");
+    o.push_str("    pub groups: [Color32; 6],\n    pub brights: [Color32; 6],\n}\n\n");
     writeln!(o, "impl Colors {{\n    pub fn named(&self) -> [(&'static str, Color32); {}] {{\n        [", COLOR_NAMES.len()).unwrap();
     for n in COLOR_NAMES {
         writeln!(o, "            ({:?}, self.{n}),", n.replace('_', "-")).unwrap();
@@ -113,12 +144,10 @@ pub fn rust(t: &Tokens) -> Result<String, String> {
         for n in COLOR_NAMES {
             writeln!(o, "    {n}: {},", rust_color(t.color(cast, n)?)).unwrap();
         }
-        let groups = t.groups(cast)?;
-        if groups.len() != 6 {
-            return Err(format!("tokens: color.{cast}.groups needs six colours"));
-        }
-        let g: Vec<String> = groups.into_iter().map(rust_color).collect();
+        let g: Vec<String> = t.groups(cast)?.into_iter().map(rust_color).collect();
         writeln!(o, "    groups: [\n        {},\n    ],", g.join(",\n        ")).unwrap();
+        let b: Vec<String> = t.brights(cast)?.into_iter().map(rust_color).collect();
+        writeln!(o, "    brights: [\n        {},\n    ],", b.join(",\n        ")).unwrap();
         o.push_str("};\n\n");
     }
     o.push_str("#[derive(Clone, Copy, Debug, PartialEq)]\npub struct FontRole {\n    pub family: &'static str,\n    pub weight: u16,\n    pub stretch: u16,\n    pub tracking: f32,\n    pub upper: bool,\n}\n\n");
@@ -146,7 +175,27 @@ pub fn rust(t: &Tokens) -> Result<String, String> {
         writeln!(o, "pub const SPACE_{}: f32 = {:?};", upper_snake(k.trim_start_matches('s')), n as f32).unwrap();
     }
     o.push('\n');
-    writeln!(o, "pub const RADIUS: f32 = {:?};", t.num("shape.radius")? as f32).unwrap();
+    for r in RADII {
+        writeln!(o, "pub const RADIUS_{}: f32 = {:?};", upper_snake(r), t.radius(r)? as f32).unwrap();
+    }
+    o.push_str("pub const RADIUS: f32 = RADIUS_SM;\n");
+    for k in SHADOWS {
+        let v = t.numbers(&format!("shadow.{k}"))?;
+        if v.len() != 4 {
+            return Err(format!("tokens: shadow.{k} is x, y, blur and spread"));
+        }
+        let v: Vec<String> = v.iter().map(|x| format!("{:?}", *x as f32)).collect();
+        writeln!(o, "pub const SHADOW_{}: [f32; 4] = [{}];", upper_snake(k), v.join(", ")).unwrap();
+    }
+    for k in WALLS {
+        let v = t.numbers(&format!("wallpaper.{k}"))?;
+        if v.len() != 5 {
+            return Err(format!("tokens: wallpaper.{k} is x, y, reach x, reach y and fade"));
+        }
+        let v: Vec<String> = v.iter().map(|x| format!("{:?}", *x as f32)).collect();
+        let name = if k == "glow" { "GLOW".to_string() } else { format!("WALL_{}", upper_snake(k)) };
+        writeln!(o, "pub const {name}: [f32; 5] = [{}];", v.join(", ")).unwrap();
+    }
     writeln!(o, "pub const LINE: f32 = {:?};", t.num("shape.line")? as f32).unwrap();
     writeln!(o, "pub const FOCUS_RING: f32 = {:?};", t.num("shape.focus_ring")? as f32).unwrap();
     writeln!(o, "pub const FOCUS_OFFSET: f32 = {:?};", t.num("shape.focus_offset")? as f32).unwrap();
@@ -174,14 +223,57 @@ fn css_name(n: &str) -> String {
     n.replace('_', "-")
 }
 
+fn css_colour_name(n: &str) -> String {
+    match n {
+        "shadow" | "shadow_soft" => format!("{}-color", css_name(n)),
+        _ => css_name(n),
+    }
+}
+
 fn css_colors(t: &Tokens, cast: &str, o: &mut String) -> Result<(), String> {
     for n in COLOR_NAMES {
-        writeln!(o, "  --{}: {};", css_name(n), css_color(t.color(cast, n)?)).unwrap();
+        writeln!(o, "  --{}: {};", css_colour_name(n), css_color(t.color(cast, n)?)).unwrap();
     }
     for (i, g) in t.groups(cast)?.into_iter().enumerate() {
         writeln!(o, "  --group-{}: {};", i + 1, css_color(g)).unwrap();
     }
     writeln!(o, "  --edge-shadow: inset 0 1px 0 var(--edge);").unwrap();
+    for k in SHADOWS {
+        let v = t.numbers(&format!("shadow.{k}"))?;
+        let colour = if k == "lift" { "shadow-color" } else { "shadow-soft-color" };
+        let name = if k == "lift" { "shadow".to_string() } else { format!("shadow-{k}") };
+        writeln!(o, "  --{name}: {}px {}px {}px {}px var(--{colour});", v[0], v[1], v[2], v[3]).unwrap();
+    }
+    let mut layers = Vec::new();
+    for k in WALLS {
+        let v = t.numbers(&format!("wallpaper.{k}"))?;
+        let name = if k == "glow" { "glow".to_string() } else { format!("wall_{k}") };
+        let c = t.color(cast, &name)?;
+        let clear = Rgba(c.0, c.1, c.2, 0);
+        layers.push(format!(
+            "radial-gradient({}% {}% at {}% {}%, {} 0, {} {}%)",
+            pct(v[2]),
+            pct(v[3]),
+            pct(v[0]),
+            pct(v[1]),
+            css_color(c),
+            css_color(clear),
+            pct(v[4])
+        ));
+    }
+    layers.reverse();
+    writeln!(o, "  --wallpaper: {};", layers.join(", ")).unwrap();
+    Ok(())
+}
+
+fn pct(x: f64) -> f64 {
+    (x * 1000.0).round() / 10.0
+}
+
+fn css_light(t: &Tokens, selector: &str, o: &mut String) -> Result<(), String> {
+    writeln!(o, "{selector} {{\n  color-scheme: light;").unwrap();
+    css_colors(t, "light", o)?;
+    o.push_str("}\n");
     Ok(())
 }
 
@@ -190,6 +282,23 @@ pub fn css(t: &Tokens) -> Result<String, String> {
     o.push_str("/* generated from tokens/ncf.toml by ncf tokens here--- */\n\n");
     o.push_str(":root {\n  color-scheme: dark;\n");
     css_colors(t, "dark", &mut o)?;
+    for (name, c) in BRIGHT_NAMES.iter().zip(t.brights("dark")?) {
+        writeln!(o, "  --{name}: {};", css_color(c)).unwrap();
+    }
+    for (i, c) in t.brights("dark")?.into_iter().enumerate() {
+        writeln!(o, "  --bright-{}: {};", i + 1, css_color(c)).unwrap();
+    }
+    for (alias, to) in [
+        ("bg", "void"),
+        ("surface", "deep"),
+        ("surface-2", "panel-2"),
+        ("accent", "signal"),
+        ("accent-hover", "signal-deep"),
+        ("link", "signal-hi"),
+        ("on-accent", "ink"),
+    ] {
+        writeln!(o, "  --{alias}: var(--{to});").unwrap();
+    }
     let family = |role: &str| -> Result<String, String> { t.str(&format!("font.{role}.family")) };
     writeln!(o, "  --display: \"{}\", ui-sans-serif, system-ui, sans-serif;", family("display")?).unwrap();
     writeln!(o, "  --font: \"{}\", ui-sans-serif, system-ui, -apple-system, \"Segoe UI\", sans-serif;", family("ui")?).unwrap();
@@ -206,7 +315,9 @@ pub fn css(t: &Tokens) -> Result<String, String> {
     for (k, v) in t.table("space")? {
         writeln!(o, "  --s-{}: {}px;", k.trim_start_matches('s'), v.as_integer().unwrap_or(0)).unwrap();
     }
-    writeln!(o, "  --r-sm: {}px;", t.num("shape.radius")?).unwrap();
+    for (r, css) in RADII.iter().zip(["r-sm", "r", "r-lg", "r-xl", "r-pill"]) {
+        writeln!(o, "  --{css}: {}px;", t.radius(r)?).unwrap();
+    }
     writeln!(o, "  --focus-ring: {}px;", t.num("shape.focus_ring")?).unwrap();
     writeln!(o, "  --focus-offset: {}px;", t.num("shape.focus_offset")?).unwrap();
     writeln!(o, "  --gutter: {}px;", t.num("shape.gutter_narrow")?).unwrap();
@@ -226,8 +337,16 @@ pub fn css(t: &Tokens) -> Result<String, String> {
     }
     o.push_str("}\n\n");
     writeln!(o, "@media (min-width: 768px) {{ :root {{ --gutter: {}px; }} }}\n", t.num("shape.gutter_wide")?).unwrap();
-    o.push_str("[data-theme=\"light\"] {\n  color-scheme: light;\n");
-    css_colors(t, "light", &mut o)?;
+    o.push_str("@media (prefers-color-scheme: light) {\n");
+    let mut inner = String::new();
+    css_light(t, ":root:not([data-theme])", &mut inner)?;
+    for line in inner.lines() {
+        writeln!(o, "  {line}").unwrap();
+    }
+    o.push_str("}\n\n");
+    css_light(t, "[data-theme=\"light\"]", &mut o)?;
+    o.push_str("\n[data-theme=\"dark\"] {\n  color-scheme: dark;\n");
+    css_colors(t, "dark", &mut o)?;
     o.push_str("}\n");
     Ok(o)
 }

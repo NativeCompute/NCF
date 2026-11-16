@@ -19,14 +19,18 @@ fn both_casts_come_from_the_tokens() {
     let _g = lock();
     let d = theme::palette(true);
     assert!(d.dark);
-    assert_eq!(d.void, egui::Color32::BLACK);
-    assert_eq!(d.signal, egui::Color32::from_rgb(0x3B, 0x4C, 0xFF));
-    assert_eq!(d.signal_hi, egui::Color32::from_rgb(0x6E, 0x7B, 0xFF));
+    assert_eq!(d.void, egui::Color32::from_rgb(0x0E, 0x0F, 0x13));
+    assert_eq!(d.signal, egui::Color32::from_rgb(0xFF, 0x6A, 0x3D));
+    assert_eq!(d.signal_hi, egui::Color32::from_rgb(0xFF, 0x9A, 0x73));
     let l = theme::palette(false);
     assert!(!l.dark);
-    assert_eq!(l.signal, d.signal, "one signal blue in both casts");
+    assert_eq!(l.void, egui::Color32::from_rgb(0xE9, 0xEB, 0xF0));
+    assert_eq!(l.signal, d.signal, "one coral accent in both casts");
+    assert_eq!(l.brights, d.brights, "the tile colours are the same in both casts");
+    assert_eq!(l.brights[0], egui::Color32::from_rgb(0xFF, 0x7A, 0x50));
     assert_ne!(l.text, d.text);
-    assert_eq!(theme::RADIUS, 2.0);
+    assert_eq!(theme::RADIUS, tokens::RADIUS_SM);
+    assert_eq!([tokens::RADIUS_SM, tokens::RADIUS_MD, tokens::RADIUS_LG, tokens::RADIUS_XL], [12.0, 20.0, 28.0, 32.0]);
     assert_eq!(tokens::BRAND_URL, "https://nativecompute.net");
 }
 
@@ -135,7 +139,7 @@ fn an_app_mark_becomes_svg_pixels_and_an_ico() {
     let svg = TEST_MARK.svg();
     assert!(svg.starts_with("<svg"));
     assert_eq!(svg.matches("<polygon").count(), 2);
-    assert!(svg.contains("#3B4CFF"));
+    assert!(svg.contains("#FF6A3D"));
     let n = 64u32;
     let px = TEST_MARK.rgba(n);
     let at = |x: u32, y: u32| {
@@ -144,8 +148,8 @@ fn an_app_mark_becomes_svg_pixels_and_an_ico() {
     };
     assert_eq!(at(0, 0)[3], 0, "rounded tile corner");
     assert_eq!(at(4, 32), [0, 0, 0, 255], "black tile");
-    assert_eq!(at(26, 32), [0xF2, 0xF3, 0xF7, 255], "chrome slab");
-    assert_eq!(at(42, 32), [0x3B, 0x4C, 0xFF, 255], "signal line");
+    assert_eq!(at(26, 32), [0xF3, 0xF3, 0xF6, 255], "chrome slab");
+    assert_eq!(at(42, 32), [0xFF, 0x6A, 0x3D, 255], "signal line");
     let ico = TEST_MARK.ico();
     assert_eq!(&ico[..4], &[0, 0, 1, 0]);
     assert_eq!(u16::from_le_bytes([ico[4], ico[5]]), 6);

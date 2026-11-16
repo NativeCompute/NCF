@@ -3,86 +3,110 @@ name = "NativeCompute"
 url = "https://nativecompute.net"
 
 [color.dark]
-void = "#000000"
-deep = "#07080d"
-panel = "#0c0e16"
-panel_2 = "#131624"
-sunken = "#000000"
-line = "#ffffff1f"
-line_strong = "#ffffff42"
-text = "#f2f3f7"
-text_2 = "#a6abc2"
-text_3 = "#8a8fa8"
-ink = "#ffffff"
-signal = "#3b4cff"
-signal_hi = "#6e7bff"
-signal_deep = "#2a36c8"
-signal_soft = "#3b4cff24"
-signal_soft_hi = "#3b4cff38"
-chrome = "#c9cddb"
-chrome_hi = "#f2f3f7"
-chrome_lo = "#8a8fa8"
-chrome_shade = "#8a8fa8"
-danger = "#ff6b7a"
+void = "#0e0f13"
+deep = "#1a1b21"
+panel = "#1a1b21"
+panel_2 = "#24262e"
+sunken = "#0e0f13"
+line = "#2c2e37"
+line_strong = "#3b3e49"
+text = "#f3f3f6"
+text_2 = "#b8bac4"
+text_3 = "#9295a2"
+ink = "#1a0c06"
+signal = "#ff6a3d"
+signal_hi = "#ff9a73"
+signal_deep = "#f25a2c"
+signal_soft = "#ff6a3d24"
+signal_soft_hi = "#ff6a3d38"
+chrome = "#d6d7de"
+chrome_hi = "#f3f3f6"
+chrome_lo = "#9295a2"
+chrome_shade = "#9295a2"
+danger = "#ff6b78"
 danger_hi = "#ff9aa5"
-warn = "#f5c451"
-ok = "#5ee0a0"
+warn = "#ffcb5c"
+ok = "#5be3a0"
 edge = "#ffffff0f"
-guide = "#ffffff09"
-groups = ["#6e7bff", "#5cc8ff", "#a78bfa", "#5ee0a0", "#f5c451", "#ff6b7a"]
+guide = "#00000000"
+focus = "#ffffff"
+on_danger = "#131318"
+on_tile = "#131318"
+glass = "#1a1b21a8"
+glass_line = "#ffffff14"
+shadow = "#00000073"
+shadow_soft = "#00000059"
+wall_a = "#ff7a5029"
+wall_b = "#8fcbff1f"
+wall_c = "#b9a6ff24"
+glow = "#ff6a3d40"
+groups = ["#ff7a50", "#b9a6ff", "#ffcb5c", "#8fcbff", "#5be3a0", "#ff8fb1"]
+brights = ["#ff7a50", "#b9a6ff", "#ffcb5c", "#8fcbff", "#5be3a0", "#ff8fb1"]
 
 [color.light]
-void = "#f4f5f8"
+void = "#e9ebf0"
 deep = "#ffffff"
-panel = "#f6f7fa"
-panel_2 = "#e6e9f1"
-sunken = "#eceef4"
-line = "#0000001f"
-line_strong = "#00000042"
-text = "#0b0c12"
-text_2 = "#454a5e"
-text_3 = "#5f647a"
-ink = "#ffffff"
-signal = "#3b4cff"
-signal_hi = "#2b3ae0"
-signal_deep = "#1f2ab0"
-signal_soft = "#3b4cff1a"
-signal_soft_hi = "#3b4cff2c"
-chrome = "#2a2d3a"
-chrome_hi = "#0b0c12"
-chrome_lo = "#5f647a"
-chrome_shade = "#05060a"
-danger = "#d1243b"
-danger_hi = "#e54b5e"
-warn = "#b77b00"
-ok = "#148a4f"
+panel = "#ffffff"
+panel_2 = "#f3f4f7"
+sunken = "#e9ebf0"
+line = "#e2e5ea"
+line_strong = "#cdd2da"
+text = "#131318"
+text_2 = "#454956"
+text_3 = "#5e6372"
+ink = "#1a0c06"
+signal = "#ff6a3d"
+signal_hi = "#b23c14"
+signal_deep = "#f25a2c"
+signal_soft = "#ff6a3d1f"
+signal_soft_hi = "#ff6a3d33"
+chrome = "#2a2c36"
+chrome_hi = "#131318"
+chrome_lo = "#5e6372"
+chrome_shade = "#08080b"
+danger = "#b5202f"
+danger_hi = "#d23a48"
+warn = "#8a5a00"
+ok = "#16714a"
 edge = "#00000000"
-guide = "#0000000c"
-groups = ["#3b4cff", "#0086c2", "#7c4de8", "#148a4f", "#b77b00", "#d1243b"]
+guide = "#00000000"
+focus = "#131318"
+on_danger = "#ffffff"
+on_tile = "#131318"
+glass = "#ffffff9e"
+glass_line = "#ffffffcc"
+shadow = "#1313181f"
+shadow_soft = "#13131814"
+wall_a = "#ffe1d6"
+wall_b = "#ddebff"
+wall_c = "#e6e0ff"
+glow = "#ff6a3d00"
+groups = ["#b23c14", "#6a4fd0", "#8a5a00", "#1f6aa5", "#16714a", "#b5205e"]
+brights = ["#ff7a50", "#b9a6ff", "#ffcb5c", "#8fcbff", "#5be3a0", "#ff8fb1"]
 
 [font.display]
-family = "Anybody"
+family = "Bricolage Grotesque"
 weight = 800
-stretch = 150
-tracking = -0.02
-case = "upper"
+stretch = 100
+tracking = -0.045
+case = "none"
 
 [font.heading]
-family = "Anybody"
-weight = 700
-stretch = 130
-tracking = 0.0
+family = "Bricolage Grotesque"
+weight = 800
+stretch = 100
+tracking = -0.02
 case = "none"
 
 [font.ui]
-family = "Anybody"
+family = "Plus Jakarta Sans"
 weight = 600
-stretch = 112
+stretch = 100
 tracking = 0.0
 case = "none"
 
 [font.body]
-family = "Anybody"
+family = "Plus Jakarta Sans"
 weight = 400
 stretch = 100
 tracking = 0.0
@@ -126,8 +150,25 @@ s16 = 64
 s24 = 96
 s32 = 128
 
+[radius]
+sm = 12.0
+md = 20.0
+lg = 28.0
+xl = 32.0
+pill = 999.0
+
+[shadow]
+lift = [0.0, 16.0, 40.0, 0.0]
+float = [0.0, 10.0, 30.0, 0.0]
+rest = [0.0, 1.0, 2.0, 0.0]
+
+[wallpaper]
+a = [0.0, 0.0, 0.6, 0.45, 0.7]
+b = [1.0, 0.08, 0.5, 0.45, 0.7]
+c = [0.85, 1.0, 0.6, 0.5, 0.7]
+glow = [0.0, 0.0, 0.75, 0.75, 0.7]
+
 [shape]
-radius = 2.0
 line = 1.0
 focus_ring = 2.0
 focus_offset = 2.0
