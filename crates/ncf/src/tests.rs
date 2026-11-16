@@ -270,7 +270,7 @@ fn shortcut_labels_name_the_keys_each_platform_has() {
     assert_eq!(keys::label_for(&c, Os::Mac), "Cmd+Option+Shift+F");
     assert_eq!(keys::text(&c), "Ctrl+Alt+Shift+F", "the settings file spells it the same on every platform");
     assert_eq!(keys::parse("Cmd+Option+F"), keys::parse("Ctrl+Alt+F"));
-    let fonts = [include_bytes!("../fonts/Anybody-Regular.ttf").as_slice(), include_bytes!("../fonts/JetBrainsMono-Regular.ttf").as_slice()];
+    let fonts = [include_bytes!("../fonts/PlusJakartaSans-Regular.ttf").as_slice(), include_bytes!("../fonts/JetBrainsMono-Regular.ttf").as_slice()];
     let label = keys::label_for(&c, Os::Mac);
     assert!(label.is_ascii(), "plain letters only: the bundled fonts have no Mac key symbols");
     assert!(fonts.iter().all(|f| f.len() > 1000));
@@ -670,4 +670,29 @@ fn a_skipped_update_is_remembered_and_absent_until_then() {
     let skipped = Look { skipped_update: "2.3.0".into(), ..Look::default() };
     assert!(skipped.write().contains("skipped_update = 2.3.0\n"));
     assert_eq!(Look::parse(&skipped.write()).skipped_update, "2.3.0");
+}
+
+#[test]
+fn every_bento_font_covers_latin_and_kerns() {
+    use eframe::egui::{FontData, FontDefinitions, FontFamily, FontId};
+    use eframe::epaint::text::Fonts;
+    let faces: [(&str, &[u8]); 7] = [
+        ("PlusJakartaSans-Regular", include_bytes!("../fonts/PlusJakartaSans-Regular.ttf")),
+        ("PlusJakartaSans-Medium", include_bytes!("../fonts/PlusJakartaSans-Medium.ttf")),
+        ("PlusJakartaSans-SemiBold", include_bytes!("../fonts/PlusJakartaSans-SemiBold.ttf")),
+        ("PlusJakartaSans-Bold", include_bytes!("../fonts/PlusJakartaSans-Bold.ttf")),
+        ("PlusJakartaSans-ExtraBold", include_bytes!("../fonts/PlusJakartaSans-ExtraBold.ttf")),
+        ("BricolageGrotesque-Display", include_bytes!("../fonts/BricolageGrotesque-Display.ttf")),
+        ("BricolageGrotesque-Heading", include_bytes!("../fonts/BricolageGrotesque-Heading.ttf")),
+    ];
+    for (name, bytes) in faces {
+        let mut defs = FontDefinitions::empty();
+        defs.font_data.insert(name.into(), FontData::from_static(bytes));
+        defs.families.insert(FontFamily::Proportional, vec![name.into()]);
+        let fonts = Fonts::new(1.0, 2048, defs);
+        let id = FontId::proportional(40.0);
+        assert!(fonts.has_glyphs(&id, "Aa Zz 0123456789 —–…·“”‘’ éñŁčß€→"), "{name} misses a glyph");
+        let w = |s: &str| fonts.layout_no_wrap(s.into(), id.clone(), egui::Color32::WHITE).rect.width();
+        assert!(w("AV") < w("A") + w("V") - 0.5, "{name} lost its kerning");
+    }
 }

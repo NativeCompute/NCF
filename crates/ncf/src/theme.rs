@@ -348,25 +348,37 @@ pub fn apply(ctx: &egui::Context) {
 
 // fonts here---
 
-const ANYBODY_REGULAR: &[u8] = include_bytes!("../fonts/Anybody-Regular.ttf");
-const ANYBODY_MEDIUM: &[u8] = include_bytes!("../fonts/Anybody-Medium.ttf");
-const ANYBODY_SEMIBOLD: &[u8] = include_bytes!("../fonts/Anybody-SemiBold.ttf");
-const ANYBODY_BOLD: &[u8] = include_bytes!("../fonts/Anybody-Bold.ttf");
-const ANYBODY_DISPLAY: &[u8] = include_bytes!("../fonts/Anybody-Display.ttf");
+const UI_REGULAR: &[u8] = include_bytes!("../fonts/PlusJakartaSans-Regular.ttf");
+const UI_MEDIUM: &[u8] = include_bytes!("../fonts/PlusJakartaSans-Medium.ttf");
+const UI_SEMIBOLD: &[u8] = include_bytes!("../fonts/PlusJakartaSans-SemiBold.ttf");
+const UI_BOLD: &[u8] = include_bytes!("../fonts/PlusJakartaSans-Bold.ttf");
+const UI_EXTRABOLD: &[u8] = include_bytes!("../fonts/PlusJakartaSans-ExtraBold.ttf");
+const DISPLAY: &[u8] = include_bytes!("../fonts/BricolageGrotesque-Display.ttf");
+const HEADING: &[u8] = include_bytes!("../fonts/BricolageGrotesque-Heading.ttf");
 const MONO_REGULAR: &[u8] = include_bytes!("../fonts/JetBrainsMono-Regular.ttf");
 const MONO_MEDIUM: &[u8] = include_bytes!("../fonts/JetBrainsMono-Medium.ttf");
 
+pub const DISPLAY_FROM: f32 = 26.0;
+pub const DISPLAY_TRACKING: f32 = -0.045;
+pub const HEADING_TRACKING: f32 = -0.02;
+
 pub fn medium() -> FontFamily {
-    FontFamily::Name("anybody-medium".into())
+    FontFamily::Name("ui-medium".into())
 }
 pub fn semibold() -> FontFamily {
-    FontFamily::Name("anybody-semibold".into())
+    FontFamily::Name("ui-semibold".into())
 }
 pub fn bold() -> FontFamily {
-    FontFamily::Name("anybody-bold".into())
+    FontFamily::Name("ui-bold".into())
+}
+pub fn extrabold() -> FontFamily {
+    FontFamily::Name("ui-extrabold".into())
 }
 pub fn display() -> FontFamily {
-    FontFamily::Name("anybody-display".into())
+    FontFamily::Name("display".into())
+}
+pub fn heading() -> FontFamily {
+    FontFamily::Name("heading".into())
 }
 pub fn hud() -> FontFamily {
     FontFamily::Name("mono-medium".into())
@@ -375,25 +387,29 @@ pub fn hud() -> FontFamily {
 pub fn font_definitions() -> FontDefinitions {
     let mut fonts = FontDefinitions::default();
     for (key, bytes) in [
-        ("Anybody", ANYBODY_REGULAR),
-        ("AnybodyMedium", ANYBODY_MEDIUM),
-        ("AnybodySemiBold", ANYBODY_SEMIBOLD),
-        ("AnybodyBold", ANYBODY_BOLD),
-        ("AnybodyDisplay", ANYBODY_DISPLAY),
+        ("Jakarta", UI_REGULAR),
+        ("JakartaMedium", UI_MEDIUM),
+        ("JakartaSemiBold", UI_SEMIBOLD),
+        ("JakartaBold", UI_BOLD),
+        ("JakartaExtraBold", UI_EXTRABOLD),
+        ("BricolageDisplay", DISPLAY),
+        ("BricolageHeading", HEADING),
         ("JetBrainsMono", MONO_REGULAR),
         ("JetBrainsMonoMedium", MONO_MEDIUM),
     ] {
         fonts.font_data.insert(key.to_string(), FontData::from_static(bytes));
     }
-    fonts.families.entry(FontFamily::Proportional).or_default().insert(0, "Anybody".to_string());
+    fonts.families.entry(FontFamily::Proportional).or_default().insert(0, "Jakarta".to_string());
     fonts.families.entry(FontFamily::Monospace).or_default().insert(0, "JetBrainsMono".to_string());
     let proportional = fonts.families.get(&FontFamily::Proportional).cloned().unwrap_or_default();
     let mono = fonts.families.get(&FontFamily::Monospace).cloned().unwrap_or_default();
     for (family, key, rest) in [
-        (medium(), "AnybodyMedium", &proportional),
-        (semibold(), "AnybodySemiBold", &proportional),
-        (bold(), "AnybodyBold", &proportional),
-        (display(), "AnybodyDisplay", &proportional),
+        (medium(), "JakartaMedium", &proportional),
+        (semibold(), "JakartaSemiBold", &proportional),
+        (bold(), "JakartaBold", &proportional),
+        (extrabold(), "JakartaExtraBold", &proportional),
+        (display(), "BricolageDisplay", &proportional),
+        (heading(), "BricolageHeading", &proportional),
         (hud(), "JetBrainsMonoMedium", &mono),
     ] {
         let mut stack = vec![key.to_string()];
@@ -430,8 +446,25 @@ pub fn font_bold(size: f32) -> egui::FontId {
 pub fn font_mono(size: f32) -> egui::FontId {
     egui::FontId::monospace(size)
 }
+pub fn font_extra(size: f32) -> egui::FontId {
+    egui::FontId::new(size, extrabold())
+}
+pub fn font_heading(size: f32) -> egui::FontId {
+    egui::FontId::new(size, heading())
+}
 pub fn font_display(size: f32) -> egui::FontId {
-    egui::FontId::new(size, display())
+    if size < DISPLAY_FROM {
+        font_heading(size)
+    } else {
+        egui::FontId::new(size, display())
+    }
+}
+pub fn display_tracking(size: f32) -> f32 {
+    if size < DISPLAY_FROM {
+        HEADING_TRACKING * size
+    } else {
+        DISPLAY_TRACKING * size
+    }
 }
 pub fn font_hud(size: f32) -> egui::FontId {
     egui::FontId::new(size, hud())

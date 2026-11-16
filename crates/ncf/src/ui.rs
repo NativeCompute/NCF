@@ -442,18 +442,21 @@ pub fn scrim(ctx: &egui::Context, id: &str, t: f32) -> bool {
 
 // text roles here---
 
+pub fn display_text(text: &str, size: f32, color: Color32) -> egui::RichText {
+    egui::RichText::new(text).font(theme::font_display(size)).extra_letter_spacing(theme::display_tracking(size)).color(color)
+}
+
 pub fn giant(ui: &mut egui::Ui, text: &str, size: f32) -> Response {
     let p = pal();
-    ui.add(egui::Label::new(egui::RichText::new(text.to_uppercase()).font(theme::font_display(size)).color(p.text)).extend())
+    ui.add(egui::Label::new(display_text(text, size, p.text)).extend())
 }
 
 pub fn giant_fit(ui: &mut egui::Ui, text: &str, max: f32, min: f32, room: f32) -> Response {
     let p = pal();
-    let shout = text.to_uppercase();
-    let full = theme::tracked_width(ui.ctx(), &shout, theme::font_display(max), 0.0);
+    let full = theme::tracked_width(ui.ctx(), text, theme::font_display(max), theme::display_tracking(max));
     let size = if full <= room { max } else { (max * room / full * 0.97).max(min) };
-    let shown = elide_to_width(ui.ctx(), &shout, theme::font_display(size), 0.0, room);
-    ui.add(egui::Label::new(egui::RichText::new(shown).font(theme::font_display(size)).color(p.text)).extend())
+    let shown = elide_to_width(ui.ctx(), text, theme::font_display(size), theme::display_tracking(size), room);
+    ui.add(egui::Label::new(display_text(&shown, size, p.text)).extend())
 }
 
 pub fn heading(ui: &mut egui::Ui, text: &str) -> Response {
