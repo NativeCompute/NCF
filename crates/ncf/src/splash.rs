@@ -16,7 +16,7 @@ const FOOT_GAP: f32 = 22.0;
 const PAD_BOTTOM: f32 = 30.0;
 pub const PROMPT_H: f32 = 84.0;
 
-pub const CARD: Vec2 = Vec2::new(540.0, PAD_TOP + BROW + TITLE_GAP + TITLE_BAND + BAR_GAP + 2.0 + RULE_GAP + FOOT_GAP + PAD_BOTTOM);
+pub const CARD: Vec2 = Vec2::new(540.0, PAD_TOP + BROW + TITLE_GAP + TITLE_BAND + BAR_GAP + BAR_H + RULE_GAP + FOOT_GAP + PAD_BOTTOM);
 
 const HOLD: f32 = 1.55;
 const FADE: f32 = 0.40;
@@ -73,8 +73,10 @@ pub fn swallow_keys(ctx: &egui::Context) {
     });
 }
 
+const BAR_H: f32 = 6.0;
+
 fn title_size(painter: &egui::Painter, word: &str, width: f32, band: f32) -> f32 {
-    let probe = painter.layout_no_wrap(word.to_string(), theme::font_display(100.0), egui::Color32::WHITE);
+    let probe = theme::display_galley(painter.ctx(), word, 100.0, egui::Color32::WHITE);
     (100.0 * width / probe.rect.width().max(1.0)).min(100.0 * band / probe.rect.height().max(1.0))
 }
 
@@ -226,24 +228,22 @@ impl Splash {
             .show(ctx, |ui| {
                 let (whole, resp) = ui.allocate_exact_size(screen.size(), Sense::click());
                 let painter = ui.painter().clone();
-                let round = egui::Rounding::same(if self.inline { 0.0 } else { theme::RADIUS });
+                let radius = if self.inline { theme::R_XL } else { crate::chrome::window_radius(ui.ctx(), theme::R_SM) };
+                let round = egui::Rounding::same(radius);
                 let want = CARD + Vec2::new(0.0, PROMPT_H * grow);
                 let rect = if self.inline { Rect::from_center_size(whole.center(), want.min(whole.size())) } else { whole };
 
                 if self.inline {
-                    painter.rect_filled(whole, egui::Rounding::ZERO, theme::wash(p.void, (255.0 * alpha) as u8));
-                    if alpha > 0.99 {
-                        crate::chrome::column_guides(&painter, whole);
-                    }
-                }
-                painter.rect_filled(rect, round, theme::wash(p.void, (255.0 * alpha) as u8));
-                if alpha > 0.99 && !self.inline {
-                    crate::chrome::column_guides(&painter, rect);
+                    theme::wallpaper_faded(&painter, whole, crate::chrome::window_radius(ui.ctx(), theme::R_SM), alpha);
+                    theme::shadow(&painter, rect, radius, if alpha > 0.99 { theme::Lift::Lift } else { theme::Lift::Flat });
+                    painter.rect_filled(rect, round, theme::wash(p.deep, (255.0 * alpha) as u8));
+                } else {
+                    theme::wallpaper_faded(&painter, rect, radius, alpha);
                 }
                 painter.rect_stroke(
                     rect.shrink(0.5),
                     round,
-                    egui::Stroke::new(1.0_f32, theme::wash(p.line_strong, (p.line_strong.a() as f32 * alpha) as u8)),
+                    egui::Stroke::new(1.0_f32, theme::wash(if p.dark { p.glass_line } else { p.line_strong }, ((if p.dark { p.glass_line } else { p.line_strong }).a() as f32 * alpha) as u8)),
                 );
 
                 let ink = |c: egui::Color32| theme::wash(c, (c.a() as f32 * alpha) as u8);
@@ -263,21 +263,20 @@ impl Splash {
                 brow(&painter, &self.app, left, y, &eyebrow, ink(if prompting { p.signal_hi } else { p.text_2 }));
                 y += BROW + TITLE_GAP;
 
-                let word = self.app.name.to_uppercase();
+                let word = self.app.name.to_string();
                 let size = title_size(&painter, &word, width, TITLE_BAND);
-                let name = painter.layout_no_wrap(word, theme::font_display(size), ink(p.text));
+                let name = theme::display_galley(ui.ctx(), &word, size, ink(p.text));
                 let name_h = name.rect.height();
                 painter.galley(Pos2::new(left + drift, y + (TITLE_BAND - name_h) * 0.5), name, ink(p.text));
                 y += TITLE_BAND + BAR_GAP;
 
-                let track = Rect::from_min_size(Pos2::new(left, y), Vec2::new(width, 2.0));
-                painter.rect_filled(track, egui::Rounding::ZERO, ink(p.line_strong));
-                painter.rect_filled(
-                    Rect::from_min_size(track.min, Vec2::new(track.width() * self.bar.clamp(0.0, 1.0), 2.0)),
-                    egui::Rounding::ZERO,
-                    ink(p.signal_hi),
-                );
-                y += 2.0;
+                let track = Rect::from_min_size(Pos2::new(left, y), Vec2::new(width, BAR_H));
+                painter.rect_filled(track, egui::Rounding::same(BAR_H * 0.5), ink(p.line_strong));
+                let done = track.width() * self.bar.clamp(0.0, 1.0);
+                if done > 0.5 {
+                    painter.rect_filled(Rect::from_min_size(track.min, Vec2::new(done.max(BAR_H), BAR_H)), egui::Rounding::same(BAR_H * 0.5), ink(p.signal));
+                }
+                y += BAR_H;
 
                 if grow > 0.01 {
                     if let Some(offer) = self.offer.clone().filter(|_| prompting) {
@@ -346,22 +345,22 @@ pub fn prompt(ctx: &egui::Context, app: &crate::AppInfo, offer: &Offer) -> Optio
         .show(ctx, |ui| {
             let _ = ui.allocate_exact_size(screen.size(), Sense::click());
             let painter = ui.painter().clone();
-            painter.rect_filled(screen, egui::Rounding::ZERO, egui::Color32::from_black_alpha((178.0 * veil) as u8));
-            painter.rect_filled(rect, egui::Rounding::same(theme::RADIUS), p.void);
-            painter.rect_stroke(rect.shrink(0.5), egui::Rounding::same(theme::RADIUS), egui::Stroke::new(1.0_f32, p.line_strong));
+            let s = p.scrim();
+            painter.rect_filled(screen, egui::Rounding::ZERO, theme::wash(s, (s.a() as f32 * veil) as u8));
+            theme::surface(&painter, rect, theme::R_XL, theme::Lift::Lift);
             let left = rect.left() + 40.0;
             let width = rect.width() - 80.0;
             let mut y = rect.top() + PAD_TOP;
             brow(&painter, app, left, y, &format!("UPDATE AVAILABLE / V{}", offer.version), p.signal_hi);
             y += BROW + TITLE_GAP;
-            let word = app.name.to_uppercase();
+            let word = app.name.to_string();
             let size = title_size(&painter, &word, width, 40.0);
-            let name = painter.layout_no_wrap(word, theme::font_display(size), p.text);
+            let name = theme::display_galley(ctx, &word, size, p.text);
             let h = name.rect.height();
             painter.galley(Pos2::new(left, y + (40.0 - h) * 0.5), name, p.text);
             y += 40.0 + BAR_GAP;
-            painter.rect_filled(Rect::from_min_size(Pos2::new(left, y), Vec2::new(width, 2.0)), egui::Rounding::ZERO, p.signal_hi);
-            y += 2.0;
+            painter.rect_filled(Rect::from_min_size(Pos2::new(left, y), Vec2::new(width, BAR_H)), egui::Rounding::same(BAR_H * 0.5), p.signal);
+            y += BAR_H;
             choice = prompt_section(ui, app, offer, Rect::from_min_size(Pos2::new(left, y), Vec2::new(width, PROMPT_H)), 1.0);
         });
     swallow_keys(ctx);

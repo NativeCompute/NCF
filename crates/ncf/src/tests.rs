@@ -757,3 +757,67 @@ fn debug_mode_can_pick_each_appearance() {
         assert_eq!(shell.look.appearance, a);
     }
 }
+
+fn contrast32(a: egui::Color32, b: egui::Color32) -> f32 {
+    let l = |c: egui::Color32| {
+        let ch = |v: u8| {
+            let s = v as f32 / 255.0;
+            if s <= 0.03928 {
+                s / 12.92
+            } else {
+                ((s + 0.055) / 1.055).powf(2.4)
+            }
+        };
+        0.2126 * ch(c.r()) + 0.7152 * ch(c.g()) + 0.0722 * ch(c.b())
+    };
+    let (x, y) = (l(a), l(b));
+    (x.max(y) + 0.05) / (x.min(y) + 0.05)
+}
+
+#[test]
+fn the_wallpaper_stays_inside_the_window_and_tints_its_corners() {
+    let _g = lock();
+    for dark in [true, false] {
+        theme::set_palette(dark);
+        let p = pal();
+        let rect = egui::Rect::from_min_size(pos2(0.0, 0.0), egui::vec2(1200.0, 800.0));
+        let mesh = theme::wallpaper_shape(rect, theme::R_SM);
+        assert!(!mesh.vertices.is_empty());
+        for v in &mesh.vertices {
+            assert!(rect.expand(1.0).contains(v.pos), "a wallpaper vertex escaped the window");
+        }
+        let near = |q: Pos2| mesh.vertices.iter().min_by(|a, b| a.pos.distance(q).total_cmp(&b.pos.distance(q))).unwrap().color;
+        let centre = near(rect.center());
+        let diff = |a: egui::Color32, b: egui::Color32| (a.r() as i32 - b.r() as i32).abs().max((a.g() as i32 - b.g() as i32).abs()).max((a.b() as i32 - b.b() as i32).abs());
+        assert!(diff(centre, p.void) <= 3, "the middle of the window is the plain background");
+        let corner = near(pos2(0.0, 0.0));
+        assert!(diff(corner, p.void) > 6, "the top-left corner carries the warm wash");
+        assert!(corner.r() > corner.b(), "and it is warm");
+    }
+}
+
+#[test]
+fn surfaces_cast_soft_shadows_and_selection_reads() {
+    let _g = lock();
+    let h = Harness::new(400.0, 300.0);
+    for dark in [true, false] {
+        theme::set_palette(dark);
+        theme::apply(&h.ctx);
+        let v = h.ctx.style().visuals.clone();
+        assert_ne!(v.window_shadow, egui::epaint::Shadow::NONE);
+        assert_ne!(v.popup_shadow, egui::epaint::Shadow::NONE);
+        assert_eq!(v.window_rounding, egui::Rounding::same(theme::R_LG));
+        let p = pal();
+        let (fill, ink) = p.selected();
+        assert!(contrast32(fill, ink) >= 4.5);
+        let (fill, _, ink) = ui::button_colors(true, 0.0);
+        assert_eq!(ink, p.ink, "coral buttons carry dark text");
+        assert!(contrast32(fill, ink) >= 4.5);
+        let (fill, _, ink) = ui::button_colors(true, 1.0);
+        assert!(contrast32(fill, ink) >= 4.5, "and keep it on hover");
+        for i in 0..6 {
+            assert!(contrast32(p.bright(i), p.on_tile) >= 4.5);
+        }
+    }
+    theme::set_palette(true);
+}

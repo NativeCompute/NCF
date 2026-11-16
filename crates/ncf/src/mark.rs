@@ -30,10 +30,10 @@ pub struct AppMark {
 pub const NATIVECOMPUTE: AppMark = AppMark {
     name: "NativeCompute",
     parts: &[
-        Part::Polygon { points: crate::brand::SLABS[0], ink: Ink::Signal },
-        Part::Polygon { points: crate::brand::SLABS[1], ink: Ink::Signal },
-        Part::Polygon { points: crate::brand::SLABS[2], ink: Ink::Signal },
-        Part::Polygon { points: crate::brand::SLABS[3], ink: Ink::Signal },
+        Part::Polygon { points: crate::brand::SLABS[0], ink: Ink::Text },
+        Part::Polygon { points: crate::brand::SLABS[1], ink: Ink::Text },
+        Part::Polygon { points: crate::brand::SLABS[2], ink: Ink::Text },
+        Part::Polygon { points: crate::brand::SLABS[3], ink: Ink::Text },
     ],
 };
 

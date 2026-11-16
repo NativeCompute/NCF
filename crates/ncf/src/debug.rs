@@ -1,4 +1,4 @@
-use eframe::egui::{self, Id, Rect, Sense, Stroke, Vec2};
+use eframe::egui::{self, Id, Rect, Sense, Vec2};
 
 use crate::alerts::Tone;
 use crate::icons::Icon;
@@ -120,11 +120,8 @@ impl Debug {
             .movable(true)
             .constrain(true)
             .show(ctx, |ui| {
-                egui::Frame::none()
-                    .fill(p.panel)
-                    .stroke(Stroke::new(1.0_f32, p.line_strong))
-                    .rounding(egui::Rounding::same(theme::RADIUS))
-                    .inner_margin(egui::Margin::same(12.0))
+                theme::surface_frame(theme::R_LG, theme::Lift::Lift)
+                    .inner_margin(egui::Margin::same(14.0))
                     .show(ui, |ui| {
                         ui.set_width(250.0);
                         ui.horizontal(|ui| {

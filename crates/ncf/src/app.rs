@@ -573,13 +573,16 @@ fn settings_window<A: NcfApp>(ctx: &egui::Context, app: &mut A, shell: &mut Shel
         .show(ctx, |ui| {
             ui.set_opacity(0.2 + 0.8 * t);
             let (win, _) = ui.allocate_exact_size(rect.size(), Sense::click());
-            ui.painter().rect_filled(win, egui::Rounding::same(theme::RADIUS), p.deep);
-            ui.painter().rect_stroke(win.shrink(0.5), egui::Rounding::same(theme::RADIUS), Stroke::new(1.0_f32, p.line_strong));
+            theme::shadow(ui.painter(), win, theme::R_XL, theme::Lift::Lift);
+            ui.painter().rect_filled(win, egui::Rounding::same(theme::R_XL), if p.dark { p.deep } else { p.panel_2 });
+            if p.dark {
+                ui.painter().rect_stroke(win.shrink(0.5), egui::Rounding::same(theme::R_XL), Stroke::new(1.0_f32, p.line));
+            }
 
-            let head = Rect::from_min_size(win.min, Vec2::new(win.width(), 56.0));
-            let mut h = ui.new_child(egui::UiBuilder::new().max_rect(head.shrink2(Vec2::new(20.0, 0.0))).layout(Layout::left_to_right(Align::Center)));
+            let head = Rect::from_min_size(win.min, Vec2::new(win.width(), 60.0));
+            let mut h = ui.new_child(egui::UiBuilder::new().max_rect(head.shrink2(Vec2::new(24.0, 0.0))).layout(Layout::left_to_right(Align::Center)));
             h.spacing_mut().item_spacing.x = 10.0;
-            h.label(egui::RichText::new("Settings").font(theme::font_bold(theme::T_H + 1.0)).color(p.text));
+            h.add(egui::Label::new(ui::display_text("Settings", theme::T_H + 5.0, p.text)));
             ui::hud(&mut h, &format!("{} / {}", shell.info.name, if p.dark { "dark" } else { "light" }), None);
             h.with_layout(Layout::right_to_left(Align::Center), |ui| {
                 if ui::icon_button(ui, Icon::Close, "Close · Esc", 28.0) {
@@ -601,12 +604,11 @@ fn settings_window<A: NcfApp>(ctx: &egui::Context, app: &mut A, shell: &mut Shel
                 0.8,
             );
 
-            let pane = Rect::from_min_max(Pos2::new(nav.right() + 14.0, head.bottom()), Pos2::new(win.right() - 10.0, win.bottom() - 10.0));
-            ui.painter().rect_filled(pane, egui::Rounding::same(theme::RADIUS), p.panel);
-            ui.painter().rect_stroke(pane.shrink(0.5), egui::Rounding::same(theme::RADIUS), Stroke::new(1.0_f32, p.line));
-            let mut pane_ui = ui.new_child(egui::UiBuilder::new().max_rect(pane.shrink2(Vec2::new(18.0, 14.0))).layout(Layout::top_down(Align::Min)));
+            let pane = Rect::from_min_max(Pos2::new(nav.right() + 14.0, head.bottom()), Pos2::new(win.right() - 14.0, win.bottom() - 14.0));
+            theme::surface(ui.painter(), pane, theme::R_LG, theme::Lift::Flat);
+            let mut pane_ui = ui.new_child(egui::UiBuilder::new().max_rect(pane.shrink2(Vec2::new(22.0, 18.0))).layout(Layout::top_down(Align::Min)));
             let name = tabs[current].0;
-            pane_ui.label(egui::RichText::new(name.to_uppercase()).font(theme::font_display(theme::T_H + 1.0)).color(p.text));
+            pane_ui.add(egui::Label::new(ui::display_text(name, theme::T_H + 3.0, p.text)));
             pane_ui.add_space(4.0);
             egui::ScrollArea::vertical().id_salt(("ncf-settings-pane", current)).auto_shrink([false, false]).show(&mut pane_ui, |ui| {
                 ui.set_max_width(ui.available_width() - 14.0);

@@ -71,17 +71,20 @@ pub fn title_inset(os: Os, fullscreen: bool) -> f32 {
 pub fn backdrop(ctx: &egui::Context, fill: egui::Color32) {
     let p = pal();
     let rect = ctx.screen_rect();
-    let r = window_radius(ctx, theme::RADIUS);
+    let r = window_radius(ctx, theme::R_SM);
     let painter = ctx.layer_painter(egui::LayerId::background());
-    painter.rect_filled(rect, egui::Rounding::same(r), fill);
-    column_guides(&painter, rect);
+    if fill == p.void {
+        theme::wallpaper(&painter, rect, r);
+    } else {
+        painter.rect_filled(rect, egui::Rounding::same(r), fill);
+    }
     if crate::WEB || native_frame(crate::OS) {
         return;
     }
     painter.rect_stroke(
         rect.shrink(0.5),
         egui::Rounding::same(r),
-        Stroke::new(1.0_f32, theme::wash(if p.dark { egui::Color32::WHITE } else { p.line_strong }, if p.dark { 26 } else { 90 })),
+        Stroke::new(1.0_f32, if p.dark { p.glass_line } else { p.line_strong }),
     );
 }
 
@@ -126,17 +129,17 @@ pub fn title_bar(ui: &mut egui::Ui, ctx: &egui::Context, app: &crate::AppInfo, e
     row.add_space(title_inset(crate::OS, fullscreen(ctx)));
 
     row.spacing_mut().item_spacing.x = 6.0;
-    let (mark, _) = row.allocate_exact_size(Vec2::splat(18.0), Sense::hover());
+    let (mark, _) = row.allocate_exact_size(Vec2::splat(20.0), Sense::hover());
     app.mark.paint(row.painter(), mark);
     row.label(
         egui::RichText::new(app.name)
-            .font(egui::FontId::new(15.0, theme::semibold()))
+            .font(egui::FontId::new(15.0, theme::bold()))
             .color(p.text),
     );
     row.spacing_mut().item_spacing.x = 9.0;
 
     row.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-        ui.spacing_mut().item_spacing.x = 2.0;
+        ui.spacing_mut().item_spacing.x = 4.0;
         if !crate::WEB && !native_frame(crate::OS) {
             if window_button(ui, Glyph::Close, p.danger) {
                 ctx.send_viewport_cmd(ViewportCommand::Close);
@@ -165,20 +168,20 @@ enum Glyph {
 
 fn window_button(ui: &mut egui::Ui, glyph: Glyph, tint: egui::Color32) -> bool {
     let p = pal();
-    let (rect, resp) = ui.allocate_exact_size(Vec2::new(30.0, 24.0), Sense::click());
+    let (rect, resp) = ui.allocate_exact_size(Vec2::new(28.0, 28.0), Sense::click());
     let hot = anim::ease(ui.ctx(), resp.id, resp.hovered(), anim::HOVER);
     if hot > 0.01 {
         let fill = if glyph == Glyph::Close {
-            theme::wash(tint, (200.0 * hot) as u8)
+            theme::wash(tint, (255.0 * hot) as u8)
         } else {
-            theme::wash(p.panel_2, (255.0 * hot) as u8)
+            theme::wash(p.hover_fill(), (255.0 * hot) as u8)
         };
-        ui.painter().rect_filled(rect.shrink2(Vec2::new(3.0, 2.0)), egui::Rounding::same(theme::RADIUS), fill);
+        ui.painter().circle_filled(rect.center(), 13.0, fill);
     }
-    let ink = theme::mix(p.text_2, if glyph == Glyph::Close { egui::Color32::BLACK } else { p.text }, hot);
+    let ink = theme::mix(p.text_2, if glyph == Glyph::Close { p.on_danger } else { p.text }, hot);
     let c = rect.center();
-    let s = 4.6;
-    let stroke = Stroke::new(1.3_f32, ink);
+    let s = 4.2;
+    let stroke = Stroke::new(1.4_f32, ink);
     match glyph {
         Glyph::Min => {
             ui.painter().line_segment(
@@ -189,14 +192,14 @@ fn window_button(ui: &mut egui::Ui, glyph: Glyph, tint: egui::Color32) -> bool {
         Glyph::Max => {
             ui.painter().rect_stroke(
                 Rect::from_center_size(c, Vec2::splat(s * 1.9)),
-                egui::Rounding::ZERO,
+                egui::Rounding::same(2.0),
                 stroke,
             );
         }
         Glyph::Restore => {
             ui.painter().rect_stroke(
                 Rect::from_center_size(c + Vec2::new(-1.2, 1.2), Vec2::splat(s * 1.7)),
-                egui::Rounding::ZERO,
+                egui::Rounding::same(2.0),
                 stroke,
             );
             ui.painter().line_segment(

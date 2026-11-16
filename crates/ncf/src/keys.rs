@@ -406,8 +406,8 @@ pub fn keycap(ui: &mut egui::Ui, text: &str, listening: bool, custom: bool) -> b
     let (rect, resp) = ui.allocate_exact_size(size, Sense::click());
     let hot = anim::ease(ui.ctx(), resp.id, resp.hovered(), anim::HOVER);
     let lit = anim::ease(ui.ctx(), resp.id.with("lit"), listening, anim::HOVER);
-    let fill = theme::mix(p.sunken, theme::mix(p.sunken, p.signal, 0.25), lit.max(0.4 * hot));
-    ui.painter().rect_filled(rect, egui::Rounding::same(6.0), fill);
+    let fill = theme::mix(p.panel_2, theme::mix(p.panel_2, p.signal, 0.25), lit.max(0.4 * hot));
+    ui.painter().rect_filled(rect, egui::Rounding::same(8.0), fill);
     ui.painter().line_segment(
         [
             rect.left_bottom() + Vec2::new(5.0, -0.5),
@@ -422,7 +422,7 @@ pub fn keycap(ui: &mut egui::Ui, text: &str, listening: bool, custom: bool) -> b
     } else {
         theme::wash(p.line_strong, 140)
     };
-    ui.painter().rect_stroke(rect, egui::Rounding::same(6.0), Stroke::new(1.0_f32, edge));
+    ui.painter().rect_stroke(rect, egui::Rounding::same(8.0), Stroke::new(1.0_f32, edge));
     let ink = if listening {
         p.signal_hi
     } else if custom {

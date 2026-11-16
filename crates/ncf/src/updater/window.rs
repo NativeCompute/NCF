@@ -141,15 +141,15 @@ impl Updater {
         let mut site = false;
         egui::CentralPanel::default().frame(egui::Frame::none()).show(ctx, |ui| {
             let rect = ui.max_rect();
-            let round = egui::Rounding::same(if native { 0.0 } else { theme::RADIUS });
+            let radius = if native { 0.0 } else { theme::R_SM };
+            let round = egui::Rounding::same(radius);
             let drag = ui.interact(rect, egui::Id::new("ncf-updater-drag"), Sense::click_and_drag());
             if drag.drag_started() && !native {
                 ctx.send_viewport_cmd(egui::ViewportCommand::StartDrag);
             }
             let painter = ui.painter().clone();
-            painter.rect_filled(rect, round, p.void);
-            chrome::column_guides(&painter, rect);
-            painter.rect_stroke(rect.shrink(0.5), round, Stroke::new(1.0_f32, p.line_strong));
+            theme::wallpaper(&painter, rect, radius);
+            painter.rect_stroke(rect.shrink(0.5), round, Stroke::new(1.0_f32, if p.dark { p.glass_line } else { p.line_strong }));
 
             let left = rect.left() + 40.0;
             let width = rect.width() - 80.0;
@@ -171,10 +171,10 @@ impl Updater {
                 site = true;
             }
 
-            let title = self.title().to_uppercase();
-            let probe = painter.layout_no_wrap(title.clone(), theme::font_display(40.0), p.text);
+            let title = self.title().to_string();
+            let probe = theme::display_galley(ctx, &title, 40.0, p.text);
             let size = (40.0 * width * 0.97 / probe.rect.width().max(1.0)).min(40.0);
-            let galley = painter.layout_no_wrap(title, theme::font_display(size), p.text);
+            let galley = theme::display_galley(ctx, &title, size, p.text);
             let title_top = top + 22.0 + 12.0;
             painter.galley(Pos2::new(left, title_top + (40.0 - galley.rect.height()) * 0.5), galley, p.text);
             let track_y = title_top + 40.0 + 8.0;
@@ -182,7 +182,7 @@ impl Updater {
             let failed = matches!(self.state.outcome, Some(Err(_)));
             let done = matches!(self.state.outcome, Some(Ok(())));
             let current = self.state.step.map(|s| s.index());
-            let row_top = track_y + 2.0 + 16.0;
+            let row_top = track_y + BAR_H + 16.0;
             let t = ui.input(|i| i.time) as f32;
             for (k, step) in STEPS.iter().enumerate() {
                 let y = row_top + k as f32 * 20.0;
@@ -194,19 +194,20 @@ impl Updater {
                     Some(c) if k == c => (1, p.text),
                     _ => (0, p.text_3),
                 };
+                let dot = marker.center();
                 match state {
                     2 => {
-                        painter.rect_filled(marker, egui::Rounding::ZERO, p.text_3);
+                        painter.circle_filled(dot, 4.0, p.text_3);
                     }
                     3 => {
-                        painter.rect_filled(marker, egui::Rounding::ZERO, p.danger_hi);
+                        painter.circle_filled(dot, 4.0, p.danger);
                     }
                     1 => {
                         let pulse = if anim::enabled() { 0.55 + 0.45 * (t * 4.0).sin().abs() } else { 1.0 };
-                        painter.rect_filled(marker, egui::Rounding::ZERO, theme::wash(p.signal_hi, (255.0 * pulse) as u8));
+                        painter.circle_filled(dot, 4.5, theme::wash(p.signal, (255.0 * pulse) as u8));
                     }
                     _ => {
-                        painter.rect_stroke(marker, egui::Rounding::ZERO, Stroke::new(1.0_f32, p.line_strong));
+                        painter.circle_stroke(dot, 3.5, Stroke::new(1.0_f32, p.line_strong));
                     }
                 }
                 let label = if *step == Step::Reopen && !self.plan.reopen { "Finishing".to_string() } else { step.label(&self.plan) };
@@ -243,13 +244,16 @@ impl Updater {
                 (_, Some(c)) => (c as f32 + if STEPS[c] == Step::Download { self.state.progress } else { 0.5 }) / STEPS.len() as f32,
                 _ => 0.0,
             };
-            let track = Rect::from_min_size(Pos2::new(left, track_y), Vec2::new(width, 2.0));
-            painter.rect_filled(track, egui::Rounding::ZERO, p.line_strong);
-            painter.rect_filled(
-                Rect::from_min_size(track.min, Vec2::new(track.width() * overall.clamp(0.0, 1.0), 2.0)),
-                egui::Rounding::ZERO,
-                if failed { p.danger_hi } else { p.signal_hi },
-            );
+            let track = Rect::from_min_size(Pos2::new(left, track_y), Vec2::new(width, BAR_H));
+            painter.rect_filled(track, egui::Rounding::same(BAR_H * 0.5), p.line_strong);
+            let filled = track.width() * overall.clamp(0.0, 1.0);
+            if filled > 0.5 {
+                painter.rect_filled(
+                    Rect::from_min_size(track.min, Vec2::new(filled.max(BAR_H), BAR_H)),
+                    egui::Rounding::same(BAR_H * 0.5),
+                    if failed { p.danger } else { p.signal },
+                );
+            }
 
             let bar = Rect::from_center_size(Pos2::new(left + width * 0.5, row_mid), Vec2::new(width, 32.0));
             let mut buttons = ui.new_child(egui::UiBuilder::new().max_rect(bar).layout(Layout::right_to_left(Align::Center)));
@@ -314,6 +318,8 @@ fn save_png(path: &std::path::Path, image: &egui::ColorImage) -> Result<(), Stri
     let bytes: Vec<u8> = image.pixels.iter().flat_map(|c| c.to_srgba_unmultiplied()).collect();
     writer.write_image_data(&bytes).map_err(|e| e.to_string())
 }
+
+const BAR_H: f32 = 6.0;
 
 struct Host {
     updater: Updater,

@@ -39,7 +39,7 @@ impl Tone {
             Tone::Ok => p.ok,
             Tone::Info => p.signal_hi,
             Tone::Warn => p.warn,
-            Tone::Danger => p.danger_hi,
+            Tone::Danger => if p.dark { p.danger_hi } else { p.danger },
         }
     }
     pub fn label(self) -> &'static str {
@@ -241,11 +241,8 @@ impl<A> Deck<A> {
                 .interactable(true)
                 .show(ctx, |ui| {
                     let (rect, _) = ui.allocate_exact_size(screen.size(), Sense::click());
-                    ui.painter().rect_filled(
-                        rect,
-                        egui::Rounding::ZERO,
-                        Color32::from_black_alpha((155.0 * veil) as u8),
-                    );
+                    let s = pal().scrim();
+                    ui.painter().rect_filled(rect, egui::Rounding::ZERO, theme::wash(s, (s.a() as f32 * veil) as u8));
                 });
         } else {
             ctx.animate_bool_with_time(egui::Id::new("ncf-veil"), false, 0.0);
@@ -331,7 +328,7 @@ impl<A> Deck<A> {
             }
         };
         if !item.modal() {
-            let label = theme::tracked_width(ctx, item.tone.label(), theme::font_hud(theme::T_MICRO), 0.8);
+            let label = theme::tracked_width(ctx, item.tone.label(), theme::font_hud(theme::T_MICRO), 0.8) + 14.0;
             let title = width_of(&item.title, theme::font_semi(theme::T_SM));
             let body = width_of(&crate::ui::elide(&item.body, 46), theme::font(theme::T_CAP));
             let w = (PAD + label + GAP + title + if body > 0.0 { 10.0 + body } else { 0.0 } + PAD).clamp(200.0, 520.0);
@@ -366,17 +363,12 @@ impl<A> Deck<A> {
                 ui.set_width(rect.width());
                 let painter = ui.painter();
 
-                theme::panel(painter, rect);
-                painter.rect_filled(
-                    Rect::from_min_size(rect.min, Vec2::new(2.0, rect.height())),
-                    egui::Rounding::ZERO,
-                    accent,
-                );
-
                 if !is_modal {
+                    theme::surface(painter, rect, rect.height() * 0.5, theme::Lift::Lift);
                     let mid = rect.center().y;
-                    let label = theme::tracked_text(painter, Pos2::new(rect.left() + PAD, mid), tone.label(), theme::font_hud(theme::T_MICRO), tone.ink(), 0.8);
-                    let x = rect.left() + PAD + label + GAP;
+                    painter.circle_filled(Pos2::new(rect.left() + PAD + 3.0, mid), 4.0, accent);
+                    let label = theme::tracked_text(painter, Pos2::new(rect.left() + PAD + 14.0, mid), tone.label(), theme::font_hud(theme::T_MICRO), tone.ink(), 0.8);
+                    let x = rect.left() + PAD + 14.0 + label + GAP;
                     let title = painter.layout_no_wrap(self.items[idx].title.clone(), theme::font_semi(theme::T_SM), p.text);
                     let tw = title.rect.width();
                     painter.galley(Pos2::new(x, mid - title.rect.height() * 0.5), title, p.text);
@@ -396,12 +388,14 @@ impl<A> Deck<A> {
                     return;
                 }
 
+                theme::surface(painter, rect, theme::R_LG, theme::Lift::Lift);
                 let left = rect.left() + PAD;
                 let width = rect.width() - PAD * 2.0;
                 let mut y = rect.top() + 22.0;
-                theme::tracked_text(painter, Pos2::new(left, y + 6.0), tone.ask_label(), theme::font_hud(theme::T_MICRO), tone.ink(), 0.8);
+                painter.circle_filled(Pos2::new(left + 3.0, y + 6.0), 4.0, accent);
+                theme::tracked_text(painter, Pos2::new(left + 14.0, y + 6.0), tone.ask_label(), theme::font_hud(theme::T_MICRO), tone.ink(), 0.8);
                 y += 12.0 + 10.0;
-                let title = painter.layout_no_wrap(self.items[idx].title.clone(), theme::font_bold(theme::T_H), p.text);
+                let title = painter.layout_no_wrap(self.items[idx].title.clone(), theme::font_heading(theme::T_H + 1.0), p.text);
                 painter.galley(Pos2::new(left, y), title, p.text);
                 y += 24.0 + 8.0;
                 if !self.items[idx].body.is_empty() {
@@ -472,11 +466,12 @@ enum CardOut {
 
 fn danger_button(ui: &mut egui::Ui, label: &str) -> bool {
     let p = pal();
-    let font = theme::font_semi(theme::T_SM);
-    let galley = ui.painter().layout_no_wrap(label.to_string(), font, Color32::WHITE);
-    let (rect, resp) = ui.allocate_exact_size(Vec2::new(galley.rect.width() + 28.0, 30.0), Sense::click());
+    let font = theme::font_bold(theme::T_SM);
+    let galley = ui.painter().layout_no_wrap(label.to_string(), font, p.on_danger);
+    let (rect, resp) = ui.allocate_exact_size(Vec2::new(galley.rect.width() + 32.0, crate::ui::BUTTON_H), Sense::click());
     let hot = anim::ease(ui.ctx(), resp.id, resp.hovered(), anim::HOVER);
-    ui.painter().rect_filled(rect, egui::Rounding::same(theme::RADIUS), theme::mix(p.danger, theme::lighten(p.danger, 0.14), hot));
-    ui.painter().galley(rect.center() - galley.rect.size() * 0.5, galley, Color32::WHITE);
+    let fill = if p.dark { theme::mix(p.danger, theme::lighten(p.danger, 0.14), hot) } else { theme::mix(p.danger, theme::darken(p.danger, 0.12), hot) };
+    ui.painter().rect_filled(rect, egui::Rounding::same(rect.height() * 0.5), fill);
+    ui.painter().galley(rect.center() - galley.rect.size() * 0.5, galley, p.on_danger);
     resp.clicked()
 }

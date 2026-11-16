@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use eframe::egui::{self, Align, Color32, Layout, Pos2, Rect, Sense, Stroke, Vec2};
+use eframe::egui::{self, Align, Color32, Layout, Pos2, Rect, Sense, Vec2};
 
 use super::engine::Mood;
 use super::*;
@@ -20,12 +20,7 @@ pub struct Ask {
 }
 
 fn hue_colour(hue: i32) -> Color32 {
-    let h = hue.rem_euclid(360) as f32 / 360.0;
-    if pal().dark {
-        theme::hsl(h, 0.42, 0.42)
-    } else {
-        theme::hsl(h, 0.48, 0.58)
-    }
+    pal().bright((hue.rem_euclid(360) / 60) as usize)
 }
 
 pub fn initials(name: &str) -> String {
@@ -46,8 +41,7 @@ pub fn avatar(ui: &mut egui::Ui, name: &str, hue: i32, size: f32) -> egui::Respo
     let (rect, resp) = ui.allocate_exact_size(Vec2::splat(size), Sense::hover());
     let r = size * 0.5;
     ui.painter().circle_filled(rect.center(), r, hue_colour(hue));
-    ui.painter().text(rect.center(), egui::Align2::CENTER_CENTER, initials(name), theme::font_semi((r * 0.9).max(7.0)), Color32::from_white_alpha(235));
-    ui.painter().circle_stroke(rect.center(), r - 0.5, Stroke::new(1.0_f32, theme::wash(if p.dark { Color32::WHITE } else { Color32::BLACK }, 28)));
+    ui.painter().text(rect.center(), egui::Align2::CENTER_CENTER, initials(name), theme::font_bold((r * 0.85).max(7.0)), p.on_tile);
     resp.on_hover_text(name)
 }
 
@@ -76,7 +70,7 @@ pub fn meter(ui: &mut egui::Ui, label: &str, used: i64, max: i64, shown: &str) {
     painter.text(Pos2::new(rect.left(), rect.top() + 9.0), egui::Align2::LEFT_CENTER, label, theme::font_med(theme::T_SM), p.text);
     painter.text(Pos2::new(rect.right(), rect.top() + 9.0), egui::Align2::RIGHT_CENTER, shown, theme::font_hud(theme::T_MICRO + 0.5), p.text_3);
     let bar = Rect::from_min_size(Pos2::new(rect.left(), rect.top() + 24.0), Vec2::new(w, 4.0));
-    painter.rect_filled(bar, egui::Rounding::same(1.0), p.line);
+    painter.rect_filled(bar, egui::Rounding::same(2.0), p.line_strong);
     let k = if max <= 0 { 0.0 } else { (used as f32 / max as f32).clamp(0.0, 1.0) };
     let col = if k >= 0.95 {
         p.danger
@@ -86,7 +80,7 @@ pub fn meter(ui: &mut egui::Ui, label: &str, used: i64, max: i64, shown: &str) {
         p.signal
     };
     if k > 0.0 {
-        painter.rect_filled(Rect::from_min_size(bar.min, Vec2::new((w * k).max(2.0), 4.0)), egui::Rounding::same(1.0), col);
+        painter.rect_filled(Rect::from_min_size(bar.min, Vec2::new((w * k).max(2.0), 4.0)), egui::Rounding::same(2.0), col);
     }
 }
 
@@ -822,7 +816,7 @@ impl Account {
             let selected = self.org.as_deref() == Some(o.org.id.as_str());
             let (rect, resp) = ui.allocate_exact_size(Vec2::new(w, 36.0), Sense::click());
             let hot = crate::anim::ease(ui.ctx(), resp.id, resp.hovered() || selected, crate::anim::HOVER);
-            theme::hover_surface(ui.painter(), rect, theme::RADIUS, p.signal, hot, selected);
+            theme::hover_surface(ui.painter(), rect, theme::R_SM, p.signal, hot, selected);
             icons::draw(ui.painter(), Rect::from_center_size(Pos2::new(rect.left() + 16.0, rect.center().y), Vec2::splat(14.0)), Icon::Users, p.text_2);
             ui.painter().text(Pos2::new(rect.left() + 34.0, rect.center().y), egui::Align2::LEFT_CENTER, &o.org.name, theme::font_med(theme::T_SM), p.text);
             let n = o.members.len();

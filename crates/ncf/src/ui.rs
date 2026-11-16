@@ -11,7 +11,7 @@ use crate::theme::{self, pal};
 pub fn ghost_slot(ui: &egui::Ui, rect: Rect, hot: bool, on: bool) {
     let p = pal();
     let t = anim::ease(ui.ctx(), rect.min.x as i32 * 7919 + rect.min.y as i32, hot, anim::HOVER);
-    theme::hover_surface(ui.painter(), rect, theme::RADIUS, p.signal, t, on);
+    theme::hover_surface(ui.painter(), rect, rect.height().min(rect.width()) * 0.5, p.signal, t, on);
 }
 
 pub fn rule(ui: &mut egui::Ui, height: f32) {
@@ -27,7 +27,7 @@ pub fn wipe(painter: &egui::Painter, rect: Rect, t: f32, color: Color32) {
         return;
     }
     let filled = Rect::from_min_max(rect.min, Pos2::new(rect.left() + rect.width() * t, rect.max.y));
-    painter.rect_filled(filled, egui::Rounding::same(theme::RADIUS), color);
+    painter.rect_filled(filled, egui::Rounding::same(rect.height() * 0.5), color);
 }
 
 pub fn icon_button(ui: &mut egui::Ui, icon: Icon, tip: &str, size: f32) -> bool {
@@ -64,8 +64,8 @@ pub fn icon_button_full(
     let hot = anim::ease(ui.ctx(), resp.id, resp.hovered(), anim::HOVER);
     let glyph = rect.shrink(size * 0.28);
 
-    theme::hover_surface(ui.painter(), rect, theme::RADIUS, p.signal, hot, false);
-    let ink = theme::mix(tint.unwrap_or(p.text_2), tint.map(|t| theme::lighten(t, 0.2)).unwrap_or(p.text), hot);
+    theme::hover_surface(ui.painter(), rect, size * 0.5, p.signal, hot, false);
+    let ink = theme::mix(tint.unwrap_or(p.text_2), tint.unwrap_or(p.text), hot);
     icons::draw(ui.painter(), glyph, icon, ink);
 
     if tip.is_empty() {
@@ -89,6 +89,17 @@ pub fn button_sized(
     button_response(ui, label, icon, accent, width).clicked()
 }
 
+pub fn button_colors(accent: bool, hot: f32) -> (Color32, Color32, Color32) {
+    let p = pal();
+    if accent {
+        (theme::mix(p.signal, p.signal_deep, hot), Color32::TRANSPARENT, p.ink)
+    } else {
+        (theme::mix(p.deep, p.hover_fill(), hot), theme::mix(p.line_strong, p.text_3, hot), p.text)
+    }
+}
+
+pub const BUTTON_H: f32 = 32.0;
+
 pub fn button_response(
     ui: &mut egui::Ui,
     label: &str,
@@ -96,65 +107,25 @@ pub fn button_response(
     accent: bool,
     width: Option<f32>,
 ) -> Response {
-    let p = pal();
-    let font = theme::font_semi(theme::T_SM);
-    let galley = ui
-        .painter()
-        .layout_no_wrap(label.to_string(), font.clone(), p.text);
+    let font = theme::font_bold(theme::T_SM);
+    let galley = ui.painter().layout_no_wrap(label.to_string(), font.clone(), Color32::PLACEHOLDER);
     let icon_w = if icon.is_some() { 20.0 } else { 0.0 };
-    let w = width.unwrap_or(galley.rect.width() + icon_w + 28.0);
-    let (rect, resp) = ui.allocate_exact_size(Vec2::new(w, 30.0), Sense::click());
-    let hot = anim::ease(ui.ctx(), resp.id, resp.hovered(), crate::tokens::MOTION_SLOW);
+    let w = width.unwrap_or(galley.rect.width() + icon_w + 32.0);
+    let (rect, resp) = ui.allocate_exact_size(Vec2::new(w, BUTTON_H), Sense::click());
+    let hot = anim::ease(ui.ctx(), resp.id, resp.hovered(), crate::tokens::MOTION_QUICK);
     let painter = ui.painter();
-
-    let (rest_ink, fill_col, lit_ink) = if accent {
-        (Color32::WHITE, Color32::WHITE, Color32::BLACK)
-    } else {
-        (p.text, p.text, p.void)
-    };
-    if accent {
-        painter.rect_filled(rect, egui::Rounding::same(theme::RADIUS), p.signal);
-    } else {
-        painter.rect_stroke(
-            rect.shrink(0.5),
-            egui::Rounding::same(theme::RADIUS),
-            Stroke::new(1.0_f32, theme::mix(p.line_strong, p.text, hot)),
-        );
+    let (fill, edge, ink) = button_colors(accent, hot);
+    let r = egui::Rounding::same(BUTTON_H * 0.5);
+    painter.rect_filled(rect, r, fill);
+    if edge.a() > 0 {
+        painter.rect_stroke(rect.shrink(0.5), r, Stroke::new(1.0_f32, edge));
     }
-    wipe(painter, rect, hot, fill_col);
-
-    let reach = rect.left() + rect.width() * anim::ease_out_expo(hot.clamp(0.0, 1.0));
-    let start = rect.center().x - (galley.rect.width() + icon_w) * 0.5;
-    let draw = |painter: &egui::Painter, ink: Color32| {
-        let mut x = start;
-        if let Some(i) = icon {
-            icons::draw(
-                painter,
-                Rect::from_center_size(Pos2::new(x + 7.0, rect.center().y), Vec2::splat(13.0)),
-                i,
-                ink,
-            );
-            x += icon_w;
-        }
-        painter.text(
-            Pos2::new(x, rect.center().y),
-            egui::Align2::LEFT_CENTER,
-            label,
-            font.clone(),
-            ink,
-        );
-    };
-    let clip = painter.clip_rect();
-    draw(
-        &painter.with_clip_rect(clip.intersect(Rect::from_min_max(Pos2::new(reach, rect.top()), rect.max))),
-        rest_ink,
-    );
-    if reach > rect.left() + 0.5 {
-        draw(
-            &painter.with_clip_rect(clip.intersect(Rect::from_min_max(rect.min, Pos2::new(reach, rect.bottom())))),
-            lit_ink,
-        );
+    let mut x = rect.center().x - (galley.rect.width() + icon_w) * 0.5;
+    if let Some(i) = icon {
+        icons::draw(painter, Rect::from_center_size(Pos2::new(x + 7.0, rect.center().y), Vec2::splat(13.0)), i, ink);
+        x += icon_w;
     }
+    painter.galley(Pos2::new(x, rect.center().y - galley.rect.height() * 0.5), galley, ink);
     resp
 }
 
@@ -167,8 +138,10 @@ pub fn quiet_button(ui: &mut egui::Ui, label: &str, icon: Option<Icon>) -> bool 
         Vec2::new(galley.rect.width() + icon_w + 20.0, 28.0),
         Sense::click(),
     );
-    let hot = anim::ease(ui.ctx(), resp.id, resp.hovered(), crate::tokens::MOTION_SLOW);
-    wipe(ui.painter(), rect, hot, if p.dark { p.panel_2 } else { p.sunken });
+    let hot = anim::ease(ui.ctx(), resp.id, resp.hovered(), crate::tokens::MOTION_QUICK);
+    if hot > 0.005 {
+        ui.painter().rect_filled(rect, egui::Rounding::same(rect.height() * 0.5), theme::wash(p.hover_fill(), (255.0 * hot) as u8));
+    }
     let mut x = rect.left() + 10.0;
     if let Some(i) = icon {
         icons::draw(
@@ -213,16 +186,12 @@ pub fn chip_button(ui: &mut egui::Ui, text: &str) -> bool {
     let font = theme::font_hud(theme::T_MICRO + 0.5);
     let label = text.to_uppercase();
     let w = theme::tracked_width(ui.ctx(), &label, font.clone(), 0.8);
-    let (rect, resp) = ui.allocate_exact_size(Vec2::new(w + 16.0, 20.0), Sense::click());
+    let (rect, resp) = ui.allocate_exact_size(Vec2::new(w + 20.0, 22.0), Sense::click());
     let hot = anim::ease(ui.ctx(), resp.id, resp.hovered(), anim::HOVER);
-    ui.painter().rect_stroke(
-        rect.shrink(0.5),
-        egui::Rounding::same(theme::RADIUS),
-        Stroke::new(1.0_f32, theme::mix(p.line_strong, p.text, hot)),
-    );
+    ui.painter().rect_filled(rect, egui::Rounding::same(11.0), theme::mix(p.panel_2, p.line_strong, hot * 0.6));
     theme::tracked_text(
         ui.painter(),
-        Pos2::new(rect.left() + 8.0, rect.center().y),
+        Pos2::new(rect.left() + 10.0, rect.center().y),
         &label,
         font,
         theme::mix(p.text_2, p.text, hot),
@@ -233,30 +202,20 @@ pub fn chip_button(ui: &mut egui::Ui, text: &str) -> bool {
 
 pub fn toggle(ui: &mut egui::Ui, on: &mut bool) -> bool {
     let p = pal();
-    let (rect, resp) = ui.allocate_exact_size(Vec2::new(36.0, 20.0), Sense::click());
+    let (rect, resp) = ui.allocate_exact_size(Vec2::new(38.0, 22.0), Sense::click());
     if resp.clicked() {
         *on = !*on;
     }
     let t = anim::ease(ui.ctx(), resp.id.with("on"), *on, 0.15);
     let hot = anim::ease(ui.ctx(), resp.id, resp.hovered(), anim::HOVER);
-    let r = egui::Rounding::same(theme::RADIUS);
-    ui.painter()
-        .rect_filled(rect, r, theme::wash(p.signal, (255.0 * t) as u8));
-    ui.painter().rect_stroke(
-        rect.shrink(0.5),
-        r,
-        Stroke::new(
-            1.0_f32,
-            theme::mix(theme::mix(p.line_strong, p.text_3, hot), p.signal, t),
-        ),
-    );
-    let side = rect.height() - 8.0;
-    let knob = Rect::from_min_size(
-        Pos2::new(rect.left() + 4.0 + t * (rect.width() - 8.0 - side), rect.top() + 4.0),
-        Vec2::splat(side),
-    );
-    ui.painter()
-        .rect_filled(knob, r, theme::mix(p.text_2, Color32::WHITE, t));
+    let r = egui::Rounding::same(rect.height() * 0.5);
+    let off = theme::mix(p.line_strong, p.text_3, hot * 0.5);
+    ui.painter().rect_filled(rect, r, theme::mix(off, p.signal, t));
+    let side = rect.height() - 6.0;
+    let c = Pos2::new(rect.left() + 3.0 + side * 0.5 + t * (rect.width() - 6.0 - side), rect.center().y);
+    let knob = Rect::from_center_size(c, Vec2::splat(side));
+    theme::shadow(ui.painter(), knob, side * 0.5, theme::Lift::Rest);
+    ui.painter().circle_filled(c, side * 0.5, Color32::WHITE);
     resp.clicked()
 }
 
@@ -294,7 +253,7 @@ pub fn slider(ui: &mut egui::Ui, value: &mut f32, range: std::ops::RangeInclusiv
     let (lo, hi) = (*range.start(), *range.end());
     let span = (hi - lo).max(0.0001);
 
-    const KNOB: f32 = 7.0;
+    const KNOB: f32 = 8.0;
     let x0 = rect.left() + KNOB;
     let x1 = rect.right() - KNOB;
 
@@ -313,27 +272,26 @@ pub fn slider(ui: &mut egui::Ui, value: &mut f32, range: std::ops::RangeInclusiv
     let knob = Pos2::new(x0 + t * (x1 - x0), rect.center().y);
 
     let track = Rect::from_min_max(
-        Pos2::new(rect.left(), rect.center().y - 1.0),
-        Pos2::new(rect.right(), rect.center().y + 1.0),
+        Pos2::new(rect.left(), rect.center().y - 2.0),
+        Pos2::new(rect.right(), rect.center().y + 2.0),
     );
-    ui.painter().rect_filled(track, egui::Rounding::ZERO, p.line_strong);
+    ui.painter().rect_filled(track, egui::Rounding::same(2.0), p.line_strong);
     let filled = Rect::from_min_max(track.min, Pos2::new(knob.x, track.max.y));
-    ui.painter().rect_filled(filled, egui::Rounding::ZERO, p.signal_hi);
+    ui.painter().rect_filled(filled, egui::Rounding::same(2.0), p.signal);
 
     let hot = anim::ease(ui.ctx(), resp.id, resp.hovered() || resp.dragged(), anim::HOVER);
     let side = KNOB * 2.0 + 2.0 * hot;
-    ui.painter().rect_filled(
-        Rect::from_center_size(knob, Vec2::splat(side)),
-        egui::Rounding::ZERO,
-        p.text,
-    );
+    let dot = Rect::from_center_size(knob, Vec2::splat(side));
+    theme::shadow(ui.painter(), dot, side * 0.5, theme::Lift::Rest);
+    ui.painter().circle_filled(knob, side * 0.5, Color32::WHITE);
+    ui.painter().circle_stroke(knob, side * 0.5 - 0.5, Stroke::new(1.0_f32, p.line_strong));
     changed
 }
 
 pub fn link(ui: &mut egui::Ui, text: &str) -> bool {
     let p = pal();
     let font = theme::font_med(theme::T_SM);
-    let galley = ui.painter().layout_no_wrap(text.to_string(), font, p.signal_hi);
+    let galley = ui.painter().layout_no_wrap(text.to_string(), font, Color32::PLACEHOLDER);
     let (rect, resp) = ui.allocate_exact_size(galley.rect.size(), Sense::click());
     let hot = resp.hovered();
     let ink = if hot { p.text } else { p.signal_hi };
@@ -396,32 +354,25 @@ pub fn logo(ui: &mut egui::Ui, height: f32, tint: Color32) -> Response {
 
 pub fn vertical_tabs(ui: &mut egui::Ui, options: &[(&str, Icon)], current: usize) -> Option<usize> {
     let p = pal();
-    ui.spacing_mut().item_spacing.y = 0.0;
+    ui.spacing_mut().item_spacing.y = 2.0;
     let mut picked = None;
-    let mut rows = Vec::new();
+    let (sel_fill, sel_ink) = p.selected();
     for (i, (label, icon)) in options.iter().enumerate() {
         let (rect, resp) = ui.allocate_exact_size(Vec2::new(ui.available_width(), 36.0), Sense::click());
         let hot = anim::ease(ui.ctx(), resp.id, resp.hovered(), anim::HOVER);
         let lit = anim::ease(ui.ctx(), resp.id.with("on"), i == current, crate::tokens::MOTION_QUICK);
+        let r = egui::Rounding::same(theme::R_SM);
         if lit > 0.005 {
-            ui.painter().rect_filled(rect, egui::Rounding::ZERO, theme::wash(p.text, (255.0 * lit) as u8));
+            ui.painter().rect_filled(rect, r, theme::wash(sel_fill, (255.0 * lit) as u8));
         } else if hot > 0.01 {
-            ui.painter().rect_filled(rect, egui::Rounding::ZERO, theme::wash(p.hover_fill(), (255.0 * hot) as u8));
+            ui.painter().rect_filled(rect, r, theme::wash(p.hover_fill(), (255.0 * hot) as u8));
         }
-        let ink = theme::mix(theme::mix(p.text_2, p.text, hot), p.void, lit);
-        icons::draw(ui.painter(), Rect::from_center_size(Pos2::new(rect.left() + 18.0, rect.center().y), Vec2::splat(13.0)), *icon, ink);
-        theme::tracked_text(ui.painter(), Pos2::new(rect.left() + 34.0, rect.center().y), &label.to_uppercase(), theme::font_hud(theme::T_CAP), ink, 0.9);
+        let ink = theme::mix(theme::mix(p.text_2, p.text, hot), sel_ink, lit);
+        icons::draw(ui.painter(), Rect::from_center_size(Pos2::new(rect.left() + 18.0, rect.center().y), Vec2::splat(14.0)), *icon, ink);
+        ui.painter().text(Pos2::new(rect.left() + 34.0, rect.center().y), egui::Align2::LEFT_CENTER, label, theme::font_semi(theme::T_SM), ink);
         if resp.clicked() {
             picked = Some(i);
         }
-        rows.push(rect);
-    }
-    if let (Some(first), Some(last)) = (rows.first(), rows.last()) {
-        for r in &rows[1..] {
-            let y = r.top().round() + 0.5;
-            ui.painter().line_segment([Pos2::new(r.left(), y), Pos2::new(r.right(), y)], Stroke::new(1.0_f32, p.line));
-        }
-        ui.painter().rect_stroke(Rect::from_min_max(first.min, last.max).shrink(0.5), egui::Rounding::ZERO, Stroke::new(1.0_f32, p.line_strong));
     }
     picked
 }
@@ -434,7 +385,8 @@ pub fn scrim(ctx: &egui::Context, id: &str, t: f32) -> bool {
         .fixed_pos(screen.min)
         .show(ctx, |ui| {
             let (rect, resp) = ui.allocate_exact_size(screen.size(), Sense::click());
-            ui.painter().rect_filled(rect, egui::Rounding::ZERO, Color32::from_black_alpha((178.0 * t) as u8));
+            let s = pal().scrim();
+            ui.painter().rect_filled(rect, egui::Rounding::ZERO, theme::wash(s, (s.a() as f32 * t.clamp(0.0, 1.0)) as u8));
             clicked = resp.clicked();
         });
     clicked
@@ -461,7 +413,19 @@ pub fn giant_fit(ui: &mut egui::Ui, text: &str, max: f32, min: f32, room: f32) -
 
 pub fn heading(ui: &mut egui::Ui, text: &str) -> Response {
     let p = pal();
-    ui.label(egui::RichText::new(text).font(theme::font_bold(theme::T_H)).color(p.text))
+    ui.label(egui::RichText::new(text).font(theme::font_heading(theme::T_H)).extra_letter_spacing(theme::display_tracking(theme::T_H)).color(p.text))
+}
+
+pub fn big_number(ui: &mut egui::Ui, text: &str, size: f32, color: Color32) -> Response {
+    ui.add(egui::Label::new(display_text(text, size, color)).extend())
+}
+
+pub fn eyebrow_text(painter: &egui::Painter, left_centre: Pos2, text: &str, color: Color32) -> f32 {
+    theme::tracked_text(painter, left_centre, &text.to_uppercase(), theme::font_bold(theme::T_MICRO + 0.5), color, 1.1)
+}
+
+pub fn eyebrow_width(ctx: &egui::Context, text: &str) -> f32 {
+    theme::tracked_width(ctx, &text.to_uppercase(), theme::font_bold(theme::T_MICRO + 0.5), 1.1)
 }
 
 pub fn body(ui: &mut egui::Ui, text: &str) -> Response {
@@ -475,7 +439,11 @@ pub fn caption(ui: &mut egui::Ui, text: &str) -> Response {
 }
 
 pub fn eyebrow(ui: &mut egui::Ui, text: &str) -> Response {
-    hud(ui, text, None)
+    let p = pal();
+    let w = eyebrow_width(ui.ctx(), text);
+    let (rect, resp) = ui.allocate_exact_size(Vec2::new(w, 16.0), Sense::hover());
+    eyebrow_text(ui.painter(), Pos2::new(rect.left(), rect.center().y), text, p.text_3);
+    resp
 }
 
 // fields here---
@@ -498,14 +466,7 @@ pub fn section(ui: &mut egui::Ui, label: &str) {
     let p = pal();
     ui.add_space(3.0);
     let (rect, _) = ui.allocate_exact_size(Vec2::new(ui.available_width(), 14.0), Sense::hover());
-    theme::tracked_text(
-        ui.painter(),
-        Pos2::new(rect.left(), rect.center().y),
-        &label.to_uppercase(),
-        theme::font_hud(theme::T_MICRO),
-        p.text_3,
-        0.8,
-    );
+    eyebrow_text(ui.painter(), Pos2::new(rect.left(), rect.center().y), label, p.text_3);
     ui.add_space(4.0);
 }
 
@@ -530,18 +491,21 @@ pub fn ribbon_button(ui: &mut egui::Ui, icon: Icon, label: &str, tip: &str, on: 
         Some(ui.painter().layout_no_wrap(
             label.to_string(),
             theme::font_med(theme::T_LABEL),
-            p.text_2,
+            Color32::PLACEHOLDER,
         ))
     };
-    let w = 30.0 + galley.as_ref().map(|g| g.rect.width() + 6.0).unwrap_or(0.0);
+    let w = 30.0 + galley.as_ref().map(|g| g.rect.width() + 10.0).unwrap_or(0.0);
     let (rect, resp) = ui.allocate_exact_size(Vec2::new(w, 30.0), Sense::click());
     let hot = anim::ease(ui.ctx(), resp.id, resp.hovered(), anim::HOVER);
-    theme::hover_surface(ui.painter(), rect, theme::RADIUS, p.signal, hot, on);
-    let ink = if on {
-        p.signal_hi
-    } else {
-        theme::mix(p.text_2, p.text, hot)
-    };
+    let lit = anim::ease(ui.ctx(), resp.id.with("on"), on, crate::tokens::MOTION_QUICK);
+    let (sel_fill, sel_ink) = p.selected();
+    let r = egui::Rounding::same(rect.height() * 0.5);
+    if lit > 0.005 {
+        ui.painter().rect_filled(rect, r, theme::wash(sel_fill, (255.0 * lit) as u8));
+    } else if hot > 0.005 {
+        ui.painter().rect_filled(rect, r, theme::wash(p.hover_fill(), (255.0 * hot) as u8));
+    }
+    let ink = theme::mix(theme::mix(p.text_2, p.text, hot), sel_ink, lit);
     let glyph = Rect::from_center_size(Pos2::new(rect.left() + 15.0, rect.center().y), Vec2::splat(14.0));
     icons::draw(ui.painter(), glyph, icon, ink);
     if let Some(g) = galley {
@@ -560,59 +524,39 @@ pub fn ribbon_button(ui: &mut egui::Ui, icon: Icon, label: &str, tip: &str, on: 
 
 pub fn segmented(ui: &mut egui::Ui, options: &[(&str, Icon)], current: usize) -> Option<usize> {
     let p = pal();
-    let font = theme::font_hud(theme::T_CAP);
-    let labels: Vec<String> = options.iter().map(|(l, _)| l.to_uppercase()).collect();
-    let widths: Vec<f32> = labels
+    let font = theme::font_semi(theme::T_SM);
+    let widths: Vec<f32> = options
         .iter()
-        .map(|l| theme::tracked_width(ui.ctx(), l, font.clone(), 0.9) + 32.0)
+        .map(|(l, _)| ui.painter().layout_no_wrap((*l).to_string(), font.clone(), p.text).rect.width() + 30.0)
         .collect();
-    let seg_w = widths.iter().cloned().fold(72.0_f32, f32::max);
-    let h = 32.0;
-    let (rect, _) = ui.allocate_exact_size(
-        Vec2::new(seg_w * options.len() as f32, h),
-        Sense::hover(),
-    );
-
+    let seg_w = widths.iter().cloned().fold(64.0_f32, f32::max);
+    let h = 34.0;
+    let pad = 3.0;
+    let (rect, _) = ui.allocate_exact_size(Vec2::new(seg_w * options.len() as f32 + pad * 2.0, h), Sense::hover());
+    ui.painter().rect_filled(rect, egui::Rounding::same(h * 0.5), p.panel_2);
+    let (sel_fill, sel_ink) = p.selected();
     let mut picked = None;
-    for (i, label) in labels.iter().enumerate() {
-        let cell = Rect::from_min_size(
-            Pos2::new(rect.left() + i as f32 * seg_w, rect.top()),
-            Vec2::new(seg_w, h),
-        );
+    for (i, (label, _)) in options.iter().enumerate() {
+        let cell = Rect::from_min_size(Pos2::new(rect.left() + pad + i as f32 * seg_w, rect.top() + pad), Vec2::new(seg_w, h - pad * 2.0));
         let resp = ui.interact(cell, ui.id().with(("seg", i)), Sense::click());
-        let on = i == current;
-        let lit = anim::ease(ui.ctx(), resp.id.with("on"), on, 0.15);
+        let lit = anim::ease(ui.ctx(), resp.id.with("on"), i == current, 0.15);
         if lit > 0.005 {
-            ui.painter().rect_filled(cell, egui::Rounding::ZERO, theme::wash(p.text, (255.0 * lit) as u8));
-        }
-        if i > 0 {
-            let x = cell.left().round() + 0.5;
-            ui.painter().line_segment(
-                [Pos2::new(x, cell.top()), Pos2::new(x, cell.bottom())],
-                Stroke::new(1.0_f32, p.line),
-            );
+            ui.painter().rect_filled(cell, egui::Rounding::same(cell.height() * 0.5), theme::wash(sel_fill, (255.0 * lit) as u8));
         }
         let rest = if resp.hovered() { p.text } else { p.text_2 };
-        let ink = theme::mix(rest, p.void, lit);
-        let w = widths[i] - 32.0;
-        theme::tracked_text(
-            ui.painter(),
-            Pos2::new(cell.center().x - w * 0.5, cell.center().y),
-            label,
-            font.clone(),
-            ink,
-            0.9,
-        );
+        let ink = theme::mix(rest, sel_ink, lit);
+        ui.painter().text(cell.center(), egui::Align2::CENTER_CENTER, label, font.clone(), ink);
         if resp.clicked() {
             picked = Some(i);
         }
     }
-    ui.painter().rect_stroke(
-        rect.shrink(0.5),
-        egui::Rounding::ZERO,
-        Stroke::new(1.0_f32, p.line_strong),
-    );
     picked
+}
+
+pub fn pill_bar<R>(ui: &mut egui::Ui, add: impl FnOnce(&mut egui::Ui) -> R) -> egui::InnerResponse<R> {
+    theme::glass_frame(theme::R_PILL)
+        .inner_margin(egui::Margin::symmetric(6.0, 4.0))
+        .show(ui, |ui| ui.horizontal(|ui| add(ui)).inner)
 }
 
 // popups here---
@@ -620,10 +564,11 @@ pub fn segmented(ui: &mut egui::Ui, options: &[(&str, Icon)], current: usize) ->
 pub fn popover_frame() -> egui::Frame {
     let p = pal();
     egui::Frame::none()
-        .fill(p.panel)
-        .stroke(Stroke::new(1.0_f32, p.line_strong))
-        .rounding(egui::Rounding::same(theme::RADIUS))
-        .inner_margin(egui::Margin::symmetric(4.0, 4.0))
+        .fill(p.deep)
+        .stroke(if p.dark { Stroke::new(1.0_f32, p.line) } else { Stroke::NONE })
+        .rounding(egui::Rounding::same(theme::R_MD * 0.8))
+        .shadow(theme::shadow_of(theme::Lift::Float))
+        .inner_margin(egui::Margin::symmetric(6.0, 6.0))
 }
 
 pub fn menu_width(ui: &egui::Ui, labels: &[&str]) -> f32 {
@@ -660,32 +605,23 @@ pub fn menu_item_enabled(
     let p = pal();
     let w = ui.available_width();
     let (rect, resp) = ui.allocate_exact_size(
-        Vec2::new(w, 25.0),
+        Vec2::new(w, 28.0),
         if enabled { Sense::click() } else { Sense::hover() },
     );
     rects.push(rect);
     let hot = anim::ease(ui.ctx(), resp.id, resp.hovered() && enabled, anim::HOVER);
     if hot > 0.01 {
-        let fill = if critical {
-            theme::wash(p.danger, (40.0 * hot) as u8)
-        } else {
-            theme::wash(if p.dark { p.panel_2 } else { p.sunken }, (255.0 * hot) as u8)
-        };
-        ui.painter().rect_filled(rect, egui::Rounding::ZERO, fill);
-        ui.painter().rect_filled(
-            Rect::from_min_size(rect.left_top(), Vec2::new(2.0, rect.height())),
-            egui::Rounding::ZERO,
-            theme::wash(if critical { p.danger } else { p.signal_hi }, (255.0 * hot) as u8),
-        );
+        let fill = if critical { theme::wash(p.danger, (36.0 * hot) as u8) } else { theme::wash(p.hover_fill(), (255.0 * hot) as u8) };
+        ui.painter().rect_filled(rect, egui::Rounding::same(8.0), fill);
     }
     let base = if !enabled {
         theme::wash(p.text_3, 110)
     } else if critical {
-        p.danger_hi
+        p.danger
     } else {
         p.text_2
     };
-    let color = theme::mix(base, if critical { theme::lighten(p.danger_hi, 0.2) } else { p.text }, hot);
+    let color = theme::mix(base, if critical { p.danger } else { p.text }, hot);
     icons::draw(
         ui.painter(),
         Rect::from_center_size(Pos2::new(rect.left() + 15.0, rect.center().y), Vec2::splat(13.0)),
@@ -705,16 +641,11 @@ pub fn menu_item_enabled(
 pub fn menu_logo_item(ui: &mut egui::Ui, rects: &mut Vec<Rect>) -> bool {
     let p = pal();
     let w = ui.available_width();
-    let (rect, resp) = ui.allocate_exact_size(Vec2::new(w, 25.0), Sense::click());
+    let (rect, resp) = ui.allocate_exact_size(Vec2::new(w, 28.0), Sense::click());
     rects.push(rect);
     let hot = anim::ease(ui.ctx(), resp.id, resp.hovered(), anim::HOVER);
     if hot > 0.01 {
-        ui.painter().rect_filled(rect, egui::Rounding::ZERO, theme::wash(if p.dark { p.panel_2 } else { p.sunken }, (255.0 * hot) as u8));
-        ui.painter().rect_filled(
-            Rect::from_min_size(rect.left_top(), Vec2::new(2.0, rect.height())),
-            egui::Rounding::ZERO,
-            theme::wash(p.signal_hi, (255.0 * hot) as u8),
-        );
+        ui.painter().rect_filled(rect, egui::Rounding::same(8.0), theme::wash(p.hover_fill(), (255.0 * hot) as u8));
     }
     let color = theme::mix(p.text_2, p.text, hot);
     icons::draw(ui.painter(), Rect::from_center_size(Pos2::new(rect.left() + 15.0, rect.center().y), Vec2::splat(13.0)), Icon::External, color);
@@ -726,7 +657,7 @@ pub fn dropdown(ui: &mut egui::Ui, icon: Icon, label: &str, open: bool, width: f
     let p = pal();
     let (rect, resp) = ui.allocate_exact_size(Vec2::new(width, 30.0), Sense::click());
     let hot = anim::ease(ui.ctx(), resp.id, resp.hovered() || open, anim::HOVER);
-    theme::hover_surface(ui.painter(), rect, theme::RADIUS, p.signal, hot, open);
+    theme::hover_surface(ui.painter(), rect, rect.height() * 0.5, p.signal, hot, false);
     let ink = theme::mix(p.text_2, p.text, hot);
     icons::draw(
         ui.painter(),
@@ -854,17 +785,9 @@ pub fn swatch(
         None => ui.allocate_exact_size(Vec2::splat(19.0), Sense::click()),
     };
     let hot = anim::ease(ui.ctx(), resp.id, resp.hovered(), anim::HOVER);
-    ui.painter().rect_filled(
-        Rect::from_center_size(rect.center(), Vec2::splat(11.0 + 2.0 * hot)),
-        egui::Rounding::ZERO,
-        color,
-    );
+    ui.painter().circle_filled(rect.center(), 6.0 + hot, color);
     if selected {
-        ui.painter().rect_stroke(
-            Rect::from_center_size(rect.center(), Vec2::splat(17.0)),
-            egui::Rounding::ZERO,
-            Stroke::new(1.0_f32, pal().text),
-        );
+        ui.painter().circle_stroke(rect.center(), 8.5, Stroke::new(1.5_f32, pal().focus));
     }
     resp.on_hover_text(tip).clicked()
 }

@@ -25,11 +25,23 @@ impl Pal {
     }
 
     pub fn hover_fill(&self) -> Color32 {
-        if self.dark {
-            self.panel_2
-        } else {
-            self.sunken
-        }
+        self.panel_2
+    }
+
+    pub fn bright(&self, i: usize) -> Color32 {
+        self.colors.brights[i % self.colors.brights.len()]
+    }
+
+    pub fn tile(&self, i: usize) -> Color32 {
+        self.colors.brights[i % 4]
+    }
+
+    pub fn selected(&self) -> (Color32, Color32) {
+        (self.text, self.deep)
+    }
+
+    pub fn scrim(&self) -> Color32 {
+        Color32::from_rgba_unmultiplied(0x13, 0x13, 0x18, if self.dark { 150 } else { 96 })
     }
 }
 
@@ -109,6 +121,11 @@ pub fn follow(ctx: &egui::Context, a: crate::settings::Appearance) -> bool {
 // metrics here---
 
 pub const RADIUS: f32 = tokens::RADIUS;
+pub const R_SM: f32 = tokens::RADIUS_SM;
+pub const R_MD: f32 = tokens::RADIUS_MD;
+pub const R_LG: f32 = tokens::RADIUS_LG;
+pub const R_XL: f32 = tokens::RADIUS_XL;
+pub const R_PILL: f32 = tokens::RADIUS_PILL;
 
 pub const T_TITLE: f32 = tokens::SIZE_TITLE;
 pub const T_H: f32 = tokens::SIZE_HEADING;
@@ -243,20 +260,81 @@ pub fn grad_poly_shape(pts: &[Pos2], a: Color32, b: Color32, dir: Vec2) -> Shape
 
 // surfaces here---
 
-pub fn hover_surface(painter: &egui::Painter, rect: Rect, radius: f32, accent: Color32, t: f32, on: bool) {
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Lift {
+    Flat,
+    Rest,
+    Float,
+    Lift,
+}
+
+pub fn shadow_of(lift: Lift) -> egui::epaint::Shadow {
     let p = pal();
-    let t = t.clamp(0.0, 1.0);
-    if t <= 0.005 && !on {
+    let (v, color) = match lift {
+        Lift::Flat => return egui::epaint::Shadow::NONE,
+        Lift::Rest => (tokens::SHADOW_REST, p.shadow_soft),
+        Lift::Float => (tokens::SHADOW_FLOAT, p.shadow_soft),
+        Lift::Lift => (tokens::SHADOW_LIFT, p.shadow),
+    };
+    egui::epaint::Shadow { offset: Vec2::new(v[0], v[1]), blur: v[2], spread: v[3], color }
+}
+
+pub fn shadow(painter: &egui::Painter, rect: Rect, radius: f32, lift: Lift) {
+    if lift == Lift::Flat {
         return;
     }
-    let lit = t.max(if on { 1.0 } else { 0.0 });
-    painter.rect_filled(rect, Rounding::same(radius), wash(p.hover_fill(), (255.0 * lit) as u8));
-    let edge = if on { accent } else { p.line_strong };
-    painter.rect_stroke(
-        rect.shrink(0.5),
-        Rounding::same(radius),
-        Stroke::new(1.0_f32, wash(edge, ((if on { 255.0 } else { 140.0 }) * lit) as u8)),
-    );
+    painter.add(shadow_of(lift).as_shape(rect, Rounding::same(radius)));
+}
+
+pub fn surface(painter: &egui::Painter, rect: Rect, radius: f32, lift: Lift) {
+    let p = pal();
+    shadow(painter, rect, radius, lift);
+    painter.rect_filled(rect, Rounding::same(radius), p.deep);
+    if p.dark {
+        painter.rect_stroke(rect.shrink(0.5), Rounding::same(radius), Stroke::new(1.0_f32, p.line));
+    }
+}
+
+pub fn tile(painter: &egui::Painter, rect: Rect, radius: f32, i: usize) {
+    painter.rect_filled(rect, Rounding::same(radius), pal().tile(i));
+}
+
+pub fn glass(painter: &egui::Painter, rect: Rect, radius: f32) {
+    let p = pal();
+    shadow(painter, rect, radius, Lift::Float);
+    painter.rect_filled(rect, Rounding::same(radius), p.glass);
+    painter.rect_stroke(rect.shrink(0.5), Rounding::same(radius), Stroke::new(1.0_f32, p.glass_line));
+}
+
+pub fn glass_frame(radius: f32) -> egui::Frame {
+    let p = pal();
+    egui::Frame::none()
+        .fill(p.glass)
+        .stroke(Stroke::new(1.0_f32, p.glass_line))
+        .rounding(Rounding::same(radius))
+        .shadow(shadow_of(Lift::Float))
+}
+
+pub fn surface_frame(radius: f32, lift: Lift) -> egui::Frame {
+    let p = pal();
+    egui::Frame::none()
+        .fill(p.deep)
+        .stroke(if p.dark { Stroke::new(1.0_f32, p.line) } else { Stroke::NONE })
+        .rounding(Rounding::same(radius))
+        .shadow(shadow_of(lift))
+}
+
+pub fn hover_surface(painter: &egui::Painter, rect: Rect, radius: f32, _accent: Color32, t: f32, on: bool) {
+    let p = pal();
+    let t = t.clamp(0.0, 1.0);
+    if on {
+        painter.rect_filled(rect, Rounding::same(radius), p.signal_soft_hi);
+        return;
+    }
+    if t <= 0.005 {
+        return;
+    }
+    painter.rect_filled(rect, Rounding::same(radius), wash(p.hover_fill(), (255.0 * t) as u8));
 }
 
 pub fn grad_rect(painter: &egui::Painter, rect: Rect, radius: f32, a: Color32, b: Color32, dir: Vec2) {
@@ -264,50 +342,147 @@ pub fn grad_rect(painter: &egui::Painter, rect: Rect, radius: f32, a: Color32, b
 }
 
 pub fn panel_rounded(painter: &egui::Painter, rect: Rect, radius: f32) {
-    let p = pal();
-    painter.rect_filled(rect, Rounding::same(radius), p.panel);
-    painter.rect_stroke(rect.shrink(0.5), Rounding::same(radius), Stroke::new(1.0_f32, p.line_strong));
-    top_edge(painter, rect);
+    surface(painter, rect, radius, Lift::Flat);
 }
 
 pub fn panel(painter: &egui::Painter, rect: Rect) {
-    let p = pal();
-    painter.rect_filled(rect, Rounding::same(RADIUS), p.panel);
-    painter.rect_stroke(rect.shrink(0.5), Rounding::same(RADIUS), Stroke::new(1.0_f32, p.line_strong));
-    top_edge(painter, rect);
+    surface(painter, rect, R_MD, Lift::Flat);
 }
 
 pub fn top_edge(painter: &egui::Painter, rect: Rect) {
     let p = pal();
     if p.edge.a() > 0 {
         painter.line_segment(
-            [rect.left_top() + Vec2::new(1.0, 1.5), rect.right_top() + Vec2::new(-1.0, 1.5)],
+            [rect.left_top() + Vec2::new(R_SM, 1.5), rect.right_top() + Vec2::new(-R_SM, 1.5)],
             Stroke::new(1.0_f32, p.edge),
         );
     }
 }
 
 pub fn panel_frame() -> egui::Frame {
-    let p = pal();
-    egui::Frame::none().fill(p.deep).rounding(Rounding::same(RADIUS)).stroke(Stroke::new(1.0_f32, p.line))
+    surface_frame(R_MD, Lift::Flat)
 }
 
 pub fn panel_box() -> egui::Frame {
-    let p = pal();
-    egui::Frame::none()
-        .fill(p.panel)
-        .rounding(Rounding::same(RADIUS))
-        .stroke(Stroke::new(1.0_f32, p.line_strong))
-        .inner_margin(Margin::symmetric(tokens::SPACE_6, tokens::SPACE_4 + 2.0))
+    surface_frame(R_MD, Lift::Flat).inner_margin(Margin::symmetric(tokens::SPACE_6, tokens::SPACE_4 + 2.0))
 }
 
 pub fn focus_ring(painter: &egui::Painter, rect: Rect) {
+    focus_ring_r(painter, rect, R_SM);
+}
+
+pub fn focus_ring_r(painter: &egui::Painter, rect: Rect, radius: f32) {
     let p = pal();
-    painter.rect_stroke(
-        rect.expand(tokens::FOCUS_OFFSET + tokens::FOCUS_RING * 0.5),
-        Rounding::same(RADIUS),
-        Stroke::new(tokens::FOCUS_RING, p.signal_hi),
-    );
+    let grow = tokens::FOCUS_OFFSET + tokens::FOCUS_RING * 0.5;
+    painter.rect_stroke(rect.expand(grow), Rounding::same(radius + grow), Stroke::new(tokens::FOCUS_RING, p.focus));
+}
+
+// wallpaper here---
+
+fn over(top: [f32; 4], bottom: [f32; 3]) -> [f32; 3] {
+    let a = top[3];
+    [top[0] * a + bottom[0] * (1.0 - a), top[1] * a + bottom[1] * (1.0 - a), top[2] * a + bottom[2] * (1.0 - a)]
+}
+
+fn rgbf(c: Color32) -> [f32; 4] {
+    let [r, g, b, a] = c.to_srgba_unmultiplied();
+    [r as f32 / 255.0, g as f32 / 255.0, b as f32 / 255.0, a as f32 / 255.0]
+}
+
+pub fn wallpaper_at(p: &Pal, u: f32, v: f32, w: f32, h: f32) -> Color32 {
+    let base = rgbf(p.void);
+    let mut c = [base[0], base[1], base[2]];
+    let layers = [(tokens::WALL_C, p.wall_c), (tokens::WALL_B, p.wall_b), (tokens::WALL_A, p.wall_a), (tokens::GLOW, p.glow)];
+    for (g, col) in layers {
+        let col = rgbf(col);
+        if col[3] <= 0.0 {
+            continue;
+        }
+        let rx = (g[2] * w).max(1.0);
+        let ry = (g[3] * h).max(1.0);
+        let dx = (u - g[0]) * w / rx;
+        let dy = (v - g[1]) * h / ry;
+        let d = (dx * dx + dy * dy).sqrt();
+        let k = (1.0 - d / g[4].max(0.01)).clamp(0.0, 1.0);
+        if k > 0.0 {
+            c = over([col[0], col[1], col[2], col[3] * k], c);
+        }
+    }
+    let to = |x: f32| (x.clamp(0.0, 1.0) * 255.0).round() as u8;
+    Color32::from_rgb(to(c[0]), to(c[1]), to(c[2]))
+}
+
+fn inside_round(rect: Rect, radius: f32, q: Pos2) -> Pos2 {
+    let r = radius.min(rect.width() * 0.5).min(rect.height() * 0.5);
+    if r <= 0.5 {
+        return q;
+    }
+    let cx = q.x.clamp(rect.left() + r, rect.right() - r);
+    let cy = q.y.clamp(rect.top() + r, rect.bottom() - r);
+    let d = Vec2::new(q.x - cx, q.y - cy);
+    let len = d.length();
+    if len > r {
+        Pos2::new(cx, cy) + d * (r / len)
+    } else {
+        q
+    }
+}
+
+pub const WALL_STEP: f32 = 24.0;
+
+pub fn wallpaper_shape(rect: Rect, radius: f32) -> Mesh {
+    let p = pal();
+    let mut mesh = Mesh::default();
+    if rect.width() < 1.0 || rect.height() < 1.0 {
+        return mesh;
+    }
+    let cols = (rect.width() / WALL_STEP).ceil().max(1.0) as u32;
+    let rows = (rect.height() / WALL_STEP).ceil().max(1.0) as u32;
+    for j in 0..=rows {
+        for i in 0..=cols {
+            let u = i as f32 / cols as f32;
+            let v = j as f32 / rows as f32;
+            let q = Pos2::new(rect.left() + u * rect.width(), rect.top() + v * rect.height());
+            mesh.colored_vertex(inside_round(rect, radius, q), wallpaper_at(&p, u, v, rect.width(), rect.height()));
+        }
+    }
+    let w = cols + 1;
+    for j in 0..rows {
+        for i in 0..cols {
+            let a = j * w + i;
+            mesh.add_triangle(a, a + 1, a + w);
+            mesh.add_triangle(a + 1, a + w + 1, a + w);
+        }
+    }
+    mesh
+}
+
+type WallKey = (i32, i32, bool, i32, Color32);
+
+pub fn wallpaper(painter: &egui::Painter, rect: Rect, radius: f32) {
+    wallpaper_faded(painter, rect, radius, 1.0);
+}
+
+pub fn wallpaper_faded(painter: &egui::Painter, rect: Rect, radius: f32, alpha: f32) {
+    let p = pal();
+    let key = (rect.width().round() as i32, rect.height().round() as i32, p.dark, (radius * 10.0) as i32, p.void);
+    let id = egui::Id::new("ncf-wallpaper");
+    let cached: Option<(WallKey, Mesh)> = painter.ctx().data(|d| d.get_temp(id));
+    let mut mesh = match cached {
+        Some((k, m)) if k == key => m,
+        _ => {
+            let m = wallpaper_shape(Rect::from_min_size(Pos2::ZERO, rect.size()), radius);
+            painter.ctx().data_mut(|d| d.insert_temp(id, (key, m.clone())));
+            m
+        }
+    };
+    mesh.translate(rect.min.to_vec2());
+    if alpha < 0.999 {
+        for v in &mut mesh.vertices {
+            v.color = v.color.gamma_multiply(alpha.clamp(0.0, 1.0));
+        }
+    }
+    painter.add(Shape::mesh(mesh));
 }
 
 // text here---
@@ -325,6 +500,16 @@ pub fn tracked_text(painter: &egui::Painter, left_centre: Pos2, text: &str, font
     (size.x - tracking).max(0.0)
 }
 
+pub fn display_galley(ctx: &egui::Context, text: &str, size: f32, color: Color32) -> std::sync::Arc<egui::Galley> {
+    let mut job = egui::text::LayoutJob::default();
+    job.append(
+        text,
+        0.0,
+        egui::TextFormat { font_id: font_display(size), color, extra_letter_spacing: display_tracking(size), ..Default::default() },
+    );
+    ctx.fonts(|f| f.layout_job(job))
+}
+
 pub fn tracked_width(ctx: &egui::Context, text: &str, font: egui::FontId, tracking: f32) -> f32 {
     let mut job = egui::text::LayoutJob::default();
     job.append(text, 0.0, egui::TextFormat { font_id: font, extra_letter_spacing: tracking, ..Default::default() });
@@ -337,20 +522,20 @@ pub fn tracked_width(ctx: &egui::Context, text: &str, font: egui::FontId, tracki
 pub fn apply(ctx: &egui::Context) {
     let p = pal();
     let mut v = if p.dark { egui::Visuals::dark() } else { egui::Visuals::light() };
-    let r = Rounding::same(RADIUS);
+    let r = Rounding::same(R_SM);
     v.override_text_color = Some(p.text);
     v.panel_fill = Color32::TRANSPARENT;
     v.window_fill = p.deep;
-    v.extreme_bg_color = if p.dark { Color32::BLACK } else { Color32::WHITE };
+    v.extreme_bg_color = if p.dark { p.void } else { p.deep };
     v.faint_bg_color = p.panel_2;
-    v.window_stroke = Stroke::new(1.0_f32, p.line_strong);
-    v.window_rounding = r;
-    v.menu_rounding = r;
-    v.selection.bg_fill = wash(p.signal, if p.dark { 150 } else { 90 });
-    v.selection.stroke = Stroke::new(1.0_f32, p.signal);
+    v.window_stroke = if p.dark { Stroke::new(1.0_f32, p.line) } else { Stroke::NONE };
+    v.window_rounding = Rounding::same(R_LG);
+    v.menu_rounding = Rounding::same(R_MD);
+    v.selection.bg_fill = wash(p.signal, if p.dark { 110 } else { 80 });
+    v.selection.stroke = Stroke::new(1.0_f32, p.signal_hi);
     v.hyperlink_color = p.signal_hi;
-    v.popup_shadow = egui::epaint::Shadow::NONE;
-    v.window_shadow = egui::epaint::Shadow::NONE;
+    v.popup_shadow = shadow_of(Lift::Float);
+    v.window_shadow = shadow_of(Lift::Lift);
     v.text_cursor.stroke = Stroke::new(2.0_f32, p.signal_hi);
 
     let w = &mut v.widgets;
@@ -359,33 +544,33 @@ pub fn apply(ctx: &egui::Context) {
     w.noninteractive.bg_stroke = Stroke::new(1.0_f32, p.line);
     w.noninteractive.fg_stroke = Stroke::new(1.0_f32, p.text_2);
     w.noninteractive.rounding = r;
-    w.inactive.bg_fill = p.sunken;
-    w.inactive.weak_bg_fill = p.sunken;
+    w.inactive.bg_fill = p.panel_2;
+    w.inactive.weak_bg_fill = p.panel_2;
     w.inactive.bg_stroke = Stroke::new(1.0_f32, p.line_strong);
     w.inactive.fg_stroke = Stroke::new(1.0_f32, p.text);
     w.inactive.rounding = r;
-    w.hovered.bg_fill = p.panel;
-    w.hovered.weak_bg_fill = p.panel;
-    w.hovered.bg_stroke = Stroke::new(1.0_f32, p.line_strong);
+    w.hovered.bg_fill = p.panel_2;
+    w.hovered.weak_bg_fill = p.panel_2;
+    w.hovered.bg_stroke = Stroke::new(1.0_f32, p.text_3);
     w.hovered.fg_stroke = Stroke::new(1.0_f32, p.text);
     w.hovered.rounding = r;
     w.hovered.expansion = 0.0;
     w.active.bg_fill = p.signal_soft_hi;
     w.active.weak_bg_fill = p.signal_soft_hi;
-    w.active.bg_stroke = Stroke::new(1.0_f32, p.signal);
-    w.active.fg_stroke = Stroke::new(1.0_f32, p.signal_hi);
+    w.active.bg_stroke = Stroke::new(1.0_f32, p.signal_hi);
+    w.active.fg_stroke = Stroke::new(1.0_f32, p.text);
     w.active.rounding = r;
     w.open.bg_fill = p.panel_2;
     w.open.weak_bg_fill = p.panel_2;
-    w.open.bg_stroke = Stroke::new(1.0_f32, p.line);
+    w.open.bg_stroke = Stroke::new(1.0_f32, p.line_strong);
     w.open.fg_stroke = Stroke::new(1.0_f32, p.text);
     w.open.rounding = r;
 
     ctx.all_styles_mut(|s| {
         s.visuals = v.clone();
         s.spacing.item_spacing = Vec2::new(8.0, 8.0);
-        s.spacing.button_padding = Vec2::new(11.0, 6.0);
-        s.spacing.window_margin = Margin::same(18.0);
+        s.spacing.button_padding = Vec2::new(12.0, 6.0);
+        s.spacing.window_margin = Margin::same(20.0);
         s.spacing.menu_margin = Margin::same(6.0);
         s.spacing.scroll.bar_width = 8.0;
         s.spacing.scroll.floating = true;
