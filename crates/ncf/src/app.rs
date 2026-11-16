@@ -634,7 +634,7 @@ fn settings_window<A: NcfApp>(ctx: &egui::Context, app: &mut A, shell: &mut Shel
         });
 }
 
-pub const APPEARANCE_NOTE: &str = "System follows your computer. Light is soft pastel and white tiles; Dark is ink with a coral glow.";
+pub use crate::settings::APPEARANCE_NOTE;
 
 fn appearance(ui: &mut egui::Ui, shell: &mut Shell) {
     let before = shell.look.clone();

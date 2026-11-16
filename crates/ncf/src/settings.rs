@@ -20,6 +20,8 @@ pub fn pairs(text: &str) -> Vec<(String, String)> {
         .collect()
 }
 
+pub const APPEARANCE_NOTE: &str = "System follows your computer. Light is soft pastel and white tiles; Dark is ink with a coral glow.";
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
 pub enum Appearance {
     #[default]
