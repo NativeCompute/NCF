@@ -1069,3 +1069,13 @@ fn live_nativecloud_round_trip() {
     assert_eq!(after.iter().find(|o| o.org.id == made.id).unwrap().org.role, OrgRole::Owner);
     ben.sign_out(false).unwrap();
 }
+
+#[test]
+fn the_sign_in_page_wears_the_bento_tokens() {
+    let html = crate::cloud::browser::page("Signed in", "You can close this tab <now>.", true);
+    assert!(html.contains("#0e0f13") && html.contains("#e9ebf0"), "both casts");
+    assert!(html.contains("prefers-color-scheme: light"));
+    assert!(!html.to_ascii_lowercase().contains("#3b4cff"), "no old signal blue");
+    assert!(html.contains("&lt;now&gt;"), "text is escaped");
+    assert!(html.contains("border-radius: 28px"));
+}

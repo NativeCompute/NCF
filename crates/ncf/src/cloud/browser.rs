@@ -279,9 +279,51 @@ fn escape(s: &str) -> String {
     s.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;").replace('"', "&quot;").replace('\'', "&#39;")
 }
 
+fn css_hex(c: eframe::egui::Color32) -> String {
+    let [r, g, b, a] = c.to_srgba_unmultiplied();
+    if a == 255 {
+        format!("#{r:02x}{g:02x}{b:02x}")
+    } else {
+        format!("rgba({r},{g},{b},{:.3})", a as f32 / 255.0)
+    }
+}
+
+fn page_vars(c: &crate::tokens::Colors) -> String {
+    let wall = |g: [f32; 5], col: eframe::egui::Color32| {
+        let [r, gg, b, _] = col.to_srgba_unmultiplied();
+        format!(
+            "radial-gradient({:.0}% {:.0}% at {:.0}% {:.0}%, {} 0, rgba({r},{gg},{b},0) {:.0}%)",
+            g[2] * 100.0,
+            g[3] * 100.0,
+            g[0] * 100.0,
+            g[1] * 100.0,
+            css_hex(col),
+            g[4] * 100.0
+        )
+    };
+    use crate::tokens::{GLOW, WALL_A, WALL_B, WALL_C};
+    format!(
+        "--bg: {}; --surface: {}; --line: {}; --text: {}; --text-2: {}; --text-3: {}; --accent: {}; --ok: {}; --shadow: {}; --wall: {}, {}, {}, {};",
+        css_hex(c.void),
+        css_hex(c.deep),
+        css_hex(c.line),
+        css_hex(c.text),
+        css_hex(c.text_2),
+        css_hex(c.text_3),
+        css_hex(c.signal),
+        css_hex(c.ok),
+        css_hex(c.shadow),
+        wall(GLOW, c.glow),
+        wall(WALL_A, c.wall_a),
+        wall(WALL_B, c.wall_b),
+        wall(WALL_C, c.wall_c)
+    )
+}
+
 pub fn page(title: &str, body: &str, ok: bool) -> String {
-    let mark = if ok { "#5ee0a0" } else { "#8a8fa8" };
     let (title, body) = (escape(title), escape(body));
+    let (dark, light) = (page_vars(&crate::tokens::DARK), page_vars(&crate::tokens::LIGHT));
+    let dot = if ok { "var(--ok)" } else { "var(--text-3)" };
     format!(
         r#"<!doctype html>
 <html lang="en">
@@ -290,17 +332,17 @@ pub fn page(title: &str, body: &str, ok: bool) -> String {
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{title} · NativeCloud</title>
 <style>
-:root {{ color-scheme: dark; --void: #000000; --panel: #0c0e16; --line: rgba(255,255,255,0.122); --text: #f2f3f7; --text-2: #a6abc2; --text-3: #8a8fa8; --signal: #3b4cff; }}
-@media (prefers-color-scheme: light) {{ :root {{ color-scheme: light; --void: #f4f5f8; --panel: #ffffff; --line: rgba(10,12,22,0.12); --text: #0b0d16; --text-2: #4a4f66; --text-3: #6a6f88; }} }}
+:root {{ color-scheme: dark; {dark} }}
+@media (prefers-color-scheme: light) {{ :root {{ color-scheme: light; {light} }} }}
 * {{ box-sizing: border-box; }}
-html, body {{ margin: 0; height: 100%; background: var(--void); color: var(--text); font: 15px/1.5 "Inter", system-ui, -apple-system, "Segoe UI", sans-serif; }}
+html, body {{ margin: 0; height: 100%; background: var(--wall), var(--bg); color: var(--text); font: 15px/1.55 "Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", sans-serif; }}
 main {{ min-height: 100%; display: grid; place-items: center; padding: 24px 16px; }}
-section {{ width: 100%; max-width: 420px; background: var(--panel); border: 1px solid var(--line); border-radius: 2px; padding: 28px 24px; }}
-.hud {{ font: 600 11px/1 ui-monospace, "JetBrains Mono", Menlo, monospace; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-3); display: flex; align-items: center; gap: 8px; }}
-.dot {{ width: 8px; height: 8px; border-radius: 50%; background: {mark}; }}
-h1 {{ font-size: 22px; line-height: 1.25; margin: 18px 0 6px; font-weight: 650; }}
+section {{ width: 100%; max-width: 440px; background: var(--surface); border-radius: 28px; padding: 32px 30px; box-shadow: 0 16px 40px var(--shadow); }}
+.hud {{ font: 700 11px/1 "Plus Jakarta Sans", system-ui, sans-serif; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-3); display: flex; align-items: center; gap: 8px; }}
+.dot {{ width: 8px; height: 8px; border-radius: 50%; background: {dot}; }}
+h1 {{ font: 800 26px/1.15 "Bricolage Grotesque", "Plus Jakarta Sans", system-ui, sans-serif; letter-spacing: -0.02em; margin: 18px 0 8px; }}
 p {{ margin: 0; color: var(--text-2); }}
-.rule {{ height: 2px; width: 32px; background: var(--signal); margin-top: 22px; }}
+.rule {{ height: 6px; width: 40px; border-radius: 999px; background: var(--accent); margin-top: 24px; }}
 </style>
 </head>
 <body>
