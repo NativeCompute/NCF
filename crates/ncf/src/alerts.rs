@@ -44,17 +44,17 @@ impl Tone {
     }
     pub fn label(self) -> &'static str {
         match self {
-            Tone::Ok => "DONE",
-            Tone::Info => "NOTE",
-            Tone::Warn => "WARNING",
-            Tone::Danger => "ERROR",
+            Tone::Ok => "Done",
+            Tone::Info => "Note",
+            Tone::Warn => "Warning",
+            Tone::Danger => "Error",
         }
     }
     fn ask_label(self) -> &'static str {
         match self {
-            Tone::Danger => "CAREFUL",
-            Tone::Warn => "WARNING",
-            _ => "CONFIRM",
+            Tone::Danger => "Careful",
+            Tone::Warn => "Warning",
+            _ => "Confirm",
         }
     }
 }

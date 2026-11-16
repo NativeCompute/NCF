@@ -56,10 +56,10 @@ pub fn own_window(os: crate::Os) -> bool {
 pub fn status_line(status: &Status) -> Option<(String, bool)> {
     match status {
         Status::Off => None,
-        Status::Checking => Some(("CHECKING FOR UPDATES…".to_string(), false)),
-        Status::Latest => Some(("UP TO DATE".to_string(), false)),
-        Status::Newer(r) => Some((format!("V{} IS OUT", r.version), true)),
-        Status::Failed => Some(("COULD NOT CHECK FOR UPDATES".to_string(), false)),
+        Status::Checking => Some(("Checking for updates…".to_string(), false)),
+        Status::Latest => Some(("Up to date".to_string(), false)),
+        Status::Newer(r) => Some((format!("{} is out", r.version), true)),
+        Status::Failed => Some(("Could not check for updates".to_string(), false)),
     }
 }
 
@@ -254,11 +254,11 @@ impl Splash {
 
                 let mut y = rect.top() + PAD_TOP;
                 let eyebrow = if prompting {
-                    "UPDATE AVAILABLE".to_string()
+                    "Update available".to_string()
                 } else if self.app.tagline.is_empty() {
-                    format!("V{}", self.app.version)
+                    format!("Version {}", self.app.version)
                 } else {
-                    format!("V{} / {}", self.app.version, self.app.tagline.trim_end_matches('.').to_uppercase())
+                    format!("{} · {}", self.app.version, self.app.tagline.trim_end_matches('.'))
                 };
                 brow(&painter, &self.app, left, y, &eyebrow, ink(if prompting { p.signal_hi } else { p.text_2 }));
                 y += BROW + TITLE_GAP;
@@ -294,7 +294,7 @@ impl Splash {
                 painter.line_segment([Pos2::new(left, y), Pos2::new(left + width, y)], egui::Stroke::new(1.0_f32, ink(p.line)));
                 let foot_y = y + FOOT_GAP;
                 let foot_font = theme::font_hud(theme::T_MICRO + 0.5);
-                let by = theme::tracked_text(&painter, Pos2::new(left, foot_y), "BY", foot_font.clone(), ink(p.text_3), 0.8);
+                let by = theme::tracked_text(&painter, Pos2::new(left, foot_y), "by", foot_font.clone(), ink(p.text_3), 0.8);
                 let logo_h = ((theme::T_MICRO + 0.5) * 1.35).round();
                 let logo_at = Rect::from_min_size(Pos2::new(left + by + 8.0, foot_y - logo_h * 0.5), Vec2::new(crate::mark::logo_width(logo_h), logo_h));
                 let logo_hit = ui.interact(logo_at.expand(4.0), egui::Id::new("ncf-splash-logo"), Sense::click());

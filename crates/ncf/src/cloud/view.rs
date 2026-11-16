@@ -648,7 +648,7 @@ impl Account {
                 ui.add_space(2.0);
                 ui::caption(ui, &format!("We opened {web}. Sign in there and press Continue. You come back here signed in."));
                 ui.add_space(6.0);
-                let tag = if self.busy { "SIGNING IN…".to_string() } else { format!("WAITING · {}", countdown(left)) };
+                let tag = if self.busy { "Signing in…".to_string() } else { format!("Waiting · {}", countdown(left)) };
                 ui::hud(ui, &tag, Some(p.signal_hi));
                 ui.add_space(10.0);
                 ui.horizontal(|ui| {
@@ -826,7 +826,7 @@ impl Account {
             icons::draw(ui.painter(), Rect::from_center_size(Pos2::new(rect.left() + 18.0, rect.center().y), Vec2::splat(14.0)), Icon::Users, if selected { sel_ink } else { p.text_2 });
             ui.painter().text(Pos2::new(rect.left() + 36.0, rect.center().y), egui::Align2::LEFT_CENTER, &o.org.name, theme::font_med(theme::T_SM), ink);
             let n = o.members.len();
-            let tag = format!("{} · {} · {n} {}", o.org.role.label(), plan_name(&o.org.plan), if n == 1 { "person" } else { "people" }).to_uppercase();
+            let tag = format!("{} · {} · {n} {}", o.org.role.label(), plan_name(&o.org.plan), if n == 1 { "person" } else { "people" });
             let tw = theme::tracked_width(ui.ctx(), &tag, theme::font_hud(theme::T_MICRO), 0.8);
             theme::tracked_text(ui.painter(), Pos2::new(rect.right() - 14.0 - tw, rect.center().y), &tag, theme::font_hud(theme::T_MICRO), soft, 0.8);
             if resp.clicked() {

@@ -157,7 +157,7 @@ impl Updater {
 
             let mark = Rect::from_min_size(Pos2::new(left, top), Vec2::splat(22.0));
             self.info.mark.paint(&painter, mark);
-            let eyebrow = format!("UPDATE / V{} TO V{}", self.info.version, self.plan.version);
+            let eyebrow = format!("Update · {} to {}", self.info.version, self.plan.version);
             theme::tracked_text(&painter, Pos2::new(left + 32.0, mark.center().y), &eyebrow, theme::font_hud(theme::T_MICRO + 0.5), p.text_2, 0.8);
             let logo_h = 13.0;
             let logo_at = Rect::from_min_size(Pos2::new(left + width - crate::mark::logo_width(logo_h), mark.center().y - logo_h * 0.5), Vec2::new(crate::mark::logo_width(logo_h), logo_h));
@@ -211,7 +211,7 @@ impl Updater {
                     }
                 }
                 let label = if *step == Step::Reopen && !self.plan.reopen { "Finishing".to_string() } else { step.label(&self.plan) };
-                theme::tracked_text(&painter, Pos2::new(left + 18.0, y), &label.to_uppercase(), theme::font_hud(theme::T_MICRO + 0.5), colour, 0.8);
+                theme::tracked_text(&painter, Pos2::new(left + 18.0, y), &label, theme::font_hud(theme::T_MICRO + 0.5), colour, 0.8);
                 if state == 1 && *step == Step::Download && self.state.progress > 0.0 {
                     let pct = format!("{:.0}%", self.state.progress * 100.0);
                     let font = theme::font_hud(theme::T_MICRO + 0.5);
@@ -268,7 +268,7 @@ impl Updater {
             } else if !done && !self.state.installing() && ui::quiet_button(&mut buttons, "Cancel", None) {
                 cancel = true;
             } else if self.state.installing() {
-                theme::tracked_text(&painter, Pos2::new(left, row_mid), "PLEASE WAIT · THIS TAKES A MOMENT", theme::font_hud(theme::T_MICRO + 0.5), p.text_3, 0.8);
+                theme::tracked_text(&painter, Pos2::new(left, row_mid), "Please wait, this takes a moment", theme::font_hud(theme::T_MICRO + 0.5), p.text_3, 0.8);
             }
         });
         if page {

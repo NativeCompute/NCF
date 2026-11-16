@@ -4,7 +4,7 @@ use crate::anim;
 use crate::theme::{self, pal};
 use crate::Os;
 
-pub const TITLE_H: f32 = 32.0;
+pub const TITLE_H: f32 = 44.0;
 pub const TRAFFIC_LIGHTS: f32 = 78.0;
 pub const MIN_SIZE: Vec2 = Vec2::new(880.0, 580.0);
 
@@ -107,6 +107,19 @@ pub fn column_guides(painter: &egui::Painter, rect: Rect) {
 }
 
 pub fn title_bar(ui: &mut egui::Ui, ctx: &egui::Context, app: &crate::AppInfo, extra: impl FnOnce(&mut egui::Ui)) {
+    title_bar_with(ui, ctx, app, None, |_| {}, extra);
+}
+
+pub const SEARCH_W: f32 = 380.0;
+
+pub fn title_bar_with(
+    ui: &mut egui::Ui,
+    ctx: &egui::Context,
+    app: &crate::AppInfo,
+    crumb: Option<&str>,
+    centre: impl FnOnce(&mut egui::Ui),
+    extra: impl FnOnce(&mut egui::Ui),
+) {
     let p = pal();
     let full = Rect::from_min_size(ui.cursor().min, Vec2::new(ui.available_width(), TITLE_H));
 
@@ -136,7 +149,17 @@ pub fn title_bar(ui: &mut egui::Ui, ctx: &egui::Context, app: &crate::AppInfo, e
             .font(egui::FontId::new(15.0, theme::bold()))
             .color(p.text),
     );
+    if let Some(c) = crumb.filter(|c| !c.is_empty()) {
+        row.add_space(12.0);
+        row.label(egui::RichText::new(c).font(theme::font(theme::T_SM)).color(p.text_3));
+    }
     row.spacing_mut().item_spacing.x = 9.0;
+    let mid_w = SEARCH_W.min(full.width() * 0.34);
+    if mid_w > 160.0 {
+        let mid = Rect::from_center_size(full.center(), Vec2::new(mid_w, full.height()));
+        let mut m = ui.new_child(egui::UiBuilder::new().max_rect(mid).layout(egui::Layout::left_to_right(egui::Align::Center)));
+        centre(&mut m);
+    }
 
     row.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
         ui.spacing_mut().item_spacing.x = 4.0;

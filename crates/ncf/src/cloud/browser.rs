@@ -338,7 +338,7 @@ pub fn page(title: &str, body: &str, ok: bool) -> String {
 html, body {{ margin: 0; height: 100%; background: var(--wall), var(--bg); color: var(--text); font: 15px/1.55 "Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", sans-serif; }}
 main {{ min-height: 100%; display: grid; place-items: center; padding: 24px 16px; }}
 section {{ width: 100%; max-width: 440px; background: var(--surface); border-radius: 28px; padding: 32px 30px; box-shadow: 0 16px 40px var(--shadow); }}
-.hud {{ font: 700 11px/1 "Plus Jakarta Sans", system-ui, sans-serif; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-3); display: flex; align-items: center; gap: 8px; }}
+.hud {{ font: 700 11px/1 "Plus Jakarta Sans", system-ui, sans-serif; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-3); display: flex; align-items: center; gap: 8px; }}
 .dot {{ width: 8px; height: 8px; border-radius: 50%; background: {dot}; }}
 h1 {{ font: 800 26px/1.15 "Bricolage Grotesque", "Plus Jakarta Sans", system-ui, sans-serif; letter-spacing: -0.02em; margin: 18px 0 8px; }}
 p {{ margin: 0; color: var(--text-2); }}

@@ -40,6 +40,28 @@ impl Pal {
         (self.text, self.deep)
     }
 
+    pub fn pill(&self) -> Color32 {
+        if self.dark {
+            Color32::from_rgba_unmultiplied(255, 255, 255, 20)
+        } else {
+            Color32::from_rgba_unmultiplied(255, 255, 255, 128)
+        }
+    }
+
+    pub fn tag(&self, tone: Option<usize>) -> (Color32, Color32) {
+        match tone {
+            None => (self.text_2, if self.dark { Color32::from_rgba_unmultiplied(255, 255, 255, 18) } else { self.panel_2 }),
+            Some(i) => {
+                let b = self.bright(i);
+                if self.dark {
+                    (lighten(b, 0.45), Color32::from_rgba_unmultiplied(b.r(), b.g(), b.b(), 46))
+                } else {
+                    (self.colors.groups[i % self.colors.groups.len()], Color32::from_rgba_unmultiplied(b.r(), b.g(), b.b(), 64))
+                }
+            }
+        }
+    }
+
     pub fn scrim(&self) -> Color32 {
         Color32::from_rgba_unmultiplied(0x13, 0x13, 0x18, if self.dark { 150 } else { 96 })
     }
@@ -304,6 +326,18 @@ pub fn glass(painter: &egui::Painter, rect: Rect, radius: f32) {
     shadow(painter, rect, radius, Lift::Float);
     painter.rect_filled(rect, Rounding::same(radius), p.glass);
     painter.rect_stroke(rect.shrink(0.5), Rounding::same(radius), Stroke::new(1.0_f32, p.glass_line));
+    glass_highlight(painter, rect, radius);
+}
+
+pub fn glass_highlight(painter: &egui::Painter, rect: Rect, radius: f32) {
+    let p = pal();
+    let r = radius.min(rect.height() * 0.5).min(rect.width() * 0.5);
+    let y = rect.top() + 1.0;
+    let a = if p.dark { 60 } else { 230 };
+    painter.line_segment(
+        [Pos2::new(rect.left() + r * 0.8, y), Pos2::new(rect.right() - r * 0.8, y)],
+        Stroke::new(1.0_f32, Color32::from_rgba_unmultiplied(255, 255, 255, a)),
+    );
 }
 
 pub fn glass_frame(radius: f32) -> egui::Frame {
@@ -390,8 +424,9 @@ fn rgbf(c: Color32) -> [f32; 4] {
 }
 
 pub fn wallpaper_at(p: &Pal, u: f32, v: f32, w: f32, h: f32) -> Color32 {
-    let base = rgbf(p.void);
-    let mut c = [base[0], base[1], base[2]];
+    let (from, to) = (rgbf(p.wall_from), rgbf(p.wall_to));
+    let t = ((u * w + v * h) / (w + h).max(1.0)).clamp(0.0, 1.0);
+    let mut c = [from[0] + (to[0] - from[0]) * t, from[1] + (to[1] - from[1]) * t, from[2] + (to[2] - from[2]) * t];
     let layers = [(tokens::WALL_C, p.wall_c), (tokens::WALL_B, p.wall_b), (tokens::WALL_A, p.wall_a), (tokens::GLOW, p.glow)];
     for (g, col) in layers {
         let col = rgbf(col);
@@ -488,6 +523,7 @@ pub fn wallpaper_faded(painter: &egui::Painter, rect: Rect, radius: f32, alpha: 
 // text here---
 
 pub fn tracked_text(painter: &egui::Painter, left_centre: Pos2, text: &str, font: egui::FontId, color: Color32, tracking: f32) -> f32 {
+    let tracking = untracked(&font, tracking);
     let mut job = egui::text::LayoutJob::default();
     job.append(
         text,
@@ -511,6 +547,7 @@ pub fn display_galley(ctx: &egui::Context, text: &str, size: f32, color: Color32
 }
 
 pub fn tracked_width(ctx: &egui::Context, text: &str, font: egui::FontId, tracking: f32) -> f32 {
+    let tracking = untracked(&font, tracking);
     let mut job = egui::text::LayoutJob::default();
     job.append(text, 0.0, egui::TextFormat { font_id: font, extra_letter_spacing: tracking, ..Default::default() });
     let w = ctx.fonts(|f| f.layout_job(job)).rect.width();
@@ -588,11 +625,13 @@ const UI_EXTRABOLD: &[u8] = include_bytes!("../fonts/PlusJakartaSans-ExtraBold.t
 const DISPLAY: &[u8] = include_bytes!("../fonts/BricolageGrotesque-Display.ttf");
 const HEADING: &[u8] = include_bytes!("../fonts/BricolageGrotesque-Heading.ttf");
 const MONO_REGULAR: &[u8] = include_bytes!("../fonts/JetBrainsMono-Regular.ttf");
-const MONO_MEDIUM: &[u8] = include_bytes!("../fonts/JetBrainsMono-Medium.ttf");
+const LABEL: &[u8] = include_bytes!("../fonts/PlusJakartaSans-Label.ttf");
 
 pub const DISPLAY_FROM: f32 = 26.0;
 pub const DISPLAY_TRACKING: f32 = -0.045;
 pub const HEADING_TRACKING: f32 = -0.02;
+pub const LABEL_LIFT: f32 = 1.5;
+pub const EYEBROW_TRACKING: f32 = 0.06;
 
 pub fn medium() -> FontFamily {
     FontFamily::Name("ui-medium".into())
@@ -613,7 +652,7 @@ pub fn heading() -> FontFamily {
     FontFamily::Name("heading".into())
 }
 pub fn hud() -> FontFamily {
-    FontFamily::Name("mono-medium".into())
+    FontFamily::Name("label".into())
 }
 
 pub fn font_definitions() -> FontDefinitions {
@@ -627,14 +666,13 @@ pub fn font_definitions() -> FontDefinitions {
         ("BricolageDisplay", DISPLAY),
         ("BricolageHeading", HEADING),
         ("JetBrainsMono", MONO_REGULAR),
-        ("JetBrainsMonoMedium", MONO_MEDIUM),
+        ("JakartaLabel", LABEL),
     ] {
         fonts.font_data.insert(key.to_string(), FontData::from_static(bytes));
     }
     fonts.families.entry(FontFamily::Proportional).or_default().insert(0, "Jakarta".to_string());
     fonts.families.entry(FontFamily::Monospace).or_default().insert(0, "JetBrainsMono".to_string());
     let proportional = fonts.families.get(&FontFamily::Proportional).cloned().unwrap_or_default();
-    let mono = fonts.families.get(&FontFamily::Monospace).cloned().unwrap_or_default();
     for (family, key, rest) in [
         (medium(), "JakartaMedium", &proportional),
         (semibold(), "JakartaSemiBold", &proportional),
@@ -642,7 +680,7 @@ pub fn font_definitions() -> FontDefinitions {
         (extrabold(), "JakartaExtraBold", &proportional),
         (display(), "BricolageDisplay", &proportional),
         (heading(), "BricolageHeading", &proportional),
-        (hud(), "JetBrainsMonoMedium", &mono),
+        (hud(), "JakartaLabel", &proportional),
     ] {
         let mut stack = vec![key.to_string()];
         stack.extend(rest.iter().cloned());
@@ -699,5 +737,21 @@ pub fn display_tracking(size: f32) -> f32 {
     }
 }
 pub fn font_hud(size: f32) -> egui::FontId {
-    egui::FontId::new(size, hud())
+    egui::FontId::new(size + LABEL_LIFT, hud())
+}
+
+pub fn font_eyebrow(size: f32) -> egui::FontId {
+    egui::FontId::new(size, bold())
+}
+
+pub fn eyebrow_tracking(size: f32) -> f32 {
+    EYEBROW_TRACKING * size
+}
+
+fn untracked(font: &egui::FontId, tracking: f32) -> f32 {
+    if font.family == hud() {
+        0.0
+    } else {
+        tracking
+    }
 }

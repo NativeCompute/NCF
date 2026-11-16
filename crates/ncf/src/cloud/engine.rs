@@ -43,17 +43,17 @@ pub enum Mood {
 impl SyncState {
     pub fn readout(&self, now: i64) -> (String, Mood) {
         if !self.signed_in {
-            return ("SIGNED OUT".into(), Mood::Warn);
+            return ("Signed out".into(), Mood::Warn);
         }
         if !self.online {
-            return if self.waiting > 0 { (format!("OFFLINE · {} WAITING", self.waiting), Mood::Warn) } else { ("OFFLINE".into(), Mood::Warn) };
+            return if self.waiting > 0 { (format!("Offline · {} waiting", self.waiting), Mood::Warn) } else { ("Offline".into(), Mood::Warn) };
         }
         if self.waiting > 0 {
-            return (format!("SYNCING · {}", self.waiting), Mood::Busy);
+            return (format!("Syncing · {}", self.waiting), Mood::Busy);
         }
         match self.last_sync {
-            Some(t) => (format!("SYNCED · {}", time::ago(now - t).to_uppercase()), Mood::Calm),
-            None => ("SYNCED".into(), Mood::Calm),
+            Some(t) => (format!("Synced · {}", time::ago(now - t)), Mood::Calm),
+            None => ("Synced".into(), Mood::Calm),
         }
     }
 }

@@ -1,11 +1,11 @@
 use eframe::egui::Color32;
 use std::fmt::Write;
 
-pub const COLOR_NAMES: [&str; 37] = [
+pub const COLOR_NAMES: [&str; 39] = [
     "void", "deep", "panel", "panel_2", "sunken", "line", "line_strong", "text", "text_2", "text_3", "ink",
     "signal", "signal_hi", "signal_deep", "signal_soft", "signal_soft_hi", "chrome", "chrome_hi", "chrome_lo", "chrome_shade",
     "danger", "danger_hi", "warn", "ok", "edge", "guide", "focus", "on_danger", "on_tile", "glass", "glass_line", "shadow",
-    "shadow_soft", "wall_a", "wall_b", "wall_c", "glow",
+    "shadow_soft", "wall_a", "wall_b", "wall_c", "glow", "wall_from", "wall_to",
 ];
 
 pub const BRIGHT_NAMES: [&str; 6] = ["coral", "lilac", "sun", "sky", "mint", "rose"];
@@ -262,6 +262,7 @@ fn css_colors(t: &Tokens, cast: &str, o: &mut String) -> Result<(), String> {
         ));
     }
     layers.reverse();
+    layers.push(format!("linear-gradient(135deg, {}, {})", css_color(t.color(cast, "wall_from")?), css_color(t.color(cast, "wall_to")?)));
     writeln!(o, "  --wallpaper: {};", layers.join(", ")).unwrap();
     Ok(())
 }

@@ -598,7 +598,7 @@ fn settings_window<A: NcfApp>(ctx: &egui::Context, app: &mut A, shell: &mut Shel
             theme::tracked_text(
                 ui.painter(),
                 Pos2::new(nav.left() + 10.0, nav.bottom() - 16.0),
-                &format!("{} V{}", shell.info.name.to_uppercase(), shell.info.version),
+                &format!("{} {}", shell.info.name, shell.info.version),
                 theme::font_hud(theme::T_MICRO),
                 p.text_3,
                 0.8,

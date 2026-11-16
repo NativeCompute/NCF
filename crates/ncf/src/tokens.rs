@@ -41,12 +41,14 @@ pub struct Colors {
     pub wall_b: Color32,
     pub wall_c: Color32,
     pub glow: Color32,
+    pub wall_from: Color32,
+    pub wall_to: Color32,
     pub groups: [Color32; 6],
     pub brights: [Color32; 6],
 }
 
 impl Colors {
-    pub fn named(&self) -> [(&'static str, Color32); 37] {
+    pub fn named(&self) -> [(&'static str, Color32); 39] {
         [
             ("void", self.void),
             ("deep", self.deep),
@@ -85,6 +87,8 @@ impl Colors {
             ("wall-b", self.wall_b),
             ("wall-c", self.wall_c),
             ("glow", self.glow),
+            ("wall-from", self.wall_from),
+            ("wall-to", self.wall_to),
         ]
     }
 }
@@ -119,14 +123,16 @@ pub const DARK: Colors = Colors {
     focus: Color32::from_rgb(255, 255, 255),
     on_danger: Color32::from_rgb(19, 19, 24),
     on_tile: Color32::from_rgb(19, 19, 24),
-    glass: Color32::from_rgba_premultiplied(20, 20, 25, 168),
-    glass_line: Color32::from_rgba_premultiplied(79, 79, 79, 20),
+    glass: Color32::from_rgba_premultiplied(75, 75, 75, 18),
+    glass_line: Color32::from_rgba_premultiplied(118, 118, 118, 46),
     shadow: Color32::from_rgba_premultiplied(0, 0, 0, 115),
     shadow_soft: Color32::from_rgba_premultiplied(0, 0, 0, 89),
-    wall_a: Color32::from_rgba_premultiplied(112, 49, 30, 41),
-    wall_b: Color32::from_rgba_premultiplied(51, 76, 98, 31),
-    wall_c: Color32::from_rgba_premultiplied(74, 66, 105, 36),
-    glow: Color32::from_rgba_premultiplied(137, 53, 28, 64),
+    wall_a: Color32::from_rgb(90, 36, 24),
+    wall_b: Color32::from_rgb(23, 62, 94),
+    wall_c: Color32::from_rgb(51, 37, 107),
+    glow: Color32::from_rgba_premultiplied(0, 0, 0, 0),
+    wall_from: Color32::from_rgb(23, 17, 15),
+    wall_to: Color32::from_rgb(20, 18, 36),
     groups: [
         Color32::from_rgb(255, 122, 80),
         Color32::from_rgb(185, 166, 255),
@@ -175,14 +181,16 @@ pub const LIGHT: Colors = Colors {
     focus: Color32::from_rgb(19, 19, 24),
     on_danger: Color32::from_rgb(255, 255, 255),
     on_tile: Color32::from_rgb(19, 19, 24),
-    glass: Color32::from_rgba_premultiplied(206, 206, 206, 158),
+    glass: Color32::from_rgba_premultiplied(158, 158, 158, 87),
     glass_line: Color32::from_rgba_premultiplied(231, 231, 231, 204),
     shadow: Color32::from_rgba_premultiplied(3, 3, 4, 31),
     shadow_soft: Color32::from_rgba_premultiplied(2, 2, 2, 20),
-    wall_a: Color32::from_rgb(255, 225, 214),
-    wall_b: Color32::from_rgb(221, 235, 255),
-    wall_c: Color32::from_rgb(230, 224, 255),
+    wall_a: Color32::from_rgb(255, 196, 175),
+    wall_b: Color32::from_rgb(180, 224, 255),
+    wall_c: Color32::from_rgb(210, 196, 255),
     glow: Color32::from_rgba_premultiplied(0, 0, 0, 0),
+    wall_from: Color32::from_rgb(244, 232, 226),
+    wall_to: Color32::from_rgb(231, 227, 246),
     groups: [
         Color32::from_rgb(178, 60, 20),
         Color32::from_rgb(106, 79, 208),
@@ -214,7 +222,7 @@ pub const FONT_DISPLAY: FontRole = FontRole { family: "Bricolage Grotesque", wei
 pub const FONT_HEADING: FontRole = FontRole { family: "Bricolage Grotesque", weight: 800, stretch: 100, tracking: -0.02, upper: false };
 pub const FONT_UI: FontRole = FontRole { family: "Plus Jakarta Sans", weight: 600, stretch: 100, tracking: 0.0, upper: false };
 pub const FONT_BODY: FontRole = FontRole { family: "Plus Jakarta Sans", weight: 400, stretch: 100, tracking: 0.0, upper: false };
-pub const FONT_HUD: FontRole = FontRole { family: "JetBrains Mono", weight: 500, stretch: 100, tracking: 0.08, upper: true };
+pub const FONT_HUD: FontRole = FontRole { family: "Plus Jakarta Sans", weight: 560, stretch: 100, tracking: 0.0, upper: false };
 
 pub const SIZE_BODY: f32 = 14.5;
 pub const SIZE_CAPTION: f32 = 11.0;
@@ -244,9 +252,9 @@ pub const RADIUS: f32 = RADIUS_SM;
 pub const SHADOW_LIFT: [f32; 4] = [0.0, 16.0, 40.0, 0.0];
 pub const SHADOW_FLOAT: [f32; 4] = [0.0, 10.0, 30.0, 0.0];
 pub const SHADOW_REST: [f32; 4] = [0.0, 1.0, 2.0, 0.0];
-pub const WALL_A: [f32; 5] = [0.0, 0.0, 0.6, 0.45, 0.7];
-pub const WALL_B: [f32; 5] = [1.0, 0.08, 0.5, 0.45, 0.7];
-pub const WALL_C: [f32; 5] = [0.85, 1.0, 0.6, 0.5, 0.7];
+pub const WALL_A: [f32; 5] = [0.0, 0.0, 0.55, 0.85, 0.62];
+pub const WALL_B: [f32; 5] = [0.88, 0.06, 0.4, 0.5, 0.6];
+pub const WALL_C: [f32; 5] = [1.0, 1.0, 0.55, 0.8, 0.62];
 pub const GLOW: [f32; 5] = [0.0, 0.0, 0.75, 0.75, 0.7];
 pub const LINE: f32 = 1.0;
 pub const FOCUS_RING: f32 = 2.0;

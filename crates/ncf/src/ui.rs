@@ -164,16 +164,9 @@ pub fn hud(ui: &mut egui::Ui, text: &str, color: Option<Color32>) -> Response {
     let p = pal();
     let col = color.unwrap_or(p.text_3);
     let font = theme::font_hud(theme::T_MICRO + 0.5);
-    let w = theme::tracked_width(ui.ctx(), &text.to_uppercase(), font.clone(), 0.8);
+    let w = theme::tracked_width(ui.ctx(), text, font.clone(), 0.0);
     let (rect, resp) = ui.allocate_exact_size(Vec2::new(w, 16.0), Sense::hover());
-    theme::tracked_text(
-        ui.painter(),
-        Pos2::new(rect.left(), rect.center().y),
-        &text.to_uppercase(),
-        font,
-        col,
-        0.8,
-    );
+    theme::tracked_text(ui.painter(), Pos2::new(rect.left(), rect.center().y), text, font, col, 0.0);
     resp
 }
 
@@ -184,8 +177,8 @@ pub fn chip(ui: &mut egui::Ui, text: &str, tint: Option<Color32>) -> Response {
 pub fn chip_button(ui: &mut egui::Ui, text: &str) -> bool {
     let p = pal();
     let font = theme::font_hud(theme::T_MICRO + 0.5);
-    let label = text.to_uppercase();
-    let w = theme::tracked_width(ui.ctx(), &label, font.clone(), 0.8);
+    let label = text.to_string();
+    let w = theme::tracked_width(ui.ctx(), &label, font.clone(), 0.0);
     let (rect, resp) = ui.allocate_exact_size(Vec2::new(w + 20.0, 22.0), Sense::click());
     let hot = anim::ease(ui.ctx(), resp.id, resp.hovered(), anim::HOVER);
     ui.painter().rect_filled(rect, egui::Rounding::same(11.0), theme::mix(p.panel_2, p.line_strong, hot * 0.6));
@@ -306,7 +299,7 @@ pub fn link(ui: &mut egui::Ui, text: &str) -> bool {
 
 pub fn maker_line(ui: &mut egui::Ui, rect: Rect, centre: bool, app_name: &str) -> bool {
     let p = pal();
-    let text = &format!("{} BY", app_name.to_uppercase());
+    let text = &format!("{app_name} by");
     let font = theme::font_hud(theme::T_MICRO);
     let logo_h = (theme::T_MICRO * 1.3).round();
     let text_w = theme::tracked_width(ui.ctx(), text, font.clone(), 0.8);
@@ -420,12 +413,14 @@ pub fn big_number(ui: &mut egui::Ui, text: &str, size: f32, color: Color32) -> R
     ui.add(egui::Label::new(display_text(text, size, color)).extend())
 }
 
+pub const EYEBROW_SIZE: f32 = theme::T_CAP;
+
 pub fn eyebrow_text(painter: &egui::Painter, left_centre: Pos2, text: &str, color: Color32) -> f32 {
-    theme::tracked_text(painter, left_centre, &text.to_uppercase(), theme::font_bold(theme::T_MICRO + 0.5), color, 1.1)
+    theme::tracked_text(painter, left_centre, &text.to_uppercase(), theme::font_eyebrow(EYEBROW_SIZE), color, theme::eyebrow_tracking(EYEBROW_SIZE))
 }
 
 pub fn eyebrow_width(ctx: &egui::Context, text: &str) -> f32 {
-    theme::tracked_width(ctx, &text.to_uppercase(), theme::font_bold(theme::T_MICRO + 0.5), 1.1)
+    theme::tracked_width(ctx, &text.to_uppercase(), theme::font_eyebrow(EYEBROW_SIZE), theme::eyebrow_tracking(EYEBROW_SIZE))
 }
 
 pub fn body(ui: &mut egui::Ui, text: &str) -> Response {
@@ -791,3 +786,243 @@ pub fn swatch(
     }
     resp.on_hover_text(tip).clicked()
 }
+
+// concept pieces here---
+
+pub fn tag_size(ctx: &egui::Context, text: &str, dot: bool) -> Vec2 {
+    let w = theme::tracked_width(ctx, text, theme::font_hud(theme::T_MICRO), 0.0);
+    Vec2::new(w + 16.0 + if dot { 10.0 } else { 0.0 }, 22.0)
+}
+
+pub fn tag_at(painter: &egui::Painter, rect: Rect, text: &str, tone: Option<usize>, dot: bool) {
+    let p = pal();
+    let (ink, fill) = p.tag(tone);
+    painter.rect_filled(rect, egui::Rounding::same(rect.height() * 0.5), fill);
+    let mut x = rect.left() + 8.0;
+    if dot {
+        painter.circle_filled(Pos2::new(x + 3.0, rect.center().y), 3.0, ink);
+        x += 10.0;
+    }
+    theme::tracked_text(painter, Pos2::new(x, rect.center().y), text, theme::font_hud(theme::T_MICRO), ink, 0.0);
+}
+
+pub fn tag(ui: &mut egui::Ui, text: &str, tone: Option<usize>) -> Response {
+    let (rect, resp) = ui.allocate_exact_size(tag_size(ui.ctx(), text, false), Sense::hover());
+    tag_at(ui.painter(), rect, text, tone, false);
+    resp
+}
+
+pub fn live_tag(ui: &mut egui::Ui, text: &str) -> Response {
+    let (rect, resp) = ui.allocate_exact_size(tag_size(ui.ctx(), text, true), Sense::hover());
+    tag_at(ui.painter(), rect, text, Some(4), true);
+    resp
+}
+
+pub const SIDE_ROW_H: f32 = 38.0;
+
+pub fn side_link(ui: &mut egui::Ui, icon: Icon, label: &str, trailing: Option<&str>, on: bool) -> Response {
+    let p = pal();
+    let (rect, resp) = ui.allocate_exact_size(Vec2::new(ui.available_width(), SIDE_ROW_H), Sense::click());
+    let hot = anim::ease(ui.ctx(), resp.id, resp.hovered(), anim::HOVER);
+    let lit = anim::ease(ui.ctx(), resp.id.with("on"), on, crate::tokens::MOTION_QUICK);
+    let round = egui::Rounding::same(theme::R_SM);
+    let (sel_fill, sel_ink) = p.selected();
+    if lit > 0.005 {
+        ui.painter().rect_filled(rect, round, theme::wash(sel_fill, (255.0 * lit) as u8));
+    } else if hot > 0.01 {
+        ui.painter().rect_filled(rect, round, theme::wash(p.pill(), (p.pill().a() as f32 * hot * 1.6).min(255.0) as u8));
+    }
+    let ink = theme::mix(theme::mix(p.text_2, p.text, hot), sel_ink, lit);
+    icons::draw(ui.painter(), Rect::from_center_size(Pos2::new(rect.left() + 20.0, rect.center().y), Vec2::splat(16.0)), icon, ink);
+    let font = theme::font_med(theme::T_SM + 0.5);
+    let room = rect.width() - 46.0 - if trailing.is_some() { 44.0 } else { 8.0 };
+    ui.painter().text(Pos2::new(rect.left() + 40.0, rect.center().y), egui::Align2::LEFT_CENTER, elide_to_width(ui.ctx(), label, font.clone(), 0.0, room), font, ink);
+    if let Some(t) = trailing {
+        let soft = theme::mix(p.text_3, theme::wash(sel_ink, 170), lit);
+        ui.painter().text(Pos2::new(rect.right() - 12.0, rect.center().y), egui::Align2::RIGHT_CENTER, t, theme::font_hud(theme::T_MICRO), soft);
+    }
+    if resp.hovered() {
+        ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+    }
+    resp
+}
+
+pub fn side_section(ui: &mut egui::Ui, label: &str) {
+    ui.add_space(10.0);
+    ui.horizontal(|ui| {
+        ui.add_space(12.0);
+        eyebrow(ui, label);
+    });
+    ui.add_space(4.0);
+}
+
+pub fn search_trigger(ui: &mut egui::Ui, width: f32, hint: &str, chord: &str) -> Response {
+    let p = pal();
+    let (rect, resp) = ui.allocate_exact_size(Vec2::new(width, 32.0), Sense::click());
+    let hot = anim::ease(ui.ctx(), resp.id, resp.hovered(), anim::HOVER);
+    let r = rect.height() * 0.5;
+    ui.painter().rect_filled(rect, egui::Rounding::same(r), theme::mix(p.glass, p.pill(), hot));
+    ui.painter().rect_stroke(rect.shrink(0.5), egui::Rounding::same(r), Stroke::new(1.0_f32, p.glass_line));
+    theme::glass_highlight(ui.painter(), rect, r);
+    icons::draw(ui.painter(), Rect::from_center_size(Pos2::new(rect.left() + 20.0, rect.center().y), Vec2::splat(14.0)), Icon::Search, p.text_2);
+    ui.painter().text(Pos2::new(rect.left() + 36.0, rect.center().y), egui::Align2::LEFT_CENTER, hint, theme::font(theme::T_SM), p.text_3);
+    if !chord.is_empty() {
+        let kw = theme::tracked_width(ui.ctx(), chord, theme::font_hud(theme::T_MICRO - 0.5), 0.0) + 12.0;
+        let k = Rect::from_center_size(Pos2::new(rect.right() - 8.0 - kw * 0.5, rect.center().y), Vec2::new(kw, 20.0));
+        ui.painter().rect_filled(k, egui::Rounding::same(6.0), p.pill());
+        ui.painter().rect_stroke(k.shrink(0.5), egui::Rounding::same(6.0), Stroke::new(1.0_f32, p.line));
+        ui.painter().text(k.center(), egui::Align2::CENTER_CENTER, chord, theme::font_hud(theme::T_MICRO - 0.5), p.text_2);
+    }
+    if resp.hovered() {
+        ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+    }
+    resp
+}
+
+pub fn stat_chip(ui: &mut egui::Ui, value: &str, unit: &str) -> Response {
+    let p = pal();
+    let bold = theme::font_hud(theme::T_SM - 1.5);
+    let soft = theme::font(theme::T_SM);
+    let vw = theme::tracked_width(ui.ctx(), value, bold.clone(), 0.0);
+    let uw = theme::tracked_width(ui.ctx(), unit, soft.clone(), 0.0);
+    let (rect, resp) = ui.allocate_exact_size(Vec2::new(vw + uw + 26.0, 28.0), Sense::hover());
+    ui.painter().rect_filled(rect, egui::Rounding::same(14.0), p.pill());
+    ui.painter().text(Pos2::new(rect.left() + 11.0, rect.center().y), egui::Align2::LEFT_CENTER, value, bold, p.text);
+    ui.painter().text(Pos2::new(rect.left() + 15.0 + vw, rect.center().y), egui::Align2::LEFT_CENTER, unit, soft, p.text_2);
+    resp
+}
+
+pub struct SegTab<'a> {
+    pub label: &'a str,
+    pub icon: Option<Icon>,
+    pub count: Option<usize>,
+    pub dot: bool,
+}
+
+pub fn seg_tabs(ui: &mut egui::Ui, tabs: &[SegTab], current: usize, width: Option<f32>) -> Option<usize> {
+    let p = pal();
+    let font = theme::font_semi(theme::T_SM);
+    let extra = |t: &SegTab| -> f32 {
+        (if t.icon.is_some() { 22.0 } else { 0.0 }) + if t.count.is_some() { 26.0 } else if t.dot { 12.0 } else { 0.0 }
+    };
+    let natural: Vec<f32> = tabs.iter().map(|t| theme::tracked_width(ui.ctx(), t.label, font.clone(), 0.0) + extra(t) + 30.0).collect();
+    let pad = 4.0;
+    let h = 38.0;
+    let total_natural: f32 = natural.iter().sum::<f32>() + pad * 2.0;
+    let total = width.unwrap_or(total_natural).max(total_natural);
+    let scale = (total - pad * 2.0) / (total_natural - pad * 2.0).max(1.0);
+    let (rect, _) = ui.allocate_exact_size(Vec2::new(total, h), Sense::hover());
+    let r = h * 0.5;
+    ui.painter().rect_filled(rect, egui::Rounding::same(r), p.glass);
+    ui.painter().rect_stroke(rect.shrink(0.5), egui::Rounding::same(r), Stroke::new(1.0_f32, p.glass_line));
+    theme::glass_highlight(ui.painter(), rect, r);
+    let (sel_fill, sel_ink) = p.selected();
+    let mut x = rect.left() + pad;
+    let mut picked = None;
+    for (i, t) in tabs.iter().enumerate() {
+        let w = natural[i] * scale;
+        let cell = Rect::from_min_size(Pos2::new(x, rect.top() + pad), Vec2::new(w, h - pad * 2.0));
+        x += w;
+        let resp = ui.interact(cell, ui.id().with(("ncf-segtab", i)), Sense::click());
+        let lit = anim::ease(ui.ctx(), resp.id.with("on"), i == current, 0.15);
+        if lit > 0.005 {
+            ui.painter().rect_filled(cell, egui::Rounding::same(cell.height() * 0.5), theme::wash(sel_fill, (255.0 * lit) as u8));
+        }
+        let rest = if resp.hovered() { p.text } else { p.text_2 };
+        let ink = theme::mix(rest, sel_ink, lit);
+        let content = theme::tracked_width(ui.ctx(), t.label, font.clone(), 0.0) + extra(t);
+        let mut cx = cell.center().x - content * 0.5;
+        if let Some(icon) = t.icon {
+            icons::draw(ui.painter(), Rect::from_center_size(Pos2::new(cx + 7.0, cell.center().y), Vec2::splat(14.0)), icon, ink);
+            cx += 22.0;
+        }
+        let lw = theme::tracked_text(ui.painter(), Pos2::new(cx, cell.center().y), t.label, font.clone(), ink, 0.0);
+        cx += lw + 6.0;
+        if let Some(n) = t.count {
+            let b = Rect::from_center_size(Pos2::new(cx + 9.0, cell.center().y), Vec2::new(18.0, 18.0));
+            ui.painter().circle_filled(b.center(), 9.0, p.signal);
+            ui.painter().text(b.center(), egui::Align2::CENTER_CENTER, n.min(99).to_string(), theme::font_hud(theme::T_MICRO - 1.5), p.ink);
+        } else if t.dot {
+            ui.painter().circle_filled(Pos2::new(cx + 3.0, cell.center().y), 3.5, p.signal);
+        }
+        if resp.clicked() {
+            picked = Some(i);
+        }
+    }
+    picked
+}
+
+pub fn select_button(ui: &mut egui::Ui, label: &str, value: &str) -> Response {
+    let p = pal();
+    let soft = theme::font(theme::T_SM);
+    let strong = theme::font_semi(theme::T_SM);
+    let lw = theme::tracked_width(ui.ctx(), label, soft.clone(), 0.0);
+    let vw = theme::tracked_width(ui.ctx(), value, strong.clone(), 0.0);
+    let (rect, resp) = ui.allocate_exact_size(Vec2::new(lw + vw + 54.0, BUTTON_H), Sense::click());
+    let hot = anim::ease(ui.ctx(), resp.id, resp.hovered(), anim::HOVER);
+    let r = egui::Rounding::same(BUTTON_H * 0.5);
+    ui.painter().rect_filled(rect, r, theme::mix(p.pill(), p.hover_fill(), hot * 0.5));
+    ui.painter().rect_stroke(rect.shrink(0.5), r, Stroke::new(1.0_f32, p.glass_line));
+    ui.painter().text(Pos2::new(rect.left() + 14.0, rect.center().y), egui::Align2::LEFT_CENTER, label, soft, p.text_3);
+    ui.painter().text(Pos2::new(rect.left() + 20.0 + lw, rect.center().y), egui::Align2::LEFT_CENTER, value, strong, p.text);
+    icons::draw(ui.painter(), Rect::from_center_size(Pos2::new(rect.right() - 18.0, rect.center().y), Vec2::splat(13.0)), Icon::ChevronDown, p.text_2);
+    if resp.hovered() {
+        ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+    }
+    resp
+}
+
+pub fn empty_state(ui: &mut egui::Ui, icon: Icon, title: &str, body: &str, action: Option<&str>) -> bool {
+    let p = pal();
+    let w = ui.available_width();
+    let title_g = ui.painter().layout(title.to_string(), theme::font_bold(theme::T_BODY), p.text, w - 48.0);
+    let body_g = ui.painter().layout(body.to_string(), theme::font(theme::T_SM), p.text_2, (w - 48.0).min(440.0));
+    let h = 34.0 + 44.0 + 12.0 + title_g.rect.height() + 6.0 + body_g.rect.height() + if action.is_some() { 48.0 } else { 0.0 } + 30.0;
+    let (rect, _) = ui.allocate_exact_size(Vec2::new(w, h), Sense::hover());
+    let shape = egui::Shape::dashed_line(&dashed_round(rect.shrink(0.5), theme::R_MD), Stroke::new(1.0_f32, p.line_strong), 6.0, 5.0);
+    ui.painter().extend(shape);
+    let mut y = rect.top() + 34.0;
+    let chip = Rect::from_center_size(Pos2::new(rect.center().x, y + 20.0), Vec2::splat(40.0));
+    ui.painter().rect_filled(chip, egui::Rounding::same(12.0), p.signal_soft_hi);
+    icons::draw(ui.painter(), chip.shrink(11.0), icon, p.signal_hi);
+    y += 44.0 + 12.0;
+    let th = title_g.rect.height();
+    ui.painter().galley(Pos2::new(rect.center().x - title_g.rect.width() * 0.5, y), title_g, p.text);
+    y += th + 6.0;
+    let bh = body_g.rect.height();
+    ui.painter().galley(Pos2::new(rect.center().x - body_g.rect.width() * 0.5, y), body_g, p.text_2);
+    y += bh + 14.0;
+    let mut clicked = false;
+    if let Some(a) = action {
+        let font = theme::font_bold(theme::T_SM);
+        let aw = theme::tracked_width(ui.ctx(), a, font.clone(), 0.0) + 28.0;
+        let b = Rect::from_min_size(Pos2::new(rect.center().x - aw * 0.5, y), Vec2::new(aw, 30.0));
+        let resp = ui.interact(b, ui.id().with(("ncf-empty", title)), Sense::click());
+        let hot = anim::ease(ui.ctx(), resp.id, resp.hovered(), anim::HOVER);
+        let (fill, _, ink) = button_colors(true, hot);
+        ui.painter().rect_filled(b, egui::Rounding::same(15.0), fill);
+        ui.painter().text(b.center(), egui::Align2::CENTER_CENTER, a, font, ink);
+        clicked = resp.clicked();
+    }
+    clicked
+}
+
+fn dashed_round(rect: Rect, radius: f32) -> Vec<Pos2> {
+    let r = radius.min(rect.width() * 0.5).min(rect.height() * 0.5);
+    let mut pts = Vec::new();
+    let corners = [
+        (Pos2::new(rect.right() - r, rect.top() + r), -90.0_f32),
+        (Pos2::new(rect.right() - r, rect.bottom() - r), 0.0),
+        (Pos2::new(rect.left() + r, rect.bottom() - r), 90.0),
+        (Pos2::new(rect.left() + r, rect.top() + r), 180.0),
+    ];
+    for (c, start) in corners {
+        for k in 0..=8 {
+            let a = (start + 90.0 * k as f32 / 8.0).to_radians();
+            pts.push(Pos2::new(c.x + a.cos() * r, c.y + a.sin() * r));
+        }
+    }
+    pts.push(pts[0]);
+    pts
+}
+

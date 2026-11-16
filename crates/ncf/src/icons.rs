@@ -73,10 +73,11 @@ pub enum Icon {
     Discord,
     Keyboard,
     Cloud,
+    Note,
 }
 
 impl Icon {
-    pub const ALL: [Icon; 69] = [
+    pub const ALL: [Icon; 70] = [
         Icon::ChevronRight,
         Icon::ChevronLeft,
         Icon::ChevronDown,
@@ -146,6 +147,7 @@ impl Icon {
         Icon::Discord,
         Icon::Keyboard,
         Icon::Cloud,
+        Icon::Note,
     ];
 }
 
@@ -682,6 +684,23 @@ pub fn draw_weighted(
             line(vec![p(0.44, 0.20), p(0.20, 0.20), p(0.20, 0.80), p(0.80, 0.80), p(0.80, 0.56)]);
             line(vec![p(0.58, 0.20), p(0.80, 0.20), p(0.80, 0.42)]);
             seg(p(0.80, 0.20), p(0.46, 0.54));
+        }
+
+        Icon::Note => {
+            line(vec![
+                p(0.22, 0.20),
+                p(0.78, 0.20),
+                p(0.86, 0.28),
+                p(0.86, 0.58),
+                p(0.78, 0.66),
+                p(0.46, 0.66),
+                p(0.28, 0.82),
+                p(0.30, 0.66),
+                p(0.22, 0.66),
+                p(0.14, 0.58),
+                p(0.14, 0.28),
+                p(0.22, 0.20),
+            ]);
         }
 
         Icon::Home => {

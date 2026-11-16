@@ -278,6 +278,10 @@ input[type="range"]::-moz-range-thumb { width: 20px; height: 20px; background: v
 
 /* reduced motion here--- */
 .no-js [data-js-only] { display: none !important; }
+/* labels here--- */
+.hud, .nav a, .facts dt, .card-flag, .maker, .field > label, .tab { text-transform: none; letter-spacing: 0; font-family: var(--font); font-weight: 600; font-variant-numeric: tabular-nums; }
+.eyebrow, .footer-inner h2 { text-transform: uppercase; letter-spacing: 0.06em; font-family: var(--font); font-weight: 700; font-size: 0.6875rem; }
+
 @media (prefers-reduced-motion: reduce) {
   @view-transition { navigation: none; }
   .live::before { animation: none; }

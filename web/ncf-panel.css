@@ -219,3 +219,8 @@ th[aria-sort="descending"] .sort::after { content: "\2193"; color: var(--signal-
   .side, .app[data-nav="open"] .side, .side-scrim { transition: none; }
   .skeleton { animation: none; }
 }
+
+/* labels here--- */
+.crumbs, .block-head h2, .state, .table th, .table--stack td::before, .or, .kv dt { text-transform: none; letter-spacing: 0; font-family: var(--font); font-weight: 600; font-variant-numeric: tabular-nums; }
+.side-label, .palette-group { text-transform: uppercase; letter-spacing: 0.06em; font-family: var(--font); font-weight: 700; font-size: 0.6875rem; }
+

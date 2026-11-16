@@ -31,14 +31,16 @@
   --focus: #ffffff;
   --on-danger: #131318;
   --on-tile: #131318;
-  --glass: rgba(26, 27, 33, 0.659);
-  --glass-line: rgba(255, 255, 255, 0.078);
+  --glass: rgba(255, 255, 255, 0.071);
+  --glass-line: rgba(255, 255, 255, 0.18);
   --shadow-color: rgba(0, 0, 0, 0.451);
   --shadow-soft-color: rgba(0, 0, 0, 0.349);
-  --wall-a: rgba(255, 122, 80, 0.161);
-  --wall-b: rgba(143, 203, 255, 0.122);
-  --wall-c: rgba(185, 166, 255, 0.141);
-  --glow: rgba(255, 106, 61, 0.251);
+  --wall-a: #5a2418;
+  --wall-b: #173e5e;
+  --wall-c: #33256b;
+  --glow: rgba(255, 106, 61, 0);
+  --wall-from: #17110f;
+  --wall-to: #141224;
   --group-1: #ff7a50;
   --group-2: #b9a6ff;
   --group-3: #ffcb5c;
@@ -49,7 +51,7 @@
   --shadow: 0px 16px 40px 0px var(--shadow-color);
   --shadow-float: 0px 10px 30px 0px var(--shadow-soft-color);
   --shadow-rest: 0px 1px 2px 0px var(--shadow-soft-color);
-  --wallpaper: radial-gradient(75% 75% at 0% 0%, rgba(255, 106, 61, 0.251) 0, rgba(255, 106, 61, 0) 70%), radial-gradient(60% 50% at 85% 100%, rgba(185, 166, 255, 0.141) 0, rgba(185, 166, 255, 0) 70%), radial-gradient(50% 45% at 100% 8%, rgba(143, 203, 255, 0.122) 0, rgba(143, 203, 255, 0) 70%), radial-gradient(60% 45% at 0% 0%, rgba(255, 122, 80, 0.161) 0, rgba(255, 122, 80, 0) 70%);
+  --wallpaper: radial-gradient(75% 75% at 0% 0%, rgba(255, 106, 61, 0) 0, rgba(255, 106, 61, 0) 70%), radial-gradient(55% 80% at 100% 100%, #33256b 0, rgba(51, 37, 107, 0) 62%), radial-gradient(40% 50% at 88% 6%, #173e5e 0, rgba(23, 62, 94, 0) 60%), radial-gradient(55% 85% at 0% 0%, #5a2418 0, rgba(90, 36, 24, 0) 62%), linear-gradient(135deg, #17110f, #141224);
   --coral: #ff7a50;
   --lilac: #b9a6ff;
   --sun: #ffcb5c;
@@ -71,7 +73,7 @@
   --on-accent: var(--ink);
   --display: "Bricolage Grotesque", ui-sans-serif, system-ui, sans-serif;
   --font: "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-  --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --mono: "Plus Jakarta Sans", ui-monospace, "SF Mono", Menlo, monospace;
   --display-weight: 800;
   --display-stretch: 100%;
   --display-tracking: -0.045em;
@@ -84,9 +86,9 @@
   --body-weight: 400;
   --body-stretch: 100%;
   --body-tracking: 0em;
-  --hud-weight: 500;
+  --hud-weight: 560;
   --hud-stretch: 100%;
-  --hud-tracking: 0.08em;
+  --hud-tracking: 0em;
   --t-body: 1rem;
   --t-meta: 0.75rem;
   --t-sec: 0.875rem;
@@ -157,14 +159,16 @@
     --focus: #131318;
     --on-danger: #ffffff;
     --on-tile: #131318;
-    --glass: rgba(255, 255, 255, 0.62);
+    --glass: rgba(255, 255, 255, 0.341);
     --glass-line: rgba(255, 255, 255, 0.8);
     --shadow-color: rgba(19, 19, 24, 0.122);
     --shadow-soft-color: rgba(19, 19, 24, 0.078);
-    --wall-a: #ffe1d6;
-    --wall-b: #ddebff;
-    --wall-c: #e6e0ff;
+    --wall-a: #ffc4af;
+    --wall-b: #b4e0ff;
+    --wall-c: #d2c4ff;
     --glow: rgba(255, 106, 61, 0);
+    --wall-from: #f4e8e2;
+    --wall-to: #e7e3f6;
     --group-1: #b23c14;
     --group-2: #6a4fd0;
     --group-3: #8a5a00;
@@ -175,7 +179,7 @@
     --shadow: 0px 16px 40px 0px var(--shadow-color);
     --shadow-float: 0px 10px 30px 0px var(--shadow-soft-color);
     --shadow-rest: 0px 1px 2px 0px var(--shadow-soft-color);
-    --wallpaper: radial-gradient(75% 75% at 0% 0%, rgba(255, 106, 61, 0) 0, rgba(255, 106, 61, 0) 70%), radial-gradient(60% 50% at 85% 100%, #e6e0ff 0, rgba(230, 224, 255, 0) 70%), radial-gradient(50% 45% at 100% 8%, #ddebff 0, rgba(221, 235, 255, 0) 70%), radial-gradient(60% 45% at 0% 0%, #ffe1d6 0, rgba(255, 225, 214, 0) 70%);
+    --wallpaper: radial-gradient(75% 75% at 0% 0%, rgba(255, 106, 61, 0) 0, rgba(255, 106, 61, 0) 70%), radial-gradient(55% 80% at 100% 100%, #d2c4ff 0, rgba(210, 196, 255, 0) 62%), radial-gradient(40% 50% at 88% 6%, #b4e0ff 0, rgba(180, 224, 255, 0) 60%), radial-gradient(55% 85% at 0% 0%, #ffc4af 0, rgba(255, 196, 175, 0) 62%), linear-gradient(135deg, #f4e8e2, #e7e3f6);
   }
 }
 
@@ -210,14 +214,16 @@
   --focus: #131318;
   --on-danger: #ffffff;
   --on-tile: #131318;
-  --glass: rgba(255, 255, 255, 0.62);
+  --glass: rgba(255, 255, 255, 0.341);
   --glass-line: rgba(255, 255, 255, 0.8);
   --shadow-color: rgba(19, 19, 24, 0.122);
   --shadow-soft-color: rgba(19, 19, 24, 0.078);
-  --wall-a: #ffe1d6;
-  --wall-b: #ddebff;
-  --wall-c: #e6e0ff;
+  --wall-a: #ffc4af;
+  --wall-b: #b4e0ff;
+  --wall-c: #d2c4ff;
   --glow: rgba(255, 106, 61, 0);
+  --wall-from: #f4e8e2;
+  --wall-to: #e7e3f6;
   --group-1: #b23c14;
   --group-2: #6a4fd0;
   --group-3: #8a5a00;
@@ -228,7 +234,7 @@
   --shadow: 0px 16px 40px 0px var(--shadow-color);
   --shadow-float: 0px 10px 30px 0px var(--shadow-soft-color);
   --shadow-rest: 0px 1px 2px 0px var(--shadow-soft-color);
-  --wallpaper: radial-gradient(75% 75% at 0% 0%, rgba(255, 106, 61, 0) 0, rgba(255, 106, 61, 0) 70%), radial-gradient(60% 50% at 85% 100%, #e6e0ff 0, rgba(230, 224, 255, 0) 70%), radial-gradient(50% 45% at 100% 8%, #ddebff 0, rgba(221, 235, 255, 0) 70%), radial-gradient(60% 45% at 0% 0%, #ffe1d6 0, rgba(255, 225, 214, 0) 70%);
+  --wallpaper: radial-gradient(75% 75% at 0% 0%, rgba(255, 106, 61, 0) 0, rgba(255, 106, 61, 0) 70%), radial-gradient(55% 80% at 100% 100%, #d2c4ff 0, rgba(210, 196, 255, 0) 62%), radial-gradient(40% 50% at 88% 6%, #b4e0ff 0, rgba(180, 224, 255, 0) 60%), radial-gradient(55% 85% at 0% 0%, #ffc4af 0, rgba(255, 196, 175, 0) 62%), linear-gradient(135deg, #f4e8e2, #e7e3f6);
 }
 
 [data-theme="dark"] {
@@ -262,14 +268,16 @@
   --focus: #ffffff;
   --on-danger: #131318;
   --on-tile: #131318;
-  --glass: rgba(26, 27, 33, 0.659);
-  --glass-line: rgba(255, 255, 255, 0.078);
+  --glass: rgba(255, 255, 255, 0.071);
+  --glass-line: rgba(255, 255, 255, 0.18);
   --shadow-color: rgba(0, 0, 0, 0.451);
   --shadow-soft-color: rgba(0, 0, 0, 0.349);
-  --wall-a: rgba(255, 122, 80, 0.161);
-  --wall-b: rgba(143, 203, 255, 0.122);
-  --wall-c: rgba(185, 166, 255, 0.141);
-  --glow: rgba(255, 106, 61, 0.251);
+  --wall-a: #5a2418;
+  --wall-b: #173e5e;
+  --wall-c: #33256b;
+  --glow: rgba(255, 106, 61, 0);
+  --wall-from: #17110f;
+  --wall-to: #141224;
   --group-1: #ff7a50;
   --group-2: #b9a6ff;
   --group-3: #ffcb5c;
@@ -280,5 +288,5 @@
   --shadow: 0px 16px 40px 0px var(--shadow-color);
   --shadow-float: 0px 10px 30px 0px var(--shadow-soft-color);
   --shadow-rest: 0px 1px 2px 0px var(--shadow-soft-color);
-  --wallpaper: radial-gradient(75% 75% at 0% 0%, rgba(255, 106, 61, 0.251) 0, rgba(255, 106, 61, 0) 70%), radial-gradient(60% 50% at 85% 100%, rgba(185, 166, 255, 0.141) 0, rgba(185, 166, 255, 0) 70%), radial-gradient(50% 45% at 100% 8%, rgba(143, 203, 255, 0.122) 0, rgba(143, 203, 255, 0) 70%), radial-gradient(60% 45% at 0% 0%, rgba(255, 122, 80, 0.161) 0, rgba(255, 122, 80, 0) 70%);
+  --wallpaper: radial-gradient(75% 75% at 0% 0%, rgba(255, 106, 61, 0) 0, rgba(255, 106, 61, 0) 70%), radial-gradient(55% 80% at 100% 100%, #33256b 0, rgba(51, 37, 107, 0) 62%), radial-gradient(40% 50% at 88% 6%, #173e5e 0, rgba(23, 62, 94, 0) 60%), radial-gradient(55% 85% at 0% 0%, #5a2418 0, rgba(90, 36, 24, 0) 62%), linear-gradient(135deg, #17110f, #141224);
 }

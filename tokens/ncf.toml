@@ -32,14 +32,16 @@ guide = "#00000000"
 focus = "#ffffff"
 on_danger = "#131318"
 on_tile = "#131318"
-glass = "#1a1b21a8"
-glass_line = "#ffffff14"
+glass = "#ffffff12"
+glass_line = "#ffffff2e"
 shadow = "#00000073"
 shadow_soft = "#00000059"
-wall_a = "#ff7a5029"
-wall_b = "#8fcbff1f"
-wall_c = "#b9a6ff24"
-glow = "#ff6a3d40"
+wall_a = "#5a2418"
+wall_b = "#173e5e"
+wall_c = "#33256b"
+glow = "#ff6a3d00"
+wall_from = "#17110f"
+wall_to = "#141224"
 groups = ["#ff7a50", "#b9a6ff", "#ffcb5c", "#8fcbff", "#5be3a0", "#ff8fb1"]
 brights = ["#ff7a50", "#b9a6ff", "#ffcb5c", "#8fcbff", "#5be3a0", "#ff8fb1"]
 
@@ -73,14 +75,16 @@ guide = "#00000000"
 focus = "#131318"
 on_danger = "#ffffff"
 on_tile = "#131318"
-glass = "#ffffff9e"
+glass = "#ffffff57"
 glass_line = "#ffffffcc"
 shadow = "#1313181f"
 shadow_soft = "#13131814"
-wall_a = "#ffe1d6"
-wall_b = "#ddebff"
-wall_c = "#e6e0ff"
+wall_a = "#ffc4af"
+wall_b = "#b4e0ff"
+wall_c = "#d2c4ff"
 glow = "#ff6a3d00"
+wall_from = "#f4e8e2"
+wall_to = "#e7e3f6"
 groups = ["#b23c14", "#6a4fd0", "#8a5a00", "#1f6aa5", "#16714a", "#b5205e"]
 brights = ["#ff7a50", "#b9a6ff", "#ffcb5c", "#8fcbff", "#5be3a0", "#ff8fb1"]
 
@@ -113,11 +117,11 @@ tracking = 0.0
 case = "none"
 
 [font.hud]
-family = "JetBrains Mono"
-weight = 500
+family = "Plus Jakarta Sans"
+weight = 560
 stretch = 100
-tracking = 0.08
-case = "upper"
+tracking = 0.0
+case = "none"
 
 [size.app]
 title = 26.0
@@ -163,9 +167,9 @@ float = [0.0, 10.0, 30.0, 0.0]
 rest = [0.0, 1.0, 2.0, 0.0]
 
 [wallpaper]
-a = [0.0, 0.0, 0.6, 0.45, 0.7]
-b = [1.0, 0.08, 0.5, 0.45, 0.7]
-c = [0.85, 1.0, 0.6, 0.5, 0.7]
+a = [0.0, 0.0, 0.55, 0.85, 0.62]
+b = [0.88, 0.06, 0.4, 0.5, 0.6]
+c = [1.0, 1.0, 0.55, 0.8, 0.62]
 glow = [0.0, 0.0, 0.75, 0.75, 0.7]
 
 [shape]

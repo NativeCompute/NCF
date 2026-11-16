@@ -301,10 +301,10 @@ fn the_splash_says_how_the_update_check_went() {
     use crate::splash::status_line;
     use update::{Release, Status};
     assert_eq!(status_line(&Status::Off), None);
-    assert_eq!(status_line(&Status::Checking), Some(("CHECKING FOR UPDATES…".to_string(), false)));
-    assert_eq!(status_line(&Status::Latest), Some(("UP TO DATE".to_string(), false)));
+    assert_eq!(status_line(&Status::Checking), Some(("Checking for updates…".to_string(), false)));
+    assert_eq!(status_line(&Status::Latest), Some(("Up to date".to_string(), false)));
     let r = Release { version: "2.2.0".into(), url: String::new() };
-    assert_eq!(status_line(&Status::Newer(r)), Some(("V2.2.0 IS OUT".to_string(), true)));
+    assert_eq!(status_line(&Status::Newer(r)), Some(("2.2.0 is out".to_string(), true)));
     assert!(status_line(&Status::Failed).is_some());
     assert_eq!(update::releases_latest("NativeCompute/x"), "https://github.com/NativeCompute/x/releases/latest");
 }
@@ -724,8 +724,9 @@ fn a_skipped_update_is_remembered_and_absent_until_then() {
 fn every_bento_font_covers_latin_and_kerns() {
     use eframe::egui::{FontData, FontDefinitions, FontFamily, FontId};
     use eframe::epaint::text::Fonts;
-    let faces: [(&str, &[u8]); 7] = [
+    let faces: [(&str, &[u8]); 8] = [
         ("PlusJakartaSans-Regular", include_bytes!("../fonts/PlusJakartaSans-Regular.ttf")),
+        ("PlusJakartaSans-Label", include_bytes!("../fonts/PlusJakartaSans-Label.ttf")),
         ("PlusJakartaSans-Medium", include_bytes!("../fonts/PlusJakartaSans-Medium.ttf")),
         ("PlusJakartaSans-SemiBold", include_bytes!("../fonts/PlusJakartaSans-SemiBold.ttf")),
         ("PlusJakartaSans-Bold", include_bytes!("../fonts/PlusJakartaSans-Bold.ttf")),
@@ -743,6 +744,23 @@ fn every_bento_font_covers_latin_and_kerns() {
         let w = |s: &str| fonts.layout_no_wrap(s.into(), id.clone(), egui::Color32::WHITE).rect.width();
         assert!(w("AV") < w("A") + w("V") - 0.5, "{name} lost its kerning");
     }
+}
+
+#[test]
+fn labels_are_jakarta_with_figures_that_line_up() {
+    let ctx = egui::Context::default();
+    crate::theme::install_fonts(&ctx);
+    let _ = ctx.run(Default::default(), |_| {});
+    let font = crate::theme::font_hud(crate::theme::T_MICRO);
+    assert!(font.size > crate::theme::T_MICRO, "the label cut is lifted so mixed case reads at the old size");
+    let w = |s: &str| ctx.fonts(|f| f.layout_no_wrap(s.into(), font.clone(), egui::Color32::WHITE).rect.width());
+    let one = w("1");
+    for d in "023456789".chars() {
+        assert!((w(&d.to_string()) - one).abs() < 0.01, "{d} is not as wide as 1");
+    }
+    assert!((w("1,111") - w("8,808")).abs() < 0.01, "counts don't wobble as they change");
+    assert!(w("il") < w("mw"), "letters stay proportional");
+    assert_eq!(crate::theme::tracked_width(&ctx, "Writers room", font.clone(), 0.8), crate::theme::tracked_width(&ctx, "Writers room", font, 0.0), "labels are never letter-spaced");
 }
 
 #[test]
@@ -833,9 +851,10 @@ fn the_wallpaper_stays_inside_the_window_and_tints_its_corners() {
         let near = |q: Pos2| mesh.vertices.iter().min_by(|a, b| a.pos.distance(q).total_cmp(&b.pos.distance(q))).unwrap().color;
         let centre = near(rect.center());
         let diff = |a: egui::Color32, b: egui::Color32| (a.r() as i32 - b.r() as i32).abs().max((a.g() as i32 - b.g() as i32).abs()).max((a.b() as i32 - b.b() as i32).abs());
-        assert!(diff(centre, p.void) <= 3, "the middle of the window is the plain background");
+        let base = theme::mix(p.wall_from, p.wall_to, 0.5);
+        assert!(diff(centre, base) <= 4, "the middle of the window is the plain base gradient");
         let corner = near(pos2(0.0, 0.0));
-        assert!(diff(corner, p.void) > 6, "the top-left corner carries the warm wash");
+        assert!(diff(corner, p.wall_from) > 6, "the top-left corner carries the warm wash");
         assert!(corner.r() > corner.b(), "and it is warm");
     }
 }

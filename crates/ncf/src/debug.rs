@@ -100,7 +100,7 @@ impl Debug {
     }
 
     pub fn tag(&mut self, ui: &mut egui::Ui) {
-        if self.on && ui::chip_button(ui, "DEBUG") {
+        if self.on && ui::chip_button(ui, "Debug") {
             self.open = !self.open;
         }
     }
@@ -126,7 +126,7 @@ impl Debug {
                         ui.set_width(250.0);
                         ui.horizontal(|ui| {
                             let ms = ui.input(|i| i.stable_dt) * 1000.0;
-                            ui::hud(ui, &format!("DEBUG · {ms:.1} MS"), Some(p.signal_hi));
+                            ui::hud(ui, &format!("Debug · {ms:.1} ms"), Some(p.signal_hi));
                             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                                 if ui::icon_button(ui, Icon::Close, "Hide", 22.0) {
                                     close = true;

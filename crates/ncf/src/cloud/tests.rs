@@ -104,15 +104,15 @@ fn ids_passwords_and_emails() {
 #[test]
 fn readout_says_what_is_happening() {
     let mut s = SyncState { signed_in: true, online: true, ..Default::default() };
-    assert_eq!(s.readout(100).0, "SYNCED");
+    assert_eq!(s.readout(100).0, "Synced");
     s.last_sync = Some(98);
-    assert_eq!(s.readout(100), ("SYNCED · 2S AGO".into(), Mood::Calm));
+    assert_eq!(s.readout(100), ("Synced · 2s ago".into(), Mood::Calm));
     s.waiting = 2;
-    assert_eq!(s.readout(100), ("SYNCING · 2".into(), Mood::Busy));
+    assert_eq!(s.readout(100), ("Syncing · 2".into(), Mood::Busy));
     s.online = false;
-    assert_eq!(s.readout(100), ("OFFLINE · 2 WAITING".into(), Mood::Warn));
+    assert_eq!(s.readout(100), ("Offline · 2 waiting".into(), Mood::Warn));
     s.signed_in = false;
-    assert_eq!(s.readout(100).0, "SIGNED OUT");
+    assert_eq!(s.readout(100).0, "Signed out");
 }
 
 // accounts here---
