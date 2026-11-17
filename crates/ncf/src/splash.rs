@@ -64,7 +64,7 @@ pub fn art_height(art: &crate::update::Art) -> f32 {
 }
 
 pub fn prompt_height(offer: &Offer) -> f32 {
-    PROMPT_H + offer.art.as_ref().map(art_height).unwrap_or(0.0)
+    PROMPT_H + offer.art.as_ref().map(art_height).unwrap_or(0.0) + if offer.managed { 18.0 } else { 0.0 }
 }
 
 fn art_texture(ctx: &egui::Context, version: &str, pic: &crate::update::Picture) -> egui::TextureHandle {
