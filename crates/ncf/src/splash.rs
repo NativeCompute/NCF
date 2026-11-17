@@ -26,6 +26,24 @@ const LINGER: f32 = 0.35;
 pub struct Offer {
     pub version: String,
     pub can_update: bool,
+    pub art: Option<crate::update::Art>,
+    pub managed: bool,
+}
+
+impl Offer {
+    pub fn new(version: &str, can_update: bool) -> Offer {
+        Offer { version: version.to_string(), can_update, art: None, managed: false }
+    }
+
+    pub fn with_art(mut self, art: Option<crate::update::Art>) -> Offer {
+        self.art = art;
+        self
+    }
+
+    pub fn managed(mut self, managed: bool) -> Offer {
+        self.managed = managed && !self.can_update;
+        self
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -34,6 +52,73 @@ pub enum Choice {
     Download(String),
     NotNow,
     Skip(String),
+    Open(String),
+}
+
+const BANNER_H: f32 = 150.0;
+
+pub fn art_height(art: &crate::update::Art) -> f32 {
+    let image = if art.image.is_some() { BANNER_H + 14.0 } else { 0.0 };
+    let body = if art.body.trim().is_empty() { 0.0 } else { 40.0 };
+    image + 26.0 + body + 10.0
+}
+
+pub fn prompt_height(offer: &Offer) -> f32 {
+    PROMPT_H + offer.art.as_ref().map(art_height).unwrap_or(0.0)
+}
+
+fn art_texture(ctx: &egui::Context, version: &str, pic: &crate::update::Picture) -> egui::TextureHandle {
+    let id = egui::Id::new(("ncf-update-art", version.to_string(), pic.width, pic.height));
+    if let Some(t) = ctx.data(|d| d.get_temp::<egui::TextureHandle>(id)) {
+        return t;
+    }
+    let image = egui::ColorImage::from_rgba_unmultiplied([pic.width, pic.height], &pic.rgba);
+    let t = ctx.load_texture(format!("ncf-update-art-{version}"), image, egui::TextureOptions::LINEAR);
+    ctx.data_mut(|d| d.insert_temp(id, t.clone()));
+    t
+}
+
+fn cover_uv(rect: Rect, w: usize, h: usize) -> Rect {
+    let ra = rect.width() / rect.height().max(1.0);
+    let ia = w as f32 / (h.max(1)) as f32;
+    if ia > ra {
+        let k = ra / ia;
+        Rect::from_min_max(Pos2::new(0.5 - k * 0.5, 0.0), Pos2::new(0.5 + k * 0.5, 1.0))
+    } else {
+        let k = ia / ra;
+        Rect::from_min_max(Pos2::new(0.0, 0.5 - k * 0.5), Pos2::new(1.0, 0.5 + k * 0.5))
+    }
+}
+
+fn draw_art(ui: &egui::Ui, offer: &Offer, art: &crate::update::Art, area: Rect, alpha: f32) -> f32 {
+    let p = pal();
+    let painter = ui.painter();
+    let ink = |c: egui::Color32| theme::wash(c, (c.a() as f32 * alpha) as u8);
+    let accent = art.accent.map(|[r, g, b]| egui::Color32::from_rgb(r, g, b));
+    let mut y = area.top() + 10.0;
+    if let Some(pic) = &art.image {
+        let banner = Rect::from_min_size(Pos2::new(area.left(), y), Vec2::new(area.width(), BANNER_H));
+        let tex = art_texture(ui.ctx(), &offer.version, pic);
+        let mut shape = egui::epaint::RectShape::filled(banner, egui::Rounding::same(theme::R_MD), theme::wash(egui::Color32::WHITE, (255.0 * alpha) as u8));
+        shape.fill_texture_id = tex.id();
+        shape.uv = cover_uv(banner, pic.width, pic.height);
+        painter.add(shape);
+        if let Some(a) = accent {
+            painter.rect_stroke(banner, egui::Rounding::same(theme::R_MD), egui::Stroke::new(1.0_f32, ink(a)));
+        }
+        y += BANNER_H + 14.0;
+    }
+    let title = painter.layout_no_wrap(art.title.clone(), theme::font_semi(theme::T_BODY + 2.0), ink(accent.unwrap_or(p.text)));
+    painter.galley(Pos2::new(area.left(), y), title, ink(accent.unwrap_or(p.text)));
+    y += 26.0;
+    if !art.body.trim().is_empty() {
+        let body = painter.layout(art.body.clone(), theme::font(theme::T_CAP + 1.0), ink(p.text_2), area.width());
+        let shown = body.rect.height().min(36.0);
+        let clip = Rect::from_min_size(Pos2::new(area.left(), y), Vec2::new(area.width(), shown + 2.0));
+        ui.painter().with_clip_rect(clip).galley(Pos2::new(area.left(), y), body, ink(p.text_2));
+        y += 40.0;
+    }
+    y + 10.0 - area.top()
 }
 
 pub struct Splash {
@@ -67,6 +152,10 @@ pub fn card_size(prompt: bool) -> Vec2 {
     CARD + Vec2::new(0.0, if prompt { PROMPT_H } else { 0.0 })
 }
 
+pub fn card_size_for(offer: Option<&Offer>) -> Vec2 {
+    CARD + Vec2::new(0.0, offer.map(prompt_height).unwrap_or(0.0))
+}
+
 pub fn swallow_keys(ctx: &egui::Context) {
     ctx.input_mut(|i| {
         i.events.retain(|e| !matches!(e, egui::Event::Key { .. } | egui::Event::Text(_) | egui::Event::Paste(_) | egui::Event::Copy | egui::Event::Cut));
@@ -90,14 +179,29 @@ pub fn prompt_section(ui: &mut egui::Ui, app: &crate::AppInfo, offer: &Offer, ar
     let p = pal();
     let painter = ui.painter().clone();
     let ink = |c: egui::Color32| theme::wash(c, (c.a() as f32 * alpha) as u8);
-    let line = format!("Version {} is out. You have {}. Your files stay where they are.", offer.version, app.version.trim_start_matches(['v', 'V']));
+    let top = match &offer.art {
+        Some(art) => area.top() + draw_art(ui, offer, art, area, alpha),
+        None => area.top(),
+    };
+    let tail = if offer.managed {
+        "Update it with the package manager you installed it with."
+    } else {
+        "Your files stay where they are."
+    };
+    let line = format!("Version {} is out. You have {}. {tail}", offer.version, app.version.trim_start_matches(['v', 'V']));
     let galley = painter.layout(line, theme::font(theme::T_CAP + 1.0), ink(p.text_2), area.width());
-    painter.galley(Pos2::new(area.left(), area.top() + 12.0), galley, ink(p.text_2));
+    painter.galley(Pos2::new(area.left(), top + 12.0), galley, ink(p.text_2));
     let row = Rect::from_min_size(Pos2::new(area.left(), area.bottom() - 34.0), Vec2::new(area.width(), 30.0));
     let mut buttons = ui.new_child(egui::UiBuilder::new().max_rect(row).layout(egui::Layout::right_to_left(egui::Align::Center)));
     buttons.spacing_mut().item_spacing.x = 8.0;
     let mut choice = None;
-    let primary = if offer.can_update { "Update now" } else { "Download" };
+    let primary = if offer.can_update {
+        "Update now"
+    } else if offer.managed {
+        "What's new"
+    } else {
+        "Download"
+    };
     let icon = if offer.can_update { crate::icons::Icon::Download } else { crate::icons::Icon::External };
     if crate::ui::button(&mut buttons, primary, Some(icon), true) {
         choice = Some(if offer.can_update { Choice::UpdateNow(offer.version.clone()) } else { Choice::Download(offer.version.clone()) });
@@ -107,6 +211,11 @@ pub fn prompt_section(ui: &mut egui::Ui, app: &crate::AppInfo, offer: &Offer, ar
     }
     if crate::ui::quiet_button(&mut buttons, "Skip this version", None) {
         choice = Some(Choice::Skip(offer.version.clone()));
+    }
+    if let Some(link) = offer.art.as_ref().and_then(|a| a.link.clone()) {
+        if crate::ui::quiet_button(&mut buttons, "Read more", Some(crate::icons::Icon::External)) {
+            choice = Some(Choice::Open(link));
+        }
     }
     if choice.is_none() {
         ui.input(|i| {
@@ -210,9 +319,10 @@ impl Splash {
         self.bar += (target - self.bar) * (dt * 9.0).min(1.0);
 
         let prompting = self.has_offer() && self.skip_at.is_none();
+        let ph = self.offer.as_ref().map(prompt_height).unwrap_or(PROMPT_H);
         if prompting && !self.inline && !self.grown {
             self.grown = true;
-            let size = card_size(true);
+            let size = card_size_for(self.offer.as_ref());
             ctx.send_viewport_cmd(egui::ViewportCommand::MinInnerSize(size));
             ctx.send_viewport_cmd(egui::ViewportCommand::InnerSize(size));
             centre(ctx, size);
@@ -230,7 +340,7 @@ impl Splash {
                 let painter = ui.painter().clone();
                 let radius = if self.inline { theme::R_XL } else { crate::chrome::window_radius(ui.ctx(), theme::R_SM) };
                 let round = egui::Rounding::same(radius);
-                let want = CARD + Vec2::new(0.0, PROMPT_H * grow);
+                let want = CARD + Vec2::new(0.0, ph * grow);
                 let rect = if self.inline { Rect::from_center_size(whole.center(), want.min(whole.size())) } else { whole };
 
                 if self.inline {
@@ -280,14 +390,14 @@ impl Splash {
 
                 if grow > 0.01 {
                     if let Some(offer) = self.offer.clone().filter(|_| prompting) {
-                        let area = Rect::from_min_size(Pos2::new(left, y), Vec2::new(width, PROMPT_H * grow));
+                        let area = Rect::from_min_size(Pos2::new(left, y), Vec2::new(width, ph * grow));
                         let mut clipped = ui.new_child(egui::UiBuilder::new().max_rect(area));
                         clipped.set_clip_rect(area.expand2(Vec2::new(4.0, 0.0)));
                         if grow > 0.98 {
-                            choice = prompt_section(&mut clipped, &self.app, &offer, Rect::from_min_size(area.min, Vec2::new(width, PROMPT_H)), alpha);
+                            choice = prompt_section(&mut clipped, &self.app, &offer, Rect::from_min_size(area.min, Vec2::new(width, ph)), alpha);
                         }
                     }
-                    y += PROMPT_H * grow;
+                    y += ph * grow;
                 }
 
                 y += RULE_GAP;
@@ -335,7 +445,8 @@ pub fn prompt(ctx: &egui::Context, app: &crate::AppInfo, offer: &Offer) -> Optio
     let p = pal();
     let screen = ctx.screen_rect();
     let veil = anim::ease(ctx, "ncf-update-veil", true, 0.24);
-    let size = Vec2::new(CARD.x.min(screen.width() - 32.0), PAD_TOP + BROW + TITLE_GAP + 40.0 + BAR_GAP + PROMPT_H + 20.0);
+    let ph = prompt_height(offer);
+    let size = Vec2::new(CARD.x.min(screen.width() - 32.0), PAD_TOP + BROW + TITLE_GAP + 40.0 + BAR_GAP + ph + 20.0);
     let rect = Rect::from_center_size(screen.center(), size);
     let mut choice = None;
     egui::Area::new(egui::Id::new("ncf-update-prompt"))
@@ -361,7 +472,7 @@ pub fn prompt(ctx: &egui::Context, app: &crate::AppInfo, offer: &Offer) -> Optio
             y += 40.0 + BAR_GAP;
             painter.rect_filled(Rect::from_min_size(Pos2::new(left, y), Vec2::new(width, BAR_H)), egui::Rounding::same(BAR_H * 0.5), p.signal);
             y += BAR_H;
-            choice = prompt_section(ui, app, offer, Rect::from_min_size(Pos2::new(left, y), Vec2::new(width, PROMPT_H)), 1.0);
+            choice = prompt_section(ui, app, offer, Rect::from_min_size(Pos2::new(left, y), Vec2::new(width, ph)), 1.0);
         });
     swallow_keys(ctx);
     choice

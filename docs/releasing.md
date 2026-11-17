@@ -21,6 +21,29 @@ Apps made with `ncf new` ship the same way NativeDraft does.
    and attaches them to the release.
 6. Running copies see the new version at their next launch through the update check, as long as `INFO.repo` names the repository. Copies installed the standard way can update with one click (*Update now*). The updater downloads that release's files and their `.sha256`, so keep the asset names the template's release workflow writes.
 
+### A designed update screen
+
+The update prompt can carry art for a release. Put two files on the website before you tag:
+
+```
+https://nativecompute.net/updates/<app>/<version>.json
+https://nativecompute.net/updates/<app>/<version>.png
+```
+
+`<app>` is the repository name in lower case (`nativedraft`), and `<version>` has no `v`. The JSON:
+
+```json
+{
+  "title": "Timelines are here",
+  "body": "Branch a script at any choice, merge it back, or let it end its own way.",
+  "image": "3.1.0.png",
+  "accent": "#FF6A3D",
+  "link": "https://nativecompute.net/nativedraft"
+}
+```
+
+Only `title` is required. `image` is relative to the JSON, a path on the site (`/assets/…`) or a full https address on nativecompute.net. It is shown 150 px tall and as wide as the prompt, cropped to fill, so a 1000×300 PNG works well; keep it under 2 MB. `link` may point to nativecompute.net or github.com. If the files are missing or anything is off, the prompt shows without art, so publishing art is never required.
+
 Write the release notes yourself, in the voice of [writing.md](writing.md): what's new, what's fixed, then anything a person has to do. Leave out internal changes.
 
 ### Linux install

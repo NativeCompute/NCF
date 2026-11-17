@@ -179,7 +179,7 @@ impl Shell {
         if r.version.trim() == self.look.skipped_update.trim() {
             return None;
         }
-        Some(splash::Offer { version: r.version.clone(), can_update: self.update_plan().is_some() })
+        Some(splash::Offer::new(&r.version, self.update_plan().is_some()).with_art(r.art.clone()))
     }
 
     pub fn answer_offer(&mut self, ctx: &egui::Context, choice: splash::Choice) {
@@ -192,6 +192,7 @@ impl Shell {
                 self.look.skipped_update = version;
                 self.save_due = true;
             }
+            splash::Choice::Open(url) => self.open_url(&url),
             splash::Choice::NotNow => {}
         }
     }
@@ -303,7 +304,7 @@ impl<A: NcfApp> eframe::App for Runner<A> {
         if let Some(status) = self.shell.splash_replay.take() {
             let mut s = Splash::inline(self.shell.info);
             if let Status::Newer(r) = &status {
-                s.set_offer(splash::Offer { version: r.version.clone(), can_update: false });
+                s.set_offer(splash::Offer::new(&r.version, false).with_art(r.art.clone()));
             }
             s.set_status(status);
             self.splash = Some(s);
@@ -503,8 +504,8 @@ pub fn apply_debug(ctx: &egui::Context, shell: &mut Shell, request: &crate::debu
     match request {
         Request::FakeUpdate => {
             let version = crate::debug::next_version(shell.info.version);
-            shell.update = Status::Newer(update::Release { version: version.clone(), url: update::releases_page(shell.info.repo) });
-            shell.offer = Some(splash::Offer { version, can_update: shell.update_plan().is_some() });
+            shell.update = Status::Newer(update::Release { version: version.clone(), url: update::releases_page(shell.info.repo), art: None });
+            shell.offer = Some(splash::Offer::new(&version, shell.update_plan().is_some()));
         }
         Request::UpdaterDemo(demo) => match crate::updater::start_demo(*demo) {
             Ok(()) => shell.say("Updater demo", "It opens in its own window. Nothing is installed."),
@@ -512,7 +513,7 @@ pub fn apply_debug(ctx: &egui::Context, shell: &mut Shell, request: &crate::debu
         },
         Request::UpdateFrom { dir, version } => {
             std::env::set_var("NCF_UPDATE_SOURCE", format!("file://{}", dir.trim_end_matches(['/', '\\'])));
-            shell.update = Status::Newer(update::Release { version: version.clone(), url: String::new() });
+            shell.update = Status::Newer(update::Release { version: version.clone(), url: String::new(), art: None });
             let body = format!("{} closes and installs {version} from {dir}.", shell.info.name);
             shell.ask(&format!("Update to {version} from this folder?"), &body, "Update now", false, "ncf-debug-update");
         }

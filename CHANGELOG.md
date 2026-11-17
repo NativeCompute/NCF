@@ -4,6 +4,12 @@ NCF follows [semantic versioning](https://semver.org). Apps pin a tag, so nothin
 
 ## Unreleased
 
+### Update art
+
+- **A designed update screen.** When a newer release is found, `update::spawn_with` also fetches `https://nativecompute.net/updates/<app>/<version>.json` (`update::art_url`). The manifest holds a title, body, a PNG image, an accent colour and a link, and the update prompt shows it above its buttons, with *Read more* for the link. Breaking: `update::Release` has a new `art` field, and `splash::Offer` gains `art` and `managed`; build offers with `Offer::new(version, can_update)`. `splash::Choice::Open(url)` asks the app to open the link.
+- **Careful by design.** Manifests and images only come over https from nativecompute.net, including after a redirect. A manifest may be at most 32 KB and an image at most 2 MB and 2048 px on a side, and the image must be a PNG. Text is trimmed to 80 and 420 characters. The check waits 3 seconds. Anything wrong and the plain prompt shows, as before. Pass a folder to `spawn_with` and the art is kept there for the next launch.
+- **Package-manager copies.** `Offer::managed(true)` tells people to update with their package manager, and the primary button opens the release notes.
+
 ### Bento 2.0
 
 - **A new look.** Rounded tiles on a soft wallpaper, one coral accent (`signal` is now #FF6A3D), colour tiles in coral, lilac, sun and sky with ink text, soft token shadows, and frosted floating bars (`ui::pill_bar`, `theme::glass`). The dark cast is graphite with a coral glow in the top-left corner.

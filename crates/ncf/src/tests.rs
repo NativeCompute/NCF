@@ -303,7 +303,7 @@ fn the_splash_says_how_the_update_check_went() {
     assert_eq!(status_line(&Status::Off), None);
     assert_eq!(status_line(&Status::Checking), Some(("Checking for updates…".to_string(), false)));
     assert_eq!(status_line(&Status::Latest), Some(("Up to date".to_string(), false)));
-    let r = Release { version: "2.2.0".into(), url: String::new() };
+    let r = Release { version: "2.2.0".into(), url: String::new(), art: None };
     assert_eq!(status_line(&Status::Newer(r)), Some(("2.2.0 is out".to_string(), true)));
     assert!(status_line(&Status::Failed).is_some());
     assert_eq!(update::releases_latest("NativeCompute/x"), "https://github.com/NativeCompute/x/releases/latest");
@@ -658,10 +658,10 @@ fn the_splash_turns_into_the_update_prompt_and_waits_for_a_choice() {
     let mut h = Harness::new(900.0, 600.0);
     let info = crate::AppInfo { name: "Field Notes", id: "x", version: "1.3.0", tagline: "", repo: "NativeCompute/field-notes", mark: crate::mark::NATIVECOMPUTE, formerly: &[] };
     let mut s = Splash::inline(info);
-    s.set_status(update::Status::Newer(update::Release { version: "1.4.0".into(), url: String::new() }));
+    s.set_status(update::Status::Newer(update::Release { version: "1.4.0".into(), url: String::new(), art: None }));
     crate::anim::set_enabled(true);
     assert!(s.wants_offer());
-    s.set_offer(Offer { version: "1.4.0".into(), can_update: true });
+    s.set_offer(Offer::new("1.4.0", true));
     splash_frames(&mut h, &mut s, 40);
     std::thread::sleep(std::time::Duration::from_millis(2100));
     assert!(splash_frames(&mut h, &mut s, 3), "it waits for a choice");
@@ -675,7 +675,7 @@ fn the_splash_turns_into_the_update_prompt_and_waits_for_a_choice() {
     assert!(!splash_frames(&mut h, &mut s, 3), "then it gets out of the way");
 
     let mut s = Splash::inline(info);
-    s.set_offer(Offer { version: "1.4.0".into(), can_update: true });
+    s.set_offer(Offer::new("1.4.0", true));
     splash_frames(&mut h, &mut s, 40);
     h.press(Key::Enter, Modifiers::NONE, |ctx| {
         crate::anim::set_enabled(true);
@@ -693,7 +693,7 @@ fn the_update_prompt_blocks_until_answered_in_both_casts() {
     for dark in [true, false] {
         let mut h = Harness::new(1000.0, 700.0);
         theme::set_palette(dark);
-        let offer = Offer { version: "1.4.0".into(), can_update: false };
+        let offer = Offer::new("1.4.0", false);
         let mut got = None;
         h.frames(3, |ctx| got = prompt(ctx, &info, &offer));
         assert_eq!(got, None);
@@ -933,4 +933,82 @@ fn a_renamed_app_keeps_its_old_folder_until_it_has_a_new_one() {
     assert_eq!(info.folder_in(&home, crate::Os::Linux), home.join("tally"), "once there is a new folder, it wins");
     assert_eq!(info.former_slugs(), vec!["ledger".to_string()]);
     let _ = std::fs::remove_dir_all(&home);
+}
+
+// update art here---
+
+fn png_of(w: u32, h: u32) -> Vec<u8> {
+    let mut out = Vec::new();
+    {
+        let mut enc = png::Encoder::new(&mut out, w, h);
+        enc.set_color(png::ColorType::Rgb);
+        enc.set_depth(png::BitDepth::Eight);
+        let mut writer = enc.write_header().unwrap();
+        writer.write_image_data(&vec![200u8; (w * h * 3) as usize]).unwrap();
+    }
+    out
+}
+
+#[test]
+fn an_update_manifest_is_read_with_care() {
+    use crate::update::{allowed, art_url, parse_manifest, resolve, slug_of, ART_HOSTS};
+    assert_eq!(slug_of("NativeCompute/NativeDraft"), "nativedraft");
+    let url = art_url("nativedraft", "v3.1.0");
+    assert_eq!(url, "https://nativecompute.net/updates/nativedraft/3.1.0.json");
+    let m = parse_manifest(r##"{"title":"Timelines","body":"Branch   the story.","image":"3.1.0.png","accent":"#FF6A3D","link":"https://nativecompute.net/nativedraft"}"##, &url).unwrap();
+    assert_eq!(m.title, "Timelines");
+    assert_eq!(m.body, "Branch the story.");
+    assert_eq!(m.image.as_deref(), Some("https://nativecompute.net/updates/nativedraft/3.1.0.png"));
+    assert_eq!(m.accent, Some([0xFF, 0x6A, 0x3D]));
+    assert!(m.link.is_some());
+    let m = parse_manifest(r#"{"title":"x","image":"/assets/a.png","link":"https://evil.example/x"}"#, &url).unwrap();
+    assert_eq!(m.image.as_deref(), Some("https://nativecompute.net/assets/a.png"));
+    assert_eq!(m.link, None, "a link off the allowed sites is dropped");
+    assert!(parse_manifest(r#"{"title":"x","image":"https://evil.example/a.png"}"#, &url).is_err(), "an image from elsewhere is refused");
+    assert!(parse_manifest(r#"{"title":"x","image":"../../secret.png"}"#, &url).is_err());
+    assert!(parse_manifest(r#"{"body":"no title"}"#, &url).is_err());
+    assert!(parse_manifest("not json", &url).is_err());
+    assert!(parse_manifest(&format!(r#"{{"title":"{}"}}"#, "x".repeat(40_000)), &url).is_err(), "too large");
+    assert_eq!(parse_manifest(&format!(r#"{{"title":"{}"}}"#, "y".repeat(200)), &url).unwrap().title.chars().count(), 80);
+    assert!(!allowed("http://nativecompute.net/a", &ART_HOSTS), "https only");
+    assert!(!allowed("https://nativecompute.net.evil.example/a", &ART_HOSTS));
+    assert!(!allowed("https://user@nativecompute.net/a", &ART_HOSTS));
+    assert!(allowed("https://www.nativecompute.net/a", &ART_HOSTS));
+    assert_eq!(resolve(&url, "https://github.com/x.png"), None);
+}
+
+#[test]
+fn update_art_images_are_png_and_kept_small() {
+    use crate::update::{art_from, decode_png, Manifest};
+    let pic = decode_png(&png_of(64, 32)).unwrap();
+    assert_eq!((pic.width, pic.height, pic.rgba.len()), (64, 32, 64 * 32 * 4));
+    assert!(decode_png(&png_of(4096, 8)).is_err(), "too wide");
+    assert!(decode_png(b"GIF89a....").is_err());
+    let m = Manifest { title: "t".into(), body: String::new(), image: None, accent: None, link: None };
+    let art = art_from(&m, Some(&png_of(8, 8)));
+    assert!(art.image.is_some());
+    let broken = art_from(&m, Some(b"nope"));
+    assert!(broken.image.is_none(), "a broken image still leaves the words");
+    let offer = crate::splash::Offer::new("3.1.0", true).with_art(Some(art.clone()));
+    assert!(crate::splash::prompt_height(&offer) > crate::splash::PROMPT_H + 150.0);
+    assert_eq!(crate::splash::prompt_height(&crate::splash::Offer::new("3.1.0", true)), crate::splash::PROMPT_H);
+    assert!(!crate::splash::Offer::new("3.1.0", true).managed(true).managed, "a copy that updates itself is not managed");
+    assert!(crate::splash::Offer::new("3.1.0", false).managed(true).managed);
+}
+
+#[test]
+fn the_prompt_draws_update_art_and_offers_read_more() {
+    use crate::splash::{prompt, Choice, Offer};
+    use crate::update::{art_from, Manifest};
+    let m = Manifest { title: "Timelines".into(), body: "Branch the story.".into(), image: None, accent: Some([255, 106, 61]), link: Some("https://nativecompute.net/x".into()) };
+    let offer = Offer::new("3.1.0", true).with_art(Some(art_from(&m, Some(&png_of(320, 160)))));
+    let _g = lock();
+    let info = crate::AppInfo { name: "Field Notes", id: "x", version: "1.3.0", tagline: "", repo: "NativeCompute/field-notes", mark: crate::mark::NATIVECOMPUTE, formerly: &[] };
+    let mut h = Harness::new(900.0, 900.0);
+    let mut got = None;
+    h.frames(3, |ctx| got = prompt(ctx, &info, &offer));
+    assert_eq!(got, None);
+    let ctx = h.ctx.clone();
+    assert!(ctx.data(|d| d.get_temp::<egui::TextureHandle>(egui::Id::new(("ncf-update-art", "3.1.0".to_string(), 320usize, 160usize)))).is_some(), "the banner was uploaded once");
+    let _ = Choice::Open(String::new());
 }

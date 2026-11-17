@@ -176,7 +176,7 @@ impl Debug {
         });
 
         ui::section(ui, "Launch & errors");
-        let newer = Status::Newer(crate::update::Release { version: "9.9.9".into(), url: String::new() });
+        let newer = Status::Newer(crate::update::Release { version: "9.9.9".into(), url: String::new(), art: None });
         row(
             ui,
             &[
