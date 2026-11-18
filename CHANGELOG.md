@@ -2,7 +2,7 @@
 
 NCF follows [semantic versioning](https://semver.org). Apps pin a tag, so nothing here reaches an app until it moves to that tag.
 
-## Unreleased
+## 0.5.0 (2026-11-18)
 
 ### Update art
 

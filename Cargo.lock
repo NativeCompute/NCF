@@ -1440,7 +1440,7 @@ dependencies = [
 
 [[package]]
 name = "ncf"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "dirs",
  "eframe",
@@ -1457,14 +1457,14 @@ dependencies = [
 
 [[package]]
 name = "ncf-build"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "winresource",
 ]
 
 [[package]]
 name = "ncf-cli"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "eframe",
  "ncf",
@@ -1473,14 +1473,14 @@ dependencies = [
 
 [[package]]
 name = "ncf-gallery"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "ncf",
 ]
 
 [[package]]
 name = "ncf-tokens"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "eframe",
  "toml 0.8.23",
