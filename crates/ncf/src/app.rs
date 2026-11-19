@@ -300,7 +300,8 @@ pub fn start<A: NcfApp>(ctx: &egui::Context, shell: &mut Shell, make: impl FnOnc
 }
 
 impl<A: NcfApp> eframe::App for Runner<A> {
-    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+    fn update(&mut self, ctx: &egui::Context, window: &mut eframe::Frame) {
+        chrome::system_corners(window);
         if let Some(status) = self.shell.splash_replay.take() {
             let mut s = Splash::inline(self.shell.info);
             if let Status::Newer(r) = &status {

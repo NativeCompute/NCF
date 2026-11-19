@@ -3,7 +3,7 @@
 `ncf::cloud` connects a desktop app to NativeCloud, the account and sync service every NativeCompute app shares. It's behind the `cloud` feature and isn't part of the web build.
 
 ```toml
-ncf = { git = "https://github.com/NativeCompute/ncf", tag = "v0.5.0", features = ["cloud"] }
+ncf = { git = "https://github.com/NativeCompute/ncf", tag = "v0.5.1", features = ["cloud"] }
 ```
 
 ![Settings → Account](shots/cloud-dark.png)

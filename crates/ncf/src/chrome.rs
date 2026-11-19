@@ -23,7 +23,7 @@ pub fn viewport(builder: egui::ViewportBuilder, os: Os) -> egui::ViewportBuilder
             .with_titlebar_shown(false)
             .with_titlebar_buttons_shown(true)
     } else {
-        builder.with_transparent(true).with_decorations(false)
+        builder.with_transparent(false).with_decorations(false)
     }
 }
 
@@ -36,12 +36,32 @@ pub fn fit(want: Vec2, monitor: Option<Vec2>, os: Os) -> Vec2 {
     want.min(most)
 }
 
-pub fn clear_color(os: Os, fill: egui::Color32) -> [f32; 4] {
-    if native_frame(os) {
-        egui::Rgba::from(fill).to_array()
-    } else {
-        [0.0, 0.0, 0.0, 0.0]
+pub fn clear_color(_os: Os, fill: egui::Color32) -> [f32; 4] {
+    egui::Rgba::from(fill).to_array()
+}
+
+pub fn system_corners(frame: &eframe::Frame) {
+    #[cfg(windows)]
+    {
+        use raw_window_handle::{HasWindowHandle, RawWindowHandle};
+        use std::sync::atomic::{AtomicBool, Ordering};
+        use windows_sys::Win32::Graphics::Dwm::{DwmSetWindowAttribute, DWMWA_WINDOW_CORNER_PREFERENCE, DWMWCP_ROUND};
+        static DONE: AtomicBool = AtomicBool::new(false);
+        if DONE.load(Ordering::Relaxed) {
+            return;
+        }
+        if let Ok(handle) = frame.window_handle() {
+            if let RawWindowHandle::Win32(h) = handle.as_raw() {
+                let pref: i32 = DWMWCP_ROUND;
+                unsafe {
+                    DwmSetWindowAttribute(h.hwnd.get() as _, DWMWA_WINDOW_CORNER_PREFERENCE as u32, &pref as *const i32 as *const _, std::mem::size_of::<i32>() as u32);
+                }
+                DONE.store(true, Ordering::Relaxed);
+            }
+        }
     }
+    #[cfg(not(windows))]
+    let _ = frame;
 }
 
 pub fn maximized(ctx: &egui::Context) -> bool {
@@ -52,12 +72,8 @@ pub fn fullscreen(ctx: &egui::Context) -> bool {
     ctx.input(|i| i.viewport().fullscreen.unwrap_or(false))
 }
 
-pub fn window_radius(ctx: &egui::Context, radius: f32) -> f32 {
-    if maximized(ctx) || native_frame(crate::OS) {
-        0.0
-    } else {
-        radius
-    }
+pub fn window_radius(_ctx: &egui::Context, _radius: f32) -> f32 {
+    0.0
 }
 
 pub fn title_inset(os: Os, fullscreen: bool) -> f32 {

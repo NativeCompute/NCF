@@ -372,7 +372,8 @@ fn a_mac_window_uses_the_native_frame_and_fits_the_screen() {
     assert!(!splash::own_window(Os::Mac) && splash::own_window(Os::Linux));
     assert_eq!(crate::app::first_size(true, Os::Mac), (crate::app::SIZE, crate::app::MIN_SIZE));
     assert_eq!(crate::app::first_size(true, Os::Linux), (splash::CARD, splash::CARD));
-    assert_eq!(chrome::clear_color(Os::Linux, eframe::egui::Color32::WHITE), [0.0; 4]);
+    assert_eq!(chrome::clear_color(Os::Linux, eframe::egui::Color32::WHITE), [1.0; 4]);
+    assert_eq!(chrome::clear_color(Os::Windows, eframe::egui::Color32::WHITE), [1.0; 4]);
     assert_eq!(chrome::clear_color(Os::Mac, eframe::egui::Color32::WHITE)[3], 1.0);
 }
 

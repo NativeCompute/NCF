@@ -327,7 +327,8 @@ struct Host {
 }
 
 impl eframe::App for Host {
-    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+    fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
+        chrome::system_corners(frame);
         theme::follow(ctx, self.appearance);
         self.updater.ui(ctx);
     }

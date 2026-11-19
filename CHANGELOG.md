@@ -2,6 +2,13 @@
 
 NCF follows [semantic versioning](https://semver.org). Apps pin a tag, so nothing here reaches an app until it moves to that tag.
 
+## 0.5.1 (2026-11-19)
+
+### Window corners
+
+- **No more dark corners.** On Windows and Linux the window is no longer see-through with painted rounded corners: where the system could not show a see-through window, the corners came out as dark squares. `chrome::viewport` now asks for a solid window, `chrome::clear_color` returns the solid fill on every system, and `chrome::window_radius` is always 0.
+- **Rounded by Windows 11.** New `chrome::system_corners(frame)` asks Windows 11 to round and shadow the window like any other app. It does nothing on Windows 10, Linux, the Mac and the web. NCF's own runner and the updater window call it; apps with their own `eframe::App` call it at the top of `update`.
+
 ## 0.5.0 (2026-11-18)
 
 ### Update art

@@ -1446,6 +1446,7 @@ dependencies = [
  "eframe",
  "keyring",
  "png",
+ "raw-window-handle",
  "rfd",
  "ring",
  "serde",
@@ -1453,6 +1454,7 @@ dependencies = [
  "ureq",
  "web-time",
  "wgpu",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
